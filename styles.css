@@ -570,6 +570,8 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 @media (max-width: 760px) {
   .container { width: min(100% - 36px, 1180px); }
   .section { padding: 75px 0; }
+  .display, h1, h2, h3 { letter-spacing: -.012em; }
+  .event-date-graphic strong { letter-spacing: .02em; }
   .story-photo-wrap { float: none; width: 100%; margin: 0 0 34px; }
   .section-heading, .mission-grid, .event-feature, .story-feature, .testimonial-feature, .split-section, .contact-layout { grid-template-columns: 1fr; }
   .section-heading { gap: 25px; }
