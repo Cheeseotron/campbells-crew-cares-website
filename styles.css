@@ -61,6 +61,7 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 .mobile-menu nav { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; display: grid; gap: 0; width: min(260px, calc(100vw - 36px)); padding: 8px; background: var(--ink); border: 1px solid #43504c; box-shadow: 0 14px 30px rgba(0,0,0,.26); font-size: 11px; text-transform: uppercase; }
 .mobile-menu nav a { padding: 13px 12px; border-bottom: 1px solid rgba(255,255,255,.1); }
 .mobile-menu nav a:last-child { border-bottom: 0; }
+.mobile-menu nav .mobile-menu__donate { display: flex; margin-top: 8px; padding: 15px 14px; align-items: center; justify-content: space-between; color: var(--ink); background: var(--logo-bright); border: 1px solid var(--logo-bright); font-weight: 800; letter-spacing: .14em; }
 
 .button { display: inline-flex; align-items: center; justify-content: space-between; gap: 35px; min-width: 210px; padding: 16px 19px; border: 1px solid currentColor; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .button--green { background: var(--logo-bright); color: var(--ink); border-color: var(--logo-bright); }
@@ -580,7 +581,7 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
   .site-header > .brand { margin-left: 18px; }
   .site-header:has(> .desktop-nav) { gap: 10px; }
   .site-header:has(> .desktop-nav) > .header-social { margin-left: auto; }
-  .site-header > .mobile-menu { min-height: auto; margin-right: 18px; }
+  .site-header > .mobile-menu { min-height: auto; margin-left: 0; margin-right: 18px; }
   .mobile-menu { flex: 0 0 auto; }
   .header-social a { width: 31px; height: 31px; }
   .home-hero, .home-hero__content { min-height: 650px; }
