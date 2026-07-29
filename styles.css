@@ -209,9 +209,9 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 }
 .carousel-arrow:hover,
 .carousel-arrow:focus-visible {
-  border-color: var(--logo-light);
+  border-color: var(--logo-bright);
   color: var(--ink);
-  background: var(--logo-light);
+  background: var(--logo-bright);
   outline: none;
 }
 .carousel-count {
@@ -595,10 +595,12 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
   .gallery-preview { grid-template-columns: 1fr 1fr; grid-template-rows: 260px 180px 180px; }
   .gallery-preview img:first-child { grid-column: 1 / 3; grid-row: auto; }
   .cta-band__inner { grid-template-columns: 1fr; }
-  .program-detail { grid-template-columns: 1fr; gap: 22px; }
+  .program-detail.section-pad { grid-template-columns: 1fr; gap: 28px; }
   .program-detail img { height: 260px; }
-  .program-detail .program-slideshow { height: 300px; }
+  .program-detail .program-slideshow { width: 100%; height: auto; aspect-ratio: 4 / 3; }
   .program-detail.reverse > .program-slideshow { order: initial; }
+  .program-detail .carousel-controls { left: 12px; right: 12px; bottom: 12px; justify-content: center; }
+  .program-detail .carousel-arrow { flex: 0 0 44px; color: var(--white); -webkit-tap-highlight-color: transparent; }
   .full-gallery { columns: 2; }
   .site-footer__grid { grid-template-columns: 1fr 1fr; }
   .footer-brand { grid-column: 1 / -1; }
