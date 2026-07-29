@@ -578,9 +578,9 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
   .section-heading, .mission-grid, .event-feature, .story-feature, .testimonial-feature, .split-section, .contact-layout { grid-template-columns: 1fr; }
   .section-heading { gap: 25px; }
   .brand span, .donate-link, .site-header > .button { display: none; }
-  .site-header__inner { gap: 10px; }
+  .site-header__inner { gap: 6px; }
   .site-header > .brand { margin-left: 18px; }
-  .site-header:has(> .desktop-nav) { gap: 10px; }
+  .site-header:has(> .desktop-nav) { gap: 6px; }
   .site-header:has(> .desktop-nav) > .header-social { margin-left: auto; }
   .site-header > .mobile-menu { min-height: auto; margin-left: 0; margin-right: 18px; }
   .mobile-menu { flex: 0 0 auto; }
