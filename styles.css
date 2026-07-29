@@ -320,8 +320,8 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 .operation-band { width: 100%; color: var(--white); background: var(--ink); }
 .operation-band__inner { display: grid; grid-template-columns: minmax(330px, .88fr) minmax(360px, 1.12fr); gap: clamp(55px, 7vw, 110px); align-items: center; width: min(1100px, calc(100% - 96px)); margin-inline: auto; padding-block: 68px; }
 .operation-band .eyebrow { color: var(--logo-bright); }
-.operation-band h2 { max-width: 520px; margin: 16px 0 0; font-size: clamp(40px, 4.35vw, 64px); line-height: .9; letter-spacing: -.035em; }
-.operation-band h2 span { color: var(--logo-bright); }
+.operation-band :is(h1, h2) { max-width: 520px; margin: 16px 0 0; font-size: clamp(40px, 4.35vw, 64px); line-height: .9; letter-spacing: -.035em; }
+.operation-band :is(h1, h2) span { color: var(--logo-bright); }
 .operation-band__copy { max-width: 610px; padding-left: clamp(24px, 4vw, 64px); border-left: 1px solid rgba(255,255,255,.28); }
 .operation-band__copy p { margin: 0 0 18px; color: rgba(255,255,255,.78); font-size: 16px; line-height: 1.65; }
 .operation-band__copy strong { display: block; margin-top: 28px; color: var(--white); font-size: 11px; letter-spacing: .14em; line-height: 1.5; text-transform: uppercase; }
