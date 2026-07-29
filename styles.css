@@ -256,7 +256,6 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 .site-header > .button { margin-right: max(24px, calc((100% - 1180px) / 2)); }
 .site-header > .brand,
 .site-header > .desktop-nav,
-.site-header > .button,
 .site-header > .mobile-menu { min-height: 82px; align-items: center; }
 .site-header:has(> .desktop-nav) { display: flex; align-items: center; gap: 28px; }
 .site-header:has(> .desktop-nav) > .header-social { margin-left: auto; }
@@ -264,6 +263,8 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 .desktop-nav a { display: flex; align-items: center; min-height: 82px; border-bottom: 3px solid transparent; }
 .desktop-nav a:hover, .desktop-nav a[aria-current="page"] { color: var(--logo-bright); border-color: var(--logo-bright); }
 .button-small { min-width: auto; padding: 13px 17px; background: var(--logo-bright); color: var(--ink); border-color: var(--logo-bright); white-space: nowrap; }
+.donate-link,
+.site-header > .button.button-small { height: 40px; padding: 0 17px; align-self: center; }
 
 .page-hero { padding: 100px max(24px, calc((100% - 1180px) / 2)) 80px; background: var(--forest); color: var(--white); border-bottom: 9px solid var(--logo-bright); }
 .page-hero h1 { max-width: 1100px; margin: 25px 0 30px; font-size: clamp(58px, 8vw, 112px); }
