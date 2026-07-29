@@ -11,8 +11,8 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--white); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
+html { max-width: 100%; overflow-x: clip; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { max-width: 100%; margin: 0; overflow-x: clip; background: var(--white); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
 img { display: block; width: 100%; }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3, p, blockquote { margin-top: 0; }
@@ -53,8 +53,14 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 .header-social rect, .header-social circle { fill: none; stroke: currentColor; stroke-width: 2; }
 .header-social .fill-dot { fill: currentColor; stroke: none; }
 .mobile-menu { display: none; position: relative; }
-.mobile-menu summary { list-style: none; color: var(--logo-bright); font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
-.mobile-menu nav { position: absolute; right: 0; top: 32px; z-index: 30; display: grid; gap: 16px; width: 220px; padding: 24px; background: var(--ink); border: 1px solid #43504c; font-size: 11px; text-transform: uppercase; }
+.mobile-menu summary { display: inline-flex; min-height: 42px; padding: 0 15px; align-items: center; justify-content: center; list-style: none; border: 1px solid var(--logo-bright); color: var(--logo-bright); background: rgba(53,211,47,.06); cursor: pointer; font-size: 11px; font-weight: 800; letter-spacing: .14em; line-height: 1; text-transform: uppercase; transition: color .18s ease, background .18s ease; }
+.mobile-menu summary::-webkit-details-marker { display: none; }
+.mobile-menu summary::after { content: "+"; margin-left: 9px; font-size: 15px; line-height: 1; }
+.mobile-menu[open] summary { color: var(--ink); background: var(--logo-bright); }
+.mobile-menu[open] summary::after { content: "\2212"; }
+.mobile-menu nav { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; display: grid; gap: 0; width: min(260px, calc(100vw - 36px)); padding: 8px; background: var(--ink); border: 1px solid #43504c; box-shadow: 0 14px 30px rgba(0,0,0,.26); font-size: 11px; text-transform: uppercase; }
+.mobile-menu nav a { padding: 13px 12px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.mobile-menu nav a:last-child { border-bottom: 0; }
 
 .button { display: inline-flex; align-items: center; justify-content: space-between; gap: 35px; min-width: 210px; padding: 16px 19px; border: 1px solid currentColor; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .button--green { background: var(--logo-bright); color: var(--ink); border-color: var(--logo-bright); }
@@ -567,7 +573,13 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
   .story-photo-wrap { float: none; width: 100%; margin: 0 0 34px; }
   .section-heading, .mission-grid, .event-feature, .story-feature, .testimonial-feature, .split-section, .contact-layout { grid-template-columns: 1fr; }
   .section-heading { gap: 25px; }
-  .brand span, .donate-link { display: none; }
+  .brand span, .donate-link, .site-header > .button { display: none; }
+  .site-header__inner { gap: 10px; }
+  .site-header > .brand { margin-left: 18px; }
+  .site-header:has(> .desktop-nav) { gap: 10px; }
+  .site-header:has(> .desktop-nav) > .header-social { margin-left: auto; }
+  .site-header > .mobile-menu { min-height: auto; margin-right: 18px; }
+  .mobile-menu { flex: 0 0 auto; }
   .header-social a { width: 31px; height: 31px; }
   .home-hero, .home-hero__content { min-height: 650px; }
   .home-hero__content { padding-block: 100px 38px; }
@@ -587,6 +599,10 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
   .site-footer__grid { grid-template-columns: 1fr 1fr; }
   .footer-brand { grid-column: 1 / -1; }
   .section-pad { width: min(100% - 36px, 1180px); padding-top: 75px; padding-bottom: 75px; }
+  .story-section .prose h2 { max-width: 100%; font-size: clamp(34px, 10vw, 46px); overflow-wrap: normal; }
+  .prose { font-size: 16px; line-height: 1.72; }
+  .about-video__intro h2 { font-size: clamp(38px, 11vw, 52px); }
+  .video-play { left: 18px; right: 18px; bottom: 18px; justify-content: center; padding: 13px 12px; text-align: center; }
   .operation-band__inner { grid-template-columns: 1fr; gap: 38px; width: min(100% - 36px, 1180px); padding-block: 58px; }
   .operation-band__copy { padding: 30px 0 0; border-left: 0; border-top: 1px solid rgba(255,255,255,.28); }
   .featured-event, .impact-grid, .media-grid, .donate-panel { grid-template-columns: 1fr; }
