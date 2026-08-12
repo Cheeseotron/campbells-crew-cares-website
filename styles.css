@@ -264,7 +264,20 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 .desktop-nav a:hover, .desktop-nav a[aria-current="page"] { color: var(--logo-bright); border-color: var(--logo-bright); }
 .button-small { min-width: auto; padding: 13px 17px; background: var(--logo-bright); color: var(--ink); border-color: var(--logo-bright); white-space: nowrap; }
 .donate-link,
-.site-header > .button.button-small { height: 40px; padding: 0 17px; align-self: center; }
+.site-header > .button.button-small { height: 40px; min-height: 40px; padding: 0 17px; align-self: center; flex: 0 0 auto; line-height: 1; }
+
+/* Keep desktop navigation available while scrolling without changing mobile behavior. */
+@media (min-width: 1081px) {
+  html { scroll-padding-top: 82px; }
+  .site-header { position: sticky; top: 0; z-index: 100; }
+  .donate-link,
+  .site-header > .button.button-small {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-block: auto;
+  }
+}
 
 .page-hero { padding: 100px max(24px, calc((100% - 1180px) / 2)) 80px; background: var(--forest); color: var(--white); border-bottom: 9px solid var(--logo-bright); }
 .page-hero h1 { max-width: 1100px; margin: 25px 0 30px; font-size: clamp(58px, 8vw, 112px); }
