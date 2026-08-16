@@ -447,7 +447,7 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 .involved-hero > p:not(.eyebrow) { max-width: 620px; font-size: 16px; }
 .involved-actions { padding-top: 92px; padding-bottom: 100px; }
 .involved-intro { margin-bottom: 52px; }
-.involved-intro h2 { width: 100%; margin: 0; font-size: clamp(48px, 6vw, 82px); }
+.involved-intro h2 { width: 100%; margin: 0; color: var(--logo-dark); font-size: clamp(20px, 4vw, 54px); line-height: 1; text-align: center; white-space: nowrap; }
 .involved-grid { display: grid; grid-template-columns: repeat(2, 1fr); border-top: 1px solid var(--ink); border-left: 1px solid var(--ink); }
 .involved-actions__summary { max-width: 760px; margin: 42px auto 0; color: var(--gray); font-size: 17px; line-height: 1.7; text-align: center; }
 .involved-card { display: flex; min-height: 315px; padding: clamp(28px, 4vw, 48px); flex-direction: column; border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
