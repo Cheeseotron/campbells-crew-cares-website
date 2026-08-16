@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="description" content="Private Campbell's Crew Cares event signup system prototype.">
+  <title>Campbell's Crew Cares | Private Signup System</title>
+  <link rel="icon" href="../assets/images/favicon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <section class="lock-screen" id="lock-screen" aria-labelledby="lock-title">
+    <div class="lock-brand">
+      <img src="../assets/images/ccc-logo.png" alt="">
+      <span>Campbell's Crew Cares</span>
+    </div>
+    <div class="lock-card">
+      <p class="eyebrow">Private test site</p>
+      <h1 id="lock-title">Welcome back.</h1>
+      <p>This protected preview is for Campbell's Crew organizers and invited testers.</p>
+      <form id="pin-form" novalidate>
+        <label for="pin">Enter your 4-digit PIN</label>
+        <div class="pin-row">
+          <input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="4" pattern="[0-9]{4}" aria-describedby="pin-help pin-error">
+          <button type="submit">Enter <span aria-hidden="true">→</span></button>
+        </div>
+        <p class="field-help" id="pin-help">The PIN was provided by Campbell's Crew.</p>
+        <p class="field-error" id="pin-error" role="alert" hidden>That PIN isn't correct. Please try again.</p>
+      </form>
+    </div>
+    <p class="lock-note">Prototype environment · No real recipient information</p>
+  </section>
+
+  <div class="app-shell" id="app-shell" hidden>
+    <header class="app-header">
+      <a class="app-brand" href="#home" aria-label="Campbell's Crew signup system home">
+        <img src="../assets/images/ccc-logo.png" alt="">
+        <span><strong>Campbell's Crew Cares</strong><small>Event Signup System</small></span>
+      </a>
+      <nav class="app-nav" id="app-nav" aria-label="Application navigation">
+        <a href="#home">Home</a>
+        <a href="#volunteer">Volunteer</a>
+        <a href="#recipient">Recipient</a>
+        <a href="#organizer/dashboard">Organizer</a>
+      </nav>
+      <div class="header-actions">
+        <span class="demo-badge">Test site</span>
+        <button class="text-button" id="lock-button" type="button">Lock site</button>
+      </div>
+    </header>
+
+    <div class="prototype-notice" role="note">
+      <strong>Prototype:</strong> Everything here uses fictional demonstration data. Do not enter real recipient information yet.
+    </div>
+
+    <main id="main" tabindex="-1"></main>
+
+    <footer class="app-footer">
+      <span>Campbell's Crew Cares · Est. 2017</span>
+      <span>Private prototype · Demonstration data only</span>
+    </footer>
+  </div>
+
+  <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <dialog class="app-dialog" id="app-dialog" aria-labelledby="dialog-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="Close">×</button>
+    <div id="dialog-content"></div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
