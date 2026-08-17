@@ -439,6 +439,11 @@ h1, h2, h3, p { margin-top: 0; }
 .summary-status--declined { color: #8b211a !important; background: #fde7e5 !important; }
 .summary-status--info { color: #174d75 !important; background: #e5f2fb !important; }
 .summary-status--review, .summary-status--waitlisted { color: #79500d !important; background: #fff1cf !important; }
+.application-flags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.application-flags span { padding: 7px 9px; color: #79500d; background: #fff1cf; border: 1px solid #e0bd65; font-size: 11px; font-weight: 700; }
+.application-flags .is-danger { color: #8b211a; background: #fde7e5; border-color: #e4a09b; }
+.application-flags .is-info { color: #174d75; background: #e5f2fb; border-color: #98bfd9; }
+.application-flags--clear span { color: var(--gray); background: var(--mist-2); border-color: var(--line); font-weight: 400; }
 .child-decision-actions button { min-height: 44px; padding: 0 16px; border-width: 2px; font-size: 12px; }
 .child-decision-actions [data-child-decision="approved"] { color: var(--white); background: var(--green-dark); border-color: var(--green-dark); }
 .child-decision-actions [data-child-decision="declined"] { color: var(--white); background: var(--danger); border-color: var(--danger); }
