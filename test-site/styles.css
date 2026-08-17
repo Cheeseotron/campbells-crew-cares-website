@@ -146,6 +146,7 @@ h1, h2, h3, p { margin-top: 0; }
 .status-pill--review, .status-pill--code, .status-pill--waitlisted { color: var(--warning); background: var(--warning-soft); }
 .status-pill--submitted, .status-pill--info { color: var(--blue); background: var(--blue-soft); }
 .status-pill--declined, .status-pill--closed { color: var(--danger); background: var(--danger-soft); }
+.status-pill--mixed { color: #623a8c; background: #f0e7fa; }
 .role-grid { display: grid; grid-template-columns: repeat(3, 1fr); margin: 34px 0; border-top: 1px solid var(--ink); border-left: 1px solid var(--ink); }
 .role-card { min-height: 210px; padding: 24px; text-align: left; background: var(--white); border: 0; border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); cursor: pointer; }
 .role-card:hover, .role-card[aria-pressed="true"] { background: var(--green); }
@@ -422,6 +423,27 @@ h1, h2, h3, p { margin-top: 0; }
 .role-viewer__options { display: flex; flex-wrap: wrap; gap: 7px; }
 .is-read-only .organizer-main form, .is-read-only .organizer-main [data-confirm-checkin], .is-read-only .organizer-main [data-checkin-note], .is-read-only .organizer-main [data-add-user], .is-read-only .organizer-main [data-print-mode], .is-read-only .organizer-main [data-email-edit], .is-read-only .organizer-main [data-demo-action] { pointer-events: none; opacity: .58; }
 .button, .eyebrow, .status-pill, .flag, .organizer-menu a, .field label, .field legend { letter-spacing: .025em; }
+.section-view-tabs { margin: 22px 0 0; }
+.application-row { border-left: 6px solid var(--line); }
+.application-row--approved { border-left-color: var(--green-dark); background: #fbfffb; }
+.application-row--declined { border-left-color: var(--danger); background: #fffafa; }
+.application-row--info { border-left-color: var(--blue); background: #f8fcff; }
+.application-row--review, .application-row--submitted, .application-row--waitlisted { border-left-color: #d39b21; }
+.application-row--mixed { border-left-color: #7c4caf; background: #fcf9ff; }
+.child-status { border: 2px solid transparent; }
+.child-status--approved { color: #0b5429; background: #dff5e3 !important; border-color: #79bd87; }
+.child-status--declined { color: #8b211a; background: #fde7e5 !important; border-color: #e4a09b; }
+.child-status--info { color: #174d75; background: #e5f2fb !important; border-color: #98bfd9; }
+.child-status--review, .child-status--waitlisted { color: #79500d; background: #fff1cf !important; border-color: #e0bd65; }
+.summary-status--approved { color: #0b5429 !important; background: #dff5e3 !important; }
+.summary-status--declined { color: #8b211a !important; background: #fde7e5 !important; }
+.summary-status--info { color: #174d75 !important; background: #e5f2fb !important; }
+.summary-status--review, .summary-status--waitlisted { color: #79500d !important; background: #fff1cf !important; }
+.child-decision-actions button { min-height: 44px; padding: 0 16px; border-width: 2px; font-size: 12px; }
+.child-decision-actions [data-child-decision="approved"] { color: var(--white); background: var(--green-dark); border-color: var(--green-dark); }
+.child-decision-actions [data-child-decision="declined"] { color: var(--white); background: var(--danger); border-color: var(--danger); }
+.child-decision-actions [data-child-decision="info"] { color: #174d75; background: var(--blue-soft); border-color: var(--blue); }
+.child-decision-actions [data-child-decision="waitlisted"] { color: #79500d; background: var(--warning-soft); border-color: #d39b21; }
 
 /* Dialog and toasts */
 .app-dialog { width: min(760px, calc(100% - 32px)); max-height: calc(100vh - 40px); padding: 0; overflow: auto; color: var(--ink); background: var(--white); border: 0; box-shadow: var(--shadow); }
@@ -469,7 +491,7 @@ h1, h2, h3, p { margin-top: 0; }
   .permission-legend { grid-template-columns: 1fr 1fr; }
   .portal-login { grid-template-columns: 1fr; }
   .role-viewer { grid-template-columns: 1fr; }
-  .organizer-sidebar__footer { display: block; min-width: max-content; margin: 8px 12px 0; padding: 8px 10px; background: #1b2832; }
+  .organizer-sidebar__footer { position: static; display: block; min-width: max-content; margin: 8px 12px 0; padding: 8px 10px; background: #1b2832; }
 }
 
 @media (max-width: 640px) {
