@@ -4,7 +4,7 @@
   const TEST_PIN = "2017";
   const SERVER_AUTH = document.documentElement.dataset.serverAuth === "true";
   const SESSION_KEY = "ccc-test-site-unlocked";
-  const STATE_KEY = "ccc-signup-prototype-state-v5";
+  const STATE_KEY = "ccc-signup-prototype-state-v6";
   const main = document.querySelector("#main");
   const lockScreen = document.querySelector("#lock-screen");
   const appShell = document.querySelector("#app-shell");
@@ -127,8 +127,22 @@
     }
   }
 
+  function expandDemoData(target) {
+    const extraVolunteers = [
+      ["Alyssa Grant","Shopper","Attended"],["Benjamin Ortiz","Cart Checker","Attended"],["Chloe Williams","Checkout Assistant","Attended"],["Derek Johnson","Floater","No-show"],["Emily Nguyen","Shopper","Attended"],["Franklin Reed","Greeter / Sign-In","Attended"],["Grace Kim","Photographer","Attended"],["Henry Davis","Shopper","Excused absence"],["Isabella Torres","Floater","Attended"],["Jack Wilson","Shopper","Attended"],["Keira Thompson","Checkout Assistant","No-show"],["Liam Martinez","Cart Checker","Attended"],["Natalie Scott","Shopper","Attended"]
+    ];
+    extraVolunteers.forEach((entry,index) => target.volunteers.push({ id:`VOL-${26006+index}`, name:entry[0], email:`${entry[0].toLowerCase().replace(/\s+/g,".")}@example.org`, phone:`480-555-${String(120+index).padStart(4,"0")}`, role:entry[1], shift:entry[1] === "Shopper" ? "6:00 AM – 10:00 AM" : "7:00 AM – 10:00 AM", currentEvent:index < 7 ? target.event.title : "", status:index < 7 ? "confirmed" : "past", checkedIn:false, checkedAt:"", notes:entry[2] === "No-show" ? "Prior no-show; review reliability before assigning a critical role." : "", history:[{event:index % 2 ? "Christmas Shopping 2025" : "Back-to-School 2025",role:entry[1],result:entry[2]}] }));
+    const families = [
+      ["Priya Shah","Maya","Shah","approved",false],["Robert Green","Ethan","Green","review",false],["Jasmine Carter","Olivia","Carter","info",false],["Miguel Hernandez","Diego","Hernandez","declined",false],["Sarah Collins","Emma","Collins","approved",false],["Tanya Lewis","Mason","Lewis","waitlisted",false],["Andre Walker","Amari","Walker","approved",true],["Nicole Baker","Harper","Baker","approved",true],["Kevin Adams","Logan","Adams","declined",true],["Rachel Young","Ella","Young","approved",true],["Omar Rahman","Samir","Rahman","info",true],["Heather Moore","Caleb","Moore","approved",true]
+    ];
+    families.forEach((entry,index) => { const [guardian,first,last,decision,archived]=entry; const householdStatus = decision === "review" ? "review" : decision; target.applications.push({ id:`CCC-${26050+index}`, guardian, email:`${guardian.toLowerCase().replace(/\s+/g,".")}@example.org`, phone:`602-555-${String(200+index).padStart(4,"0")}`, address:`${410+index*17} E Sample Ave`, city:index%2?"Mesa":"Phoenix", zip:index%2?"85201":"85004", referral:index%2?"School counselor":"Community partner", emergencyName:`Emergency contact ${index+1}`, emergencyPhone:`602-555-${String(400+index).padStart(4,"0")}`, emergencyRelation:"Relative", submitted:`Aug ${1+index}, 2026`, status:householdStatus, flags:decision === "review" ? ["Address resembles prior record"] : decision === "info" ? ["Supporting information incomplete"] : [], previousAttendance:archived?[{event:"Christmas Shopping 2025",result:decision === "declined" ? "No-show" : "Attended"}]:[], updated:false, archived, eventName:archived ? (index%2?"Christmas Shopping 2025":"Back-to-School 2025") : target.event.title, children:[{id:`CH-${260500+index}`,name:`${first} ${last}`,firstName:first,lastName:last,birthdate:`201${5+index%5}-0${1+index%8}-12`,age:7+index%5,gender:index%2?"Boy":"Girl",shirt:"10/12",pants:"10",shoes:String(3+index%4),underwear:"10/12",coat:"12",preferences:index%2?"Blue, sports, comfortable clothing":"Purple, art, soft fabrics",accommodations:"None",attendance:archived?"attended":"expected",attendanceNote:"",decision}] }); });
+  }
+
   let state = loadState();
+  if (state.volunteers.length < 15 || state.applications.length < 15) expandDemoData(state);
+  state.volunteers.forEach((volunteer,index) => { if (volunteer.currentEvent === undefined) volunteer.currentEvent = index < 5 ? state.event.title : ""; });
   state.applications.forEach((household) => household.children.forEach((child) => { if (!child.decision) child.decision = household.status === "approved" ? "approved" : household.status === "info" ? "info" : "review"; }));
+  state.applications.forEach((household) => { if (household.archived === undefined) household.archived = false; if (!household.eventName) household.eventName = state.event.title; household.children.forEach((child) => { const parts=String(child.name||"").trim().split(/\s+/); if(!child.firstName) child.firstName=parts[0]||""; if(!child.lastName) child.lastName=parts.slice(1).join(" ") || household.guardian.trim().split(/\s+/).slice(-1)[0]; child.name=`${child.firstName} ${child.lastName}`.trim(); }); });
   let selectedVolunteerRole = "shopper";
   let volunteerStep = 0;
   let volunteerConfirmation = null;
@@ -140,13 +154,15 @@
   let volunteerSort = "name-az";
   let checkinSort = "name-az";
   let packetSort = "child-az";
+  let volunteerView = "all";
+  let applicationView = "current";
   let portalUser = sessionStorage.getItem("ccc-portal-user") || "";
   let previewRole = sessionStorage.getItem("ccc-preview-role") || "";
 
   function createRecipientDraft() {
     return {
       acknowledgments: {}, guardian: "", email: "", phone: "", address: "", city: "", zip: "", referral: "", preferredContact: "Email", notes: "",
-      children: [{ name: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", underwear: "", coat: "", preferences: "", accommodations: "" }],
+      children: [{ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", underwear: "", coat: "", preferences: "", accommodations: "" }],
       emergencyName: "", emergencyPhone: "", emergencyRelation: "", recipientCode: "", documents: []
     };
   }
@@ -165,7 +181,7 @@
   }
 
   function formatStatus(value) {
-    const labels = { open: "Open", code: "Access code", closed: "Closed", submitted: "Submitted", review: "Under review", approved: "Approved", info: "Needs information", waitlisted: "Waitlisted", declined: "Declined", checked: "Checked in" };
+    const labels = { open: "Open", code: "Access code", closed: "Closed", submitted: "Submitted", review: "Under review", approved: "Approved", info: "Needs information", waitlisted: "Waitlisted", declined: "Declined", mixed: "Mixed decisions", checked: "Checked in" };
     return labels[value] || value;
   }
 
@@ -297,7 +313,7 @@
     }
     const role = state.event.roles.find((item) => item.id === data.get("role"));
     const record = {
-      id: makeId("VOL", state.volunteers), name: `${data.get("firstName")} ${data.get("lastName")}`.trim(), email: data.get("email"), phone: data.get("phone"), role: role ? role.title : "Volunteer", shift: data.get("shift"), shirt: data.get("shirt") || "", notes: data.get("notes") || "", history: [], status: "confirmed", checkedIn: false, checkedAt: ""
+      id: makeId("VOL", state.volunteers), name: `${data.get("firstName")} ${data.get("lastName")}`.trim(), email: data.get("email"), phone: data.get("phone"), role: role ? role.title : "Volunteer", shift: data.get("shift"), currentEvent: state.event.title, shirt: data.get("shirt") || "", notes: data.get("notes") || "", history: [], status: "confirmed", checkedIn: false, checkedAt: ""
     };
     state.volunteers.push(record);
     state.activity.unshift({ text: `${record.name} registered as ${record.role}.`, time: "Just now" });
@@ -385,13 +401,13 @@
       <form id="children-form">${recipientDraft.children.map((child, index) => childFormHtml(child, index)).join("")}<button class="button button--ghost" type="button" id="add-child">+ Add another child</button><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Continue <span>→</span></button></div></form>`;
     document.querySelector("#add-child").addEventListener("click", () => {
       syncChildren();
-      recipientDraft.children.push({ name: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", underwear: "", coat: "", preferences: "", accommodations: "" });
+      recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", underwear: "", coat: "", preferences: "", accommodations: "" });
       renderRecipient();
     });
     document.querySelectorAll("[data-remove-child]").forEach((button) => button.addEventListener("click", () => {
       syncChildren();
       recipientDraft.children.splice(Number(button.dataset.removeChild), 1);
-      if (!recipientDraft.children.length) recipientDraft.children.push({ name: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", underwear: "", coat: "", preferences: "", accommodations: "" });
+      if (!recipientDraft.children.length) recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", underwear: "", coat: "", preferences: "", accommodations: "" });
       renderRecipient();
     }));
     document.querySelector("[data-recipient-back]").addEventListener("click", () => { syncChildren(); recipientStep = 1; renderRecipient(); });
@@ -406,7 +422,7 @@
 
   function childFormHtml(child, index) {
     return `<section class="child-card"><div class="child-card__header"><h3>Child ${index + 1}</h3>${recipientDraft.children.length > 1 ? `<button class="link-button" type="button" data-remove-child="${index}">Remove</button>` : ""}</div><div class="form-grid">
-      <div class="field field--span-2"><label for="child-${index}-name">Child's full name</label><input id="child-${index}-name" name="child-${index}-name" value="${esc(child.name)}" required></div>
+      <div class="field"><label for="child-${index}-firstName">Child's first name</label><input id="child-${index}-firstName" name="child-${index}-firstName" value="${esc(child.firstName || "")}" required></div><div class="field"><label for="child-${index}-lastName">Child's last name</label><input id="child-${index}-lastName" name="child-${index}-lastName" value="${esc(child.lastName || "")}" required></div>
       <div class="field"><label for="child-${index}-birthdate">Date of birth</label><input id="child-${index}-birthdate" name="child-${index}-birthdate" type="date" value="${esc(child.birthdate)}" required></div>
       <div class="field"><label for="child-${index}-gender">Shopping section / gender</label><select id="child-${index}-gender" name="child-${index}-gender" required><option value="">Choose one</option><option ${child.gender === "Girl" ? "selected" : ""}>Girl</option><option ${child.gender === "Boy" ? "selected" : ""}>Boy</option><option ${child.gender === "Other / discuss with organizer" ? "selected" : ""}>Other / discuss with organizer</option></select></div>
       <div class="field"><label for="child-${index}-shirt">Shirt size</label><input id="child-${index}-shirt" name="child-${index}-shirt" value="${esc(child.shirt)}" required></div>
@@ -425,7 +441,7 @@
     const data = new FormData(form);
     recipientDraft.children = recipientDraft.children.map((child, index) => {
       const next = {};
-      ["name", "birthdate", "gender", "shirt", "pants", "shoes", "underwear", "coat", "preferences", "accommodations"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); });
+      ["firstName", "lastName", "birthdate", "gender", "shirt", "pants", "shoes", "underwear", "coat", "preferences", "accommodations"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); next.name = `${next.firstName} ${next.lastName}`.trim();
       return next;
     });
   }
@@ -506,8 +522,8 @@
     }
     const flags = findApplicationFlags(recipientDraft);
     const record = {
-      id: makeId("CCC", state.applications), guardian: recipientDraft.guardian, email: recipientDraft.email, phone: recipientDraft.phone, address: recipientDraft.address, city: recipientDraft.city, zip: recipientDraft.zip, referral: recipientDraft.referral, emergencyName: recipientDraft.emergencyName, emergencyPhone: recipientDraft.emergencyPhone, emergencyRelation: recipientDraft.emergencyRelation, submitted: "Just now", status: flags.length ? "review" : "submitted", flags, checkedIn: false,
-      children: recipientDraft.children.map((child, index) => ({ ...child, id: `child-${Date.now()}-${index}`, attendance: "expected", attendanceNote: "", age: child.birthdate ? Math.max(0, new Date().getFullYear() - Number(child.birthdate.slice(0, 4))) : "" }))
+      id: makeId("CCC", state.applications), guardian: recipientDraft.guardian, email: recipientDraft.email, phone: recipientDraft.phone, address: recipientDraft.address, city: recipientDraft.city, zip: recipientDraft.zip, referral: recipientDraft.referral, emergencyName: recipientDraft.emergencyName, emergencyPhone: recipientDraft.emergencyPhone, emergencyRelation: recipientDraft.emergencyRelation, submitted: "Just now", status: flags.length ? "review" : "submitted", flags, checkedIn: false, archived: false, eventName: state.event.title,
+      children: recipientDraft.children.map((child, index) => ({ ...child, id: `child-${Date.now()}-${index}`, decision: "review", attendance: "expected", attendanceNote: "", age: child.birthdate ? Math.max(0, new Date().getFullYear() - Number(child.birthdate.slice(0, 4))) : "" }))
     };
     state.applications.unshift(record);
     state.activity.unshift({ text: `${record.guardian} submitted recipient application ${record.id}.`, time: "Just now" });
@@ -518,7 +534,7 @@
 
   function organizerShell(subroute, content) {
     const role = previewRole || portalUser;
-    const reviewCount = state.applications.filter((item) => ["submitted", "review", "info"].includes(item.status)).length;
+    const reviewCount = state.applications.filter((item) => !item.archived && ["submitted", "review", "info"].includes(item.status)).length;
     const preview = previewRole ? `<div class="role-preview-banner"><strong>Previewing as ${esc(role)}</strong><span>You are seeing exactly what this role can access.</span><button type="button" data-return-owner>Return to Executive Owner</button></div>` : "";
     return `${preview}<div class="organizer-shell ${role === "Read-Only Coordinator" ? "is-read-only" : ""}"><aside class="organizer-sidebar"><div class="organizer-sidebar__title"><span>Private workspace</span><strong>Organizer tools</strong></div><nav class="organizer-menu" aria-label="Organizer sections">
       ${organizerLink("dashboard", "Overview", subroute)}${organizerLink("events", "Event setup", subroute)}${organizerLink("volunteers", "Volunteer directory", subroute)}${organizerLink("applications", "Applications", subroute, reviewCount)}${organizerLink("checkin", "Check-in", subroute)}${organizerLink("packets", "Print packets", subroute)}${organizerLink("emails", "Email center", subroute)}${organizerLink("reports", "Reports & history", subroute)}${organizerLink("settings", "Settings", subroute)}
@@ -538,8 +554,8 @@
     }
     let content;
     if (subroute === "events") content = organizerEvents();
-    else if (subroute === "volunteers") content = organizerVolunteers();
-    else if (subroute === "applications") content = organizerApplications();
+    else if (subroute === "volunteers") content = organizerVolunteersV6();
+    else if (subroute === "applications") content = organizerApplicationsV6();
     else if (subroute === "checkin") content = organizerCheckin();
     else if (subroute === "packets") content = organizerPacketsV5();
     else if (subroute === "emails") content = organizerEmails();
@@ -558,13 +574,15 @@
   }
 
   function heading(kicker, title, description, action) {
-    return `<header class="organizer-heading"><div><p class="eyebrow">${esc(kicker)}</p><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${action || ""}</header>`;
+    const contextualTabs = title === "Volunteer directory" ? `<div class="view-tabs section-view-tabs"><button class="${volunteerView === "all" ? "is-active" : ""}" type="button" data-volunteer-view="all">All volunteers (${state.volunteers.length})</button><button class="${volunteerView === "current" ? "is-active" : ""}" type="button" data-volunteer-view="current">Current event roster (${state.volunteers.filter((item)=>item.currentEvent).length})</button></div>` : title === "Applications" ? `<div class="view-tabs section-view-tabs"><button class="${applicationView === "current" ? "is-active" : ""}" type="button" data-application-view="current">Current applications</button><button class="${applicationView === "log" ? "is-active" : ""}" type="button" data-application-view="log">Application Log (${state.applications.filter((item)=>item.archived).length})</button></div>` : "";
+    return `<header class="organizer-heading"><div><p class="eyebrow">${esc(kicker)}</p><h1>${esc(title)}</h1><p>${esc(description)}</p>${contextualTabs}</div>${action || ""}</header>`;
   }
 
   function organizerDashboard() {
-    const applicants = state.applications.reduce((total, item) => total + item.children.length, 0);
-    const approved = state.applications.filter((item) => item.status === "approved").reduce((total, item) => total + item.children.length, 0);
-    const review = state.applications.filter((item) => ["submitted", "review", "info"].includes(item.status)).length;
+    const currentApplications = state.applications.filter((item)=>!item.archived);
+    const applicants = currentApplications.reduce((total, item) => total + item.children.length, 0);
+    const approved = currentApplications.reduce((total,item)=>total+item.children.filter((child)=>child.decision==="approved").length,0);
+    const review = currentApplications.filter((item) => ["submitted", "review", "info"].includes(item.status)).length;
     const volunteerPercent = Math.min(100, Math.round((state.volunteers.length / state.event.volunteerCapacity) * 100));
     const recipientPercent = Math.min(100, Math.round((applicants / state.event.recipientCapacity) * 100));
     return `<div class="event-context"><label>Working event<select aria-label="Working event"><option>${esc(state.event.title)}</option><option>Christmas Shopping 2025 (closed)</option></select></label><div><button class="button button--light" type="button" data-demo-action="duplicate">Duplicate event</button><button class="button button--green" type="button" data-demo-action="create">Create event</button></div></div>${heading("Organizer overview", state.event.title, "Current event operations and items needing attention.", `<a class="button button--green" href="#organizer/checkin">Open check-in →</a>`)}
@@ -594,14 +612,26 @@
   }
 
   function organizerVolunteers(filter = "") {
+    return organizerVolunteersV6(filter);
+    /* Legacy layout retained below for reference during prototype iteration. */
     const normalized = normalize(filter);
-    const rows = state.volunteers.filter((item) => !normalized || normalize(`${item.name} ${item.email} ${item.phone} ${item.role}`).includes(normalized));
+    const rows = state.volunteers.filter((item) => (volunteerView === "all" || item.currentEvent) && (!normalized || normalize(`${item.name} ${item.email} ${item.phone} ${item.role} ${item.currentEvent}`).includes(normalized)));
     const lastName = (item) => item.name.trim().split(/\s+/).slice(-1)[0];
     if (volunteerSort === "name-az") rows.sort((a,b) => a.name.localeCompare(b.name)); else if (volunteerSort === "last-az") rows.sort((a,b) => lastName(a).localeCompare(lastName(b))); else if (volunteerSort === "role") rows.sort((a,b) => a.role.localeCompare(b.role)); else if (volunteerSort === "attendance") rows.sort((a,b) => Number(b.checkedIn)-Number(a.checkedIn)); else if (volunteerSort === "no-shows") rows.sort((a,b) => (b.history||[]).filter(x=>x.result==="No-show").length-(a.history||[]).filter(x=>x.result==="No-show").length);
     return `${heading("People & participation", "Volunteer directory", "Permanent volunteer profiles with event registrations and reliability history.", `<button class="button button--light" type="button" data-export="volunteers">Download volunteers.csv</button>`)}<div class="table-tools"><label class="search-field"><span class="screen-reader-only">Search volunteers</span><input id="volunteer-search" type="search" value="${esc(filter)}" placeholder="Search name, email, phone, or role"></label><span>${rows.length} volunteers</span></div>${sortBar("volunteers", volunteerSort, [["name-az","First name"],["last-az","Last name"],["role","Role"],["attendance","Attendance"],["no-shows","No-shows"]])}<div class="directory-list">${rows.map((item) => { const history = item.history || []; const noShows = history.filter((entry) => entry.result === "No-show").length; return `<details class="directory-card"><summary><span><strong>${esc(item.name)}</strong><small>${esc(item.email)} · ${esc(item.phone)}</small></span><span><b>${esc(item.role)}</b><small>${history.length} prior event${history.length === 1 ? "" : "s"}${noShows ? ` · ${noShows} no-show` : ""}</small></span>${item.checkedIn ? statusPill("checked") : statusPill("submitted", "Registered")}</summary><div class="directory-card__body"><div><h3>Current event</h3><p>${esc(state.event.title)} · ${esc(item.role)} · ${esc(item.shift)}</p><p><strong>Organizer note:</strong> ${esc(item.notes || "No notes")}</p></div><div><h3>Event history</h3>${history.length ? history.map((entry) => `<p class="history-row"><span>${esc(entry.event)} · ${esc(entry.role)}</span><b class="${entry.result === "No-show" ? "text-danger" : ""}">${esc(entry.result)}</b></p>`).join("") : `<p>No prior events recorded.</p>`}</div></div></details>`; }).join("")}</div>`;
   }
 
+  function organizerVolunteersV6(filter = "") {
+    const normalized = normalize(filter);
+    const rows = state.volunteers.filter((item)=>(volunteerView === "all" || item.currentEvent) && (!normalized || normalize(`${item.name} ${item.email} ${item.phone} ${item.role} ${item.currentEvent}`).includes(normalized)));
+    const lastName = (item)=>item.name.trim().split(/\s+/).slice(-1)[0];
+    if(volunteerSort==="name-az")rows.sort((a,b)=>a.name.localeCompare(b.name)); else if(volunteerSort==="last-az")rows.sort((a,b)=>lastName(a).localeCompare(lastName(b))); else if(volunteerSort==="role")rows.sort((a,b)=>a.role.localeCompare(b.role)); else if(volunteerSort==="no-shows")rows.sort((a,b)=>(b.history||[]).filter(x=>x.result==="No-show").length-(a.history||[]).filter(x=>x.result==="No-show").length);
+    return `${heading("People & participation", "Volunteer directory", volunteerView === "all" ? "Every current and past volunteer remains searchable here." : `People currently registered for ${state.event.title}.`, `<button class="button button--light" type="button" data-export="volunteers">Download volunteers.csv</button>`)}<div class="table-tools"><label class="search-field"><span class="screen-reader-only">Search volunteers</span><input id="volunteer-search" type="search" value="${esc(filter)}" placeholder="Search name, email, phone, role, or event"></label><span>${rows.length} volunteers</span></div>${sortBar("volunteers",volunteerSort,[["name-az","First name"],["last-az","Last name"],["role","Role"],["no-shows","No-shows"]])}<div class="directory-list">${rows.map((item)=>{const history=item.history||[];const noShows=history.filter(x=>x.result==="No-show").length;return `<details class="directory-card"><summary><span><strong>${esc(item.name)}</strong><small>${esc(item.email)} · ${esc(item.phone)}</small></span><span><b>${esc(item.role)}</b><small>${history.length} prior event${history.length===1?"":"s"}${noShows?` · ${noShows} no-show`:""}</small></span>${item.currentEvent?statusPill("approved","Currently registered"):statusPill("closed","Past volunteer")}</summary><div class="directory-card__body"><div><h3>Current registration</h3><p>${item.currentEvent?`${esc(item.currentEvent)} · ${esc(item.role)} · ${esc(item.shift)}`:"Not registered for a current event."}</p><p><strong>Organizer note:</strong> ${esc(item.notes||"No notes")}</p></div><div><h3>Event history</h3>${history.length?history.map((entry)=>`<p class="history-row"><span>${esc(entry.event)} · ${esc(entry.role)}</span><b class="${entry.result==="No-show"?"text-danger":""}">${esc(entry.result)}</b></p>`).join(""):`<p>No prior events recorded.</p>`}</div></div></details>`;}).join("")}</div>`;
+  }
+
   function organizerApplications(filter = "") {
+    return organizerApplicationsV6(filter);
+    /* Legacy layout retained below for reference during prototype iteration. */
     const normalized = normalize(filter);
     let rows = state.applications.filter((item) => !normalized || normalize(`${item.guardian} ${item.email} ${item.phone} ${item.id} ${item.children.map((child) => child.name).join(" ")}`).includes(normalized));
     const compareName = (a, b) => a.guardian.localeCompare(b.guardian);
@@ -609,8 +639,17 @@
     return `${heading("Recipient review", "Applications", "Households stay grouped while each child receives an independent decision.", `<button class="button button--light" type="button" data-export="applications">Download applications.csv</button>`)}<div class="table-tools table-tools--wrap"><label class="search-field"><span class="screen-reader-only">Search applications</span><input id="application-search" type="search" value="${esc(filter)}" placeholder="Search guardian, child, phone, or ID"></label><span>${rows.length} households</span></div>${sortBar("applications", applicationSort, [["submitted-newest","Newest"],["submitted-oldest","Oldest"],["name-az","Guardian A–Z"],["status","Child status"],["flags","Most flags"]])}<div class="application-list">${rows.map((item) => { const counts = item.children.reduce((out, child) => { out[child.decision]=(out[child.decision]||0)+1; return out; },{}); return `<article class="application-row"><div><strong>${esc(item.guardian)}</strong><small>${esc(item.id)} · ${esc(item.submitted)}</small></div><div class="child-chip-list">${item.children.map((child) => `<span><b>${esc(child.name)}</b><small>Age ${esc(child.age)} · ${esc(formatStatus(child.decision))}</small></span>`).join("")}</div><div class="household-summary">${Object.entries(counts).map(([key,value])=>`<span>${value} ${esc(formatStatus(key))}</span>`).join("")}</div><div>${statusPill(item.status)}<button class="button button--small button--ghost" type="button" data-open-application="${esc(item.id)}">Review children</button></div></article>`; }).join("")}</div>`;
   }
 
+  function organizerApplicationsV6(filter = "") {
+    const normalized=normalize(filter);
+    let rows=state.applications.filter((item)=>(applicationView === "log" ? item.archived : !item.archived) && (!normalized || normalize(`${item.guardian} ${item.email} ${item.phone} ${item.id} ${item.children.map((child)=>child.name).join(" ")} ${item.eventName}`).includes(normalized)));
+    const childFirst=(item)=>item.children[0]?.firstName||""; const childLast=(item)=>item.children[0]?.lastName||"";
+    if(applicationSort==="name-az")rows.sort((a,b)=>a.guardian.localeCompare(b.guardian)); else if(applicationSort==="child-az")rows.sort((a,b)=>childFirst(a).localeCompare(childFirst(b))); else if(applicationSort==="child-last")rows.sort((a,b)=>childLast(a).localeCompare(childLast(b))); else if(applicationSort==="status")rows.sort((a,b)=>a.status.localeCompare(b.status)); else if(applicationSort==="flags")rows.sort((a,b)=>b.flags.length-a.flags.length); else if(applicationSort==="submitted-oldest")rows.reverse();
+    const title=applicationView === "log" ? "Application Log" : "Applications";
+    return `${heading("Recipient review", "Applications", applicationView === "log" ? "Permanent records from closed-out events remain searchable here." : "Current households stay grouped while every child has an unmistakable decision.", `<button class="button button--light" type="button" data-export="applications">Download applications.csv</button>`)}<div class="table-tools table-tools--wrap"><label class="search-field"><span class="screen-reader-only">Search ${esc(title)}</span><input id="application-search" type="search" value="${esc(filter)}" placeholder="Search guardian, child, phone, ID, or event"></label><span>${rows.length} households</span></div>${sortBar("applications",applicationSort,[["submitted-newest","Newest"],["submitted-oldest","Oldest"],["name-az","Guardian A–Z"],["child-az","Child A–Z"],["child-last","Child last name"],["status","Status"],["flags","Flags"]])}<div class="application-list">${rows.map((item)=>{const counts=item.children.reduce((out,child)=>{out[child.decision]=(out[child.decision]||0)+1;return out;},{});return `<article class="application-row application-row--${esc(item.status)}"><div><strong>${esc(item.guardian)}</strong><small>${esc(item.id)} · ${esc(item.eventName)} · ${esc(item.submitted)}</small></div><div class="child-chip-list">${item.children.map((child)=>`<span class="child-status child-status--${esc(child.decision)}"><b>${esc(child.firstName)} ${esc(child.lastName)}</b><small>Age ${esc(child.age)} · ${esc(formatStatus(child.decision))}</small></span>`).join("")}</div><div class="household-summary">${Object.entries(counts).map(([key,value])=>`<span class="summary-status summary-status--${esc(key)}">${value} ${esc(formatStatus(key))}</span>`).join("")}</div><div>${statusPill(item.status)}<button class="button button--small button--ghost" type="button" data-open-application="${esc(item.id)}">${applicationView==="log"?"View record":"Review children"}</button></div></article>`;}).join("")||`<div class="empty-state"><strong>No applications in this view</strong>Try the other tab or clear your search.</div>`}</div>`;
+  }
+
   function organizerCheckin(filter = "") {
-    const records = checkinType === "volunteers" ? state.volunteers : state.applications.flatMap((household) => household.children.filter((child) => child.decision === "approved").map((child) => ({ ...child, guardian: household.guardian, householdId: household.id, phone: household.phone })));
+    const records = checkinType === "volunteers" ? state.volunteers.filter((item)=>item.currentEvent) : state.applications.filter((household)=>!household.archived).flatMap((household) => household.children.filter((child) => child.decision === "approved").map((child) => ({ ...child, guardian: household.guardian, householdId: household.id, phone: household.phone })));
     const normalized = normalize(filter);
     const rows = records.filter((item) => !normalized || normalize(checkinType === "volunteers" ? `${item.name} ${item.email} ${item.phone} ${item.role}` : `${item.guardian} ${item.name} ${item.householdId}`).includes(normalized));
     const checkinLastName = (item) => item.name.trim().split(/\s+/).slice(-1)[0];
@@ -628,7 +667,7 @@
   }
 
   function organizerPacketsV5() {
-    let packets = state.applications.flatMap((household) => household.children.filter((child) => child.decision === "approved").map((child) => ({ child, household })));
+    let packets = state.applications.filter((household)=>!household.archived).flatMap((household) => household.children.filter((child) => child.decision === "approved").map((child) => ({ child, household })));
     const childLast = (name) => name.trim().split(/\s+/).slice(-1)[0];
     if (packetSort === "child-az") packets.sort((a,b)=>a.child.name.localeCompare(b.child.name)); else if (packetSort === "last-az") packets.sort((a,b)=>childLast(a.child.name).localeCompare(childLast(b.child.name))); else if (packetSort === "household") packets.sort((a,b)=>a.household.guardian.localeCompare(b.household.guardian)); else if (packetSort === "id") packets.sort((a,b)=>a.household.id.localeCompare(b.household.id)); else if (packetSort === "age") packets.sort((a,b)=>a.child.age-b.child.age);
     return `${heading("Volunteer handoff", "Print packets", "A compact printing queue built to handle more than 100 children.", `<button class="button button--green" type="button" data-print-mode="all">Print all complete packets</button>`)}<article class="panel template-panel"><div><h2>Packet templates</h2><p>The current rules sheet is paired automatically when you print both.</p></div><label class="upload-button">Upload child sheet<input type="file" data-template="child" accept=".pdf"></label><span>${esc(state.event.templates.child)}</span><label class="upload-button">Upload rules PDF<input type="file" data-template="rules" accept=".pdf"></label><span>${esc(state.event.templates.rules)}</span></article>${sortBar("packets", packetSort, [["child-az","First name"],["last-az","Last name"],["household","Household"],["id","Application ID"],["age","Age"]])}<div class="packet-list packet-list--compact">${packets.map(({child,household}) => `<article class="packet-row packet-card" data-packet-child="${esc(child.id)}"><div><strong>${esc(child.name)}</strong><small>Age ${esc(child.age)} · ${esc(household.guardian)} household · ${esc(household.id)}</small></div>${statusPill("approved","Ready")}<div class="packet-actions"><button class="button button--small button--ghost" type="button" data-print-mode="child" data-print-child="${esc(child.id)}">Child sheet</button><button class="button button--small button--ghost" type="button" data-print-mode="rules" data-print-child="${esc(child.id)}">Rules only</button><button class="button button--small button--green" type="button" data-print-mode="complete" data-print-child="${esc(child.id)}">Both</button></div><div class="packet-print-content"><section class="print-child-sheet"><h2>${esc(child.name)}</h2><p><strong>Household:</strong> ${esc(household.guardian)} · ${esc(household.id)}</p><p><strong>Emergency:</strong> ${esc(household.emergencyName)} · ${esc(household.emergencyPhone)}</p><p><strong>Sizes:</strong> Shirt ${esc(child.shirt)} · Pants ${esc(child.pants)} · Shoes ${esc(child.shoes)} · Underwear ${esc(child.underwear)} · Coat ${esc(child.coat)}</p><p><strong>Preferences:</strong> ${esc(child.preferences)}</p></section><section class="print-rules-sheet"><h2>${esc(state.event.title)} rules</h2><p>Current rules template: ${esc(state.event.templates.rules)}</p></section></div></article>`).join("") || `<div class="empty-state"><strong>No approved children yet</strong>Approve an individual child to create a packet.</div>`}</div>`;
@@ -702,6 +741,8 @@
       if (group === "volunteers") volunteerSort = value; else if (group === "applications") applicationSort = value; else if (group === "checkin") checkinSort = value; else if (group === "packets") packetSort = value;
       renderOrganizer(group === "packets" ? "packets" : group === "checkin" ? "checkin" : group);
     }));
+    document.querySelectorAll("[data-volunteer-view]").forEach((button)=>button.addEventListener("click",()=>{volunteerView=button.dataset.volunteerView;renderOrganizer("volunteers");}));
+    document.querySelectorAll("[data-application-view]").forEach((button)=>button.addEventListener("click",()=>{applicationView=button.dataset.applicationView;renderOrganizer("applications");}));
 
     document.querySelectorAll("[data-checkin-volunteer]").forEach((button) => button.addEventListener("click", () => { toggleVolunteerCheckin(button.dataset.checkinVolunteer); renderOrganizer("volunteers"); }));
     document.querySelectorAll("[data-open-application]").forEach((button) => button.addEventListener("click", () => openApplication(button.dataset.openApplication)));
@@ -730,7 +771,7 @@
     if (report) report.addEventListener("submit", (event) => {
       event.preventDefault(); const data = new FormData(report); const number = (key) => Number(data.get(key) || 0);
       const saved = { event: state.event.title, status: "Closed out", childrenRegistered: number("childrenRegistered"), childrenAttended: number("childrenAttended"), volunteersRegistered: number("volunteersRegistered"), volunteersAttended: number("volunteersAttended"), volunteerHours: number("volunteerHours"), totalSpent: number("shopping") + number("food") + number("supplies") + number("other"), notes: String(data.get("notes") || "") };
-      state.reports.unshift(saved); state.activity.unshift({ text: `${state.event.title} close-out report was saved.`, time: "Just now" }); saveState(); toast("Close-out report saved to permanent event history."); renderOrganizer("reports");
+      state.reports.unshift(saved); state.applications.filter((item)=>!item.archived).forEach((item)=>{item.archived=true;item.eventName=state.event.title;}); state.activity.unshift({ text: `${state.event.title} was closed out and its applications moved to the Application Log.`, time: "Just now" }); saveState(); toast("Close-out saved; current applications moved to the permanent Application Log."); renderOrganizer("reports");
     });
     const addUser = document.querySelector("[data-add-user]");
     if (addUser) addUser.addEventListener("click", openAddUser);
@@ -746,6 +787,9 @@
     if (reset) reset.addEventListener("click", () => {
       if (!window.confirm("Reset every fictional signup and organizer change in this prototype?")) return;
       state = createDefaultState();
+      expandDemoData(state);
+      state.volunteers.forEach((volunteer,index)=>{if(volunteer.currentEvent===undefined)volunteer.currentEvent=index<5?state.event.title:"";});
+      state.applications.forEach((household)=>{if(household.archived===undefined)household.archived=false;if(!household.eventName)household.eventName=state.event.title;household.children.forEach((child)=>{const parts=String(child.name||"").trim().split(/\s+/);child.firstName=child.firstName||parts[0]||"";child.lastName=child.lastName||parts.slice(1).join(" ")||household.guardian.trim().split(/\s+/).slice(-1)[0];child.name=`${child.firstName} ${child.lastName}`.trim();if(!child.decision)child.decision=household.status==="approved"?"approved":household.status==="info"?"info":"review";});});
       saveState();
       toast("Demonstration data restored.");
       renderOrganizer("settings");
@@ -825,10 +869,11 @@
     appDialog.showModal();
     document.body.classList.add("dialog-open");
     dialogContent.querySelectorAll("[data-child-decision]").forEach((button) => button.addEventListener("click", () => {
+      if (item.archived) { toast("Closed-out application records are read-only."); return; }
       const child = item.children.find((record) => record.id === button.dataset.childId); if (!child) return;
       child.decision = button.dataset.childDecision;
       const decisions = item.children.map((record) => record.decision);
-      item.status = decisions.every((status) => status === "approved") ? "approved" : decisions.some((status) => status === "info") ? "info" : decisions.some((status) => status === "review") ? "review" : "submitted";
+      item.status = decisions.every((status) => status === decisions[0]) ? decisions[0] : "mixed";
       item.updated = false; state.activity.unshift({ text: `${child.name} in ${item.id} was marked ${formatStatus(child.decision)}.`, time: "Just now" }); saveState(); toast(`${child.name} marked ${formatStatus(child.decision)}.`); closeDialog(); renderOrganizer("applications");
     }));
   }
