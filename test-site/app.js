@@ -555,7 +555,7 @@
     let content;
     if (subroute === "events") content = organizerEvents();
     else if (subroute === "volunteers") content = organizerVolunteersV6();
-    else if (subroute === "applications") content = organizerApplicationsV6();
+    else if (subroute === "applications") content = organizerApplicationsV7();
     else if (subroute === "checkin") content = organizerCheckin();
     else if (subroute === "packets") content = organizerPacketsV5();
     else if (subroute === "emails") content = organizerEmails();
@@ -630,7 +630,7 @@
   }
 
   function organizerApplications(filter = "") {
-    return organizerApplicationsV6(filter);
+    return organizerApplicationsV7(filter);
     /* Legacy layout retained below for reference during prototype iteration. */
     const normalized = normalize(filter);
     let rows = state.applications.filter((item) => !normalized || normalize(`${item.guardian} ${item.email} ${item.phone} ${item.id} ${item.children.map((child) => child.name).join(" ")}`).includes(normalized));
@@ -646,6 +646,23 @@
     if(applicationSort==="name-az")rows.sort((a,b)=>a.guardian.localeCompare(b.guardian)); else if(applicationSort==="child-az")rows.sort((a,b)=>childFirst(a).localeCompare(childFirst(b))); else if(applicationSort==="child-last")rows.sort((a,b)=>childLast(a).localeCompare(childLast(b))); else if(applicationSort==="status")rows.sort((a,b)=>a.status.localeCompare(b.status)); else if(applicationSort==="flags")rows.sort((a,b)=>b.flags.length-a.flags.length); else if(applicationSort==="submitted-oldest")rows.reverse();
     const title=applicationView === "log" ? "Application Log" : "Applications";
     return `${heading("Recipient review", "Applications", applicationView === "log" ? "Permanent records from closed-out events remain searchable here." : "Current households stay grouped while every child has an unmistakable decision.", `<button class="button button--light" type="button" data-export="applications">Download applications.csv</button>`)}<div class="table-tools table-tools--wrap"><label class="search-field"><span class="screen-reader-only">Search ${esc(title)}</span><input id="application-search" type="search" value="${esc(filter)}" placeholder="Search guardian, child, phone, ID, or event"></label><span>${rows.length} households</span></div>${sortBar("applications",applicationSort,[["submitted-newest","Newest"],["submitted-oldest","Oldest"],["name-az","Guardian A–Z"],["child-az","Child A–Z"],["child-last","Child last name"],["status","Status"],["flags","Flags"]])}<div class="application-list">${rows.map((item)=>{const counts=item.children.reduce((out,child)=>{out[child.decision]=(out[child.decision]||0)+1;return out;},{});return `<article class="application-row application-row--${esc(item.status)}"><div><strong>${esc(item.guardian)}</strong><small>${esc(item.id)} · ${esc(item.eventName)} · ${esc(item.submitted)}</small></div><div class="child-chip-list">${item.children.map((child)=>`<span class="child-status child-status--${esc(child.decision)}"><b>${esc(child.firstName)} ${esc(child.lastName)}</b><small>Age ${esc(child.age)} · ${esc(formatStatus(child.decision))}</small></span>`).join("")}</div><div class="household-summary">${Object.entries(counts).map(([key,value])=>`<span class="summary-status summary-status--${esc(key)}">${value} ${esc(formatStatus(key))}</span>`).join("")}</div><div>${statusPill(item.status)}<button class="button button--small button--ghost" type="button" data-open-application="${esc(item.id)}">${applicationView==="log"?"View record":"Review children"}</button></div></article>`;}).join("")||`<div class="empty-state"><strong>No applications in this view</strong>Try the other tab or clear your search.</div>`}</div>`;
+  }
+
+  function applicationFlagsHtml(item) {
+    const flags = [...(item.flags || [])];
+    if (item.updated) flags.unshift("Application updated · review");
+    if ((item.previousAttendance || []).some((entry)=>entry.result === "No-show")) flags.unshift("Previous no-show");
+    return flags.length ? `<div class="application-flags">${flags.map((flag)=>`<span class="${flag === "Previous no-show" ? "is-danger" : flag.startsWith("Application updated") ? "is-info" : ""}">${esc(flag)}</span>`).join("")}</div>` : `<div class="application-flags application-flags--clear"><span>No review flags</span></div>`;
+  }
+
+  function organizerApplicationsV7(filter = "") {
+    const normalized = normalize(filter);
+    let rows = state.applications.filter((item)=>(applicationView === "log" ? item.archived : !item.archived) && (!normalized || normalize(`${item.guardian} ${item.email} ${item.phone} ${item.id} ${item.children.map((child)=>child.name).join(" ")} ${item.eventName}`).includes(normalized)));
+    const childFirst=(item)=>item.children[0]?.firstName||""; const childLast=(item)=>item.children[0]?.lastName||"";
+    if(applicationSort==="name-az")rows.sort((a,b)=>a.guardian.localeCompare(b.guardian)); else if(applicationSort==="child-az")rows.sort((a,b)=>childFirst(a).localeCompare(childFirst(b))); else if(applicationSort==="child-last")rows.sort((a,b)=>childLast(a).localeCompare(childLast(b))); else if(applicationSort==="status")rows.sort((a,b)=>a.status.localeCompare(b.status)); else if(applicationSort==="flags")rows.sort((a,b)=>(b.flags.length+(b.updated?1:0))-(a.flags.length+(a.updated?1:0))); else if(applicationSort==="submitted-oldest")rows.reverse();
+    const title=applicationView === "log" ? "Application Log" : "Applications";
+    const cards = rows.map((item)=>`<article class="application-row application-row--${esc(item.status)}"><div><strong>${esc(item.guardian)}</strong><small>${esc(item.id)} · ${esc(item.eventName)} · ${esc(item.submitted)}</small></div><div class="child-chip-list">${item.children.map((child)=>`<span class="child-status child-status--${esc(child.decision)}"><b>${esc(child.firstName)} ${esc(child.lastName)}</b><small>Age ${esc(child.age)} · ${esc(formatStatus(child.decision))}</small></span>`).join("")}</div>${applicationFlagsHtml(item)}<div>${statusPill(item.status)}<button class="button button--small button--ghost" type="button" data-open-application="${esc(item.id)}">${applicationView==="log"?"View record":"Review children"}</button></div></article>`).join("");
+    return `${heading("Recipient review", "Applications", applicationView === "log" ? "Permanent records from closed-out events remain searchable here." : "Current households stay grouped while every child has an unmistakable decision.", `<button class="button button--light" type="button" data-export="applications">Download applications.csv</button>`)}<div class="table-tools table-tools--wrap"><label class="search-field"><span class="screen-reader-only">Search ${esc(title)}</span><input id="application-search" type="search" value="${esc(filter)}" placeholder="Search guardian, child, phone, ID, or event"></label><span>${rows.length} households</span></div>${sortBar("applications",applicationSort,[["submitted-newest","Newest"],["submitted-oldest","Oldest"],["name-az","Guardian A–Z"],["child-az","Child A–Z"],["child-last","Child last name"],["status","Status"],["flags","Flags"]])}<div class="application-list">${cards || `<div class="empty-state"><strong>No applications in this view</strong>Try the other tab or clear your search.</div>`}</div>`;
   }
 
   function organizerCheckin(filter = "") {
