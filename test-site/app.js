@@ -4,7 +4,7 @@
   const TEST_PIN = "2017";
   const SERVER_AUTH = document.documentElement.dataset.serverAuth === "true";
   const SESSION_KEY = "ccc-test-site-unlocked";
-  const STATE_KEY = "ccc-signup-prototype-state-v6";
+  const STATE_KEY = "ccc-signup-prototype-state-v7";
   const main = document.querySelector("#main");
   const lockScreen = document.querySelector("#lock-screen");
   const appShell = document.querySelector("#app-shell");
@@ -26,12 +26,12 @@
 
   const acknowledgments = [
     { id: "arrival", title: "Arrival and check-in", text: "Our family will arrive at the designated Walmart Garden Center meeting location at the assigned time." },
-    { id: "shopping", title: "Volunteer-led shopping", text: "Each child shops with an assigned Campbell's Crew volunteer. Parents remain in the designated waiting area and allow the volunteer to guide the experience." },
-    { id: "safety", title: "Safety and accommodations", text: "A parent may intervene during an emergency or when directed by Campbell's Crew. Needed disability, medical, communication, or behavioral accommodations should be shared in advance." },
-    { id: "essentials", title: "Essential items only", text: "Campbell's Crew is a bare-necessities charity. Event funds are for approved clothing, shoes, and personal necessities—not toys or other non-essential merchandise." },
-    { id: "review", title: "Application review", text: "Submitting an application does not guarantee acceptance. Campbell's Crew may approve, waitlist, request more information, or decline an application after review." },
-    { id: "photos", title: "Required photography release", text: "Photography and video occur throughout this large volunteer-run event. I authorize my participating children to be photographed and authorize Campbell's Crew to use selected images in its charitable communications." },
-    { id: "accuracy", title: "Accurate information", text: "The information I provide will be complete and accurate. Duplicate or intentionally false information may result in an application being denied or cancelled." }
+    { id: "shopping", title: "Volunteer-led shopping", text: "Each child shops with an assigned Campbell's Crew Cares volunteer. Responsible Parties remain in the designated waiting area and allow the volunteer to guide the experience." },
+    { id: "safety", title: "Safety and accommodations", text: "A Responsible Party may intervene during an emergency or when directed by Campbell's Crew Cares. Share disability, medical, communication, sensory, mobility, or behavioral accommodations in advance so our team can plan respectfully. We will contact you if an accommodation affects how volunteer-led shopping should work." },
+    { id: "essentials", title: "Essential items only", text: "Campbell's Crew Cares is a bare-necessities charity. Event funds are for approved clothing, shoes, and personal necessities—not toys or other non-essential merchandise unless the event rules specifically allow them." },
+    { id: "review", title: "Application review", text: "Submitting an application does not guarantee acceptance. Campbell's Crew Cares may approve, waitlist, request more information, or decline an application after review." },
+    { id: "photos", title: "Required photography release", text: "Photography and video occur throughout this large volunteer-run event. I authorize my participating children to be photographed and authorize Campbell's Crew Cares to use selected images in its charitable communications." },
+    { id: "accuracy", title: "Accurate Information and Child-Specific Sizing", text: "I confirm that the contact and family information I provide is accurate and that every clothing size reflects the actual needs of the specific child registered. I will not provide false sizing information to obtain clothing for anyone else." }
   ];
 
   function createDefaultState() {
@@ -147,6 +147,7 @@
   let volunteerStep = 0;
   let volunteerConfirmation = null;
   let recipientStep = 0;
+  let recipientMaxStep = 0;
   let recipientConfirmation = null;
   let recipientDraft = createRecipientDraft();
   let checkinType = "recipients";
@@ -161,7 +162,7 @@
 
   function createRecipientDraft() {
     return {
-      acknowledgments: {}, guardian: "", email: "", phone: "", address: "", city: "", zip: "", referral: "", preferredContact: "Email", notes: "",
+      acknowledgments: {}, agreementSignature: "", guardian: "", email: "", phone: "", address: "", city: "", zip: "", referral: "", preferredContact: "Email", notes: "",
       children: [{ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", underwear: "", coat: "", preferences: "", accommodations: "" }],
       emergencyName: "", emergencyPhone: "", emergencyRelation: "", recipientCode: "", documents: []
     };
@@ -324,13 +325,13 @@
 
   function recipientStepsHtml() {
     const labels = ["Before you apply", "Household", "Children", "Emergency & files", "Review"];
-    return `<aside class="application-steps" aria-label="Application progress">${labels.map((label, index) => `<div class="application-step ${recipientStep === index ? "is-current" : ""} ${recipientStep > index ? "is-complete" : ""}"><span>${recipientStep > index ? "✓" : index + 1}</span>${esc(label)}</div>`).join("")}</aside>`;
+    return `<aside class="application-steps" aria-label="Application progress">${labels.map((label, index) => `<button type="button" data-recipient-step="${index}" ${index > recipientMaxStep ? "disabled" : ""} class="application-step ${recipientStep === index ? "is-current" : ""} ${recipientMaxStep > index ? "is-complete" : ""}"><span>${recipientMaxStep > index ? "✓" : index + 1}</span>${esc(label)}</button>`).join("")}</aside>`;
   }
 
   function renderRecipient() {
     if (recipientConfirmation) {
       main.innerHTML = `<div class="page-content"><div class="confirmation"><div class="confirmation-mark">✓</div><p class="eyebrow">Application received</p><h1>Thank you, ${esc(recipientConfirmation.guardian)}.</h1><p>Your demonstration application has been added to the organizer review queue. Submission does not guarantee acceptance; Campbell's Crew will contact you after review.</p><div class="confirmation-number"><span>Application number</span><strong>${esc(recipientConfirmation.id)}</strong></div>${recipientConfirmation.flags.length ? `<div class="inline-note"><strong>Prototype note:</strong> The duplicate-checking demonstration added ${recipientConfirmation.flags.length} review flag${recipientConfirmation.flags.length === 1 ? "" : "s"}. Flags require human review and do not automatically reject an application.</div>` : ""}<button class="button button--green" type="button" id="new-application">Start another test application <span>→</span></button></div></div>`;
-      document.querySelector("#new-application").addEventListener("click", () => { recipientDraft = createRecipientDraft(); recipientStep = 0; recipientConfirmation = null; renderRecipient(); });
+      document.querySelector("#new-application").addEventListener("click", () => { recipientDraft = createRecipientDraft(); recipientStep = 0; recipientMaxStep = 0; recipientConfirmation = null; renderRecipient(); });
       return;
     }
 
@@ -343,6 +344,7 @@
       <section class="page-hero page-hero--ink"><div class="page-hero__grid"><div><p class="eyebrow eyebrow--light">Recipient application</p><h1>Before you <span>apply.</span></h1></div><p>This guided application explains how the event works, collects each child's essential sizes and preferences, and gives Campbell's Crew what it needs for a careful review.</p></div></section>
       <div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><div class="application-layout">${recipientStepsHtml()}<section class="application-panel" id="recipient-panel"></section></div></div>`;
     const panel = document.querySelector("#recipient-panel");
+    document.querySelectorAll("[data-recipient-step]").forEach((button) => button.addEventListener("click", () => { if (!button.disabled) { recipientStep = Number(button.dataset.recipientStep); renderRecipient(); } }));
     if (recipientStep === 0) renderOrientation(panel);
     else if (recipientStep === 1) renderHousehold(panel);
     else if (recipientStep === 2) renderChildren(panel);
@@ -352,26 +354,27 @@
 
   function renderOrientation(panel) {
     panel.innerHTML = `
-      <p class="eyebrow">Step 1 of 5</p><h2>How the event works.</h2><p>Please review each section carefully. Initial every item to confirm that you understand it before continuing.</p>
+      <p class="eyebrow">Step 1 of 5</p><h2>How the event works.</h2><p>Please review each section carefully and check every item. One signature at the bottom confirms all agreements.</p>
       <div class="video-card"><img src="../assets/images/campbell-story-video-thumbnail.jpg" alt="Campbell speaking in a video"><div class="video-card__content"><strong>Event orientation video</strong><span>Video placeholder · Written instructions are provided below</span></div></div>
       <div class="inline-note"><strong>Why both video and text?</strong> The eventual video will have captions and a transcript. The written explanation will always remain available.</div>
-      <form id="orientation-form"><div class="ack-list">${acknowledgments.map((item) => { const saved = recipientDraft.acknowledgments[item.id] || {}; return `<label class="ack-item"><input type="checkbox" name="ack-${item.id}" ${saved.checked ? "checked" : ""} required><p><strong>${esc(item.title)}.</strong> ${esc(item.text)}</p><input type="text" name="initial-${item.id}" value="${esc(saved.initials || "")}" maxlength="4" aria-label="Initial for ${esc(item.title)}" placeholder="Initial" required></label>`; }).join("")}</div><div class="form-actions"><a class="button button--ghost" href="#home">Cancel</a><button class="button button--green" type="submit">Continue to household <span>→</span></button></div></form>`;
+      <form id="orientation-form"><div class="ack-list">${acknowledgments.map((item) => { const saved = recipientDraft.acknowledgments[item.id] || {}; return `<label class="ack-item"><input type="checkbox" name="ack-${item.id}" ${saved.checked ? "checked" : ""} required><p><strong>${esc(item.title)}.</strong> ${esc(item.text)}</p></label>`; }).join("")}</div><div class="signature-block field"><label for="agreement-signature">Responsible Party full name / electronic signature</label><input id="agreement-signature" name="agreementSignature" value="${esc(recipientDraft.agreementSignature)}" autocomplete="name" required><small>Typing your full name confirms all checked agreements above.</small></div><div class="form-actions"><a class="button button--ghost" href="#home">Cancel</a><button class="button button--green" type="submit">Continue to household <span>→</span></button></div></form>`;
     document.querySelector("#orientation-form").addEventListener("submit", (event) => {
       event.preventDefault();
       const form = event.currentTarget;
       if (!form.reportValidity()) return;
       const data = new FormData(form);
-      acknowledgments.forEach((item) => { recipientDraft.acknowledgments[item.id] = { checked: data.get(`ack-${item.id}`) === "on", initials: String(data.get(`initial-${item.id}`) || "").trim().toUpperCase() }; });
-      recipientStep = 1;
+      acknowledgments.forEach((item) => { recipientDraft.acknowledgments[item.id] = { checked: data.get(`ack-${item.id}`) === "on" }; });
+      recipientDraft.agreementSignature = String(data.get("agreementSignature") || "").trim();
+      recipientStep = 1; recipientMaxStep = Math.max(recipientMaxStep, 1);
       renderRecipient();
     });
   }
 
   function renderHousehold(panel) {
     panel.innerHTML = `
-      <p class="eyebrow">Step 2 of 5</p><h2>Household information.</h2><p>Tell us how to contact the parent or legal guardian completing this application.</p>
+      <p class="eyebrow">Step 2 of 5</p><h2>Household information.</h2><p>Tell us how to contact the Responsible Party completing this application.</p>
       <form id="household-form"><div class="form-grid">
-        <div class="field field--span-2"><label for="guardian">Parent or legal guardian's full name</label><input id="guardian" name="guardian" autocomplete="name" value="${esc(recipientDraft.guardian)}" required></div>
+        <div class="field field--span-2"><label for="guardian">Responsible Party's full name</label><input id="guardian" name="guardian" autocomplete="name" value="${esc(recipientDraft.guardian)}" required></div>
         <div class="field"><label for="recipient-email">Email</label><input id="recipient-email" name="email" type="email" autocomplete="email" value="${esc(recipientDraft.email)}" required></div>
         <div class="field"><label for="recipient-phone">Mobile phone</label><input id="recipient-phone" name="phone" type="tel" autocomplete="tel" value="${esc(recipientDraft.phone)}" required></div>
         <div class="field field--span-2"><label for="recipient-address">Home address</label><input id="recipient-address" name="address" autocomplete="street-address" value="${esc(recipientDraft.address)}" required></div>
@@ -386,7 +389,7 @@
       event.preventDefault();
       if (!event.currentTarget.reportValidity()) return;
       saveHousehold(new FormData(event.currentTarget));
-      recipientStep = 2;
+      recipientStep = 2; recipientMaxStep = Math.max(recipientMaxStep, 2);
       renderRecipient();
     });
   }
@@ -415,7 +418,7 @@
       event.preventDefault();
       if (!event.currentTarget.reportValidity()) return;
       syncChildren();
-      recipientStep = 3;
+      recipientStep = 3; recipientMaxStep = Math.max(recipientMaxStep, 3);
       renderRecipient();
     });
   }
@@ -424,15 +427,17 @@
     return `<section class="child-card"><div class="child-card__header"><h3>Child ${index + 1}</h3>${recipientDraft.children.length > 1 ? `<button class="link-button" type="button" data-remove-child="${index}">Remove</button>` : ""}</div><div class="form-grid">
       <div class="field"><label for="child-${index}-firstName">Child's first name</label><input id="child-${index}-firstName" name="child-${index}-firstName" value="${esc(child.firstName || "")}" required></div><div class="field"><label for="child-${index}-lastName">Child's last name</label><input id="child-${index}-lastName" name="child-${index}-lastName" value="${esc(child.lastName || "")}" required></div>
       <div class="field"><label for="child-${index}-birthdate">Date of birth</label><input id="child-${index}-birthdate" name="child-${index}-birthdate" type="date" value="${esc(child.birthdate)}" required></div>
-      <div class="field"><label for="child-${index}-gender">Shopping section / gender</label><select id="child-${index}-gender" name="child-${index}-gender" required><option value="">Choose one</option><option ${child.gender === "Girl" ? "selected" : ""}>Girl</option><option ${child.gender === "Boy" ? "selected" : ""}>Boy</option><option ${child.gender === "Other / discuss with organizer" ? "selected" : ""}>Other / discuss with organizer</option></select></div>
-      <div class="field"><label for="child-${index}-shirt">Shirt size</label><input id="child-${index}-shirt" name="child-${index}-shirt" value="${esc(child.shirt)}" required></div>
-      <div class="field"><label for="child-${index}-pants">Pants size</label><input id="child-${index}-pants" name="child-${index}-pants" value="${esc(child.pants)}" required></div>
-      <div class="field"><label for="child-${index}-shoes">Shoe size</label><input id="child-${index}-shoes" name="child-${index}-shoes" value="${esc(child.shoes)}" required></div>
-      <div class="field"><label for="child-${index}-underwear">Underwear size</label><input id="child-${index}-underwear" name="child-${index}-underwear" value="${esc(child.underwear)}" required></div>
-      <div class="field"><label for="child-${index}-coat">Coat size</label><input id="child-${index}-coat" name="child-${index}-coat" value="${esc(child.coat)}" required></div>
+      <div class="field"><label for="child-${index}-gender">Sizing category</label><select id="child-${index}-gender" name="child-${index}-gender" required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This guides the standard size choices below and does not limit identity.</small></div>
+      ${sizeField(index,"shirt","Shirt",child.shirt)}${sizeField(index,"pants","Pants",child.pants)}${sizeField(index,"shoes","Shoes",child.shoes)}${sizeField(index,"underwear","Underwear",child.underwear)}${sizeField(index,"coat","Coat",child.coat)}
+      <div class="field field--span-2"><label for="child-${index}-photo">Recent photo of this child</label><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png"><small>JPG or PNG. Used by authorized event staff for identification and badge printing. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div>
       <div class="field field--span-2"><label for="child-${index}-preferences">Colors, styles, interests, likes, or dislikes</label><textarea id="child-${index}-preferences" name="child-${index}-preferences" required>${esc(child.preferences)}</textarea></div>
       <div class="field field--span-2"><label for="child-${index}-accommodations">Medical, sensory, communication, mobility, or behavioral accommodations</label><textarea id="child-${index}-accommodations" name="child-${index}-accommodations" required>${esc(child.accommodations)}</textarea><small>Enter “None” if no accommodation is needed.</small></div>
     </div></section>`;
+  }
+
+  function sizeField(index, key, label, value) {
+    const common = ["2T","3T","4T","5T","Youth XS","Youth S","Youth M","Youth L","Youth XL","Adult XS","Adult S","Adult M","Adult L","Adult XL","Manual / other"];
+    return `<div class="field size-field"><label for="child-${index}-${key}">${label} size</label><input id="child-${index}-${key}" name="child-${index}-${key}" value="${esc(value)}" list="size-options-${index}-${key}" placeholder="Choose or type exact size" required><datalist id="size-options-${index}-${key}">${common.map((size)=>`<option value="${size}">`).join("")}</datalist><small>Select a standard size or type the exact size from the child's clothing.</small></div>`;
   }
 
   function syncChildren() {
@@ -441,7 +446,7 @@
     const data = new FormData(form);
     recipientDraft.children = recipientDraft.children.map((child, index) => {
       const next = {};
-      ["firstName", "lastName", "birthdate", "gender", "shirt", "pants", "shoes", "underwear", "coat", "preferences", "accommodations"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); next.name = `${next.firstName} ${next.lastName}`.trim();
+      ["firstName", "lastName", "birthdate", "gender", "shirt", "pants", "shoes", "underwear", "coat", "preferences", "accommodations"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || ""); next.name = `${next.firstName} ${next.lastName}`.trim();
       return next;
     });
   }
@@ -449,11 +454,10 @@
   function renderEmergency(panel) {
     const codeRequired = state.event.recipientStatus === "code";
     panel.innerHTML = `
-      <p class="eyebrow">Step 4 of 5</p><h2>Emergency contact & documents.</h2><p>This information is available only to authorized organizers and the limited event staff who need it.</p>
+      <p class="eyebrow">Step 4 of 5</p><h2>Emergency contact & files.</h2><p>We only need a name and phone number so authorized event staff can quickly reach someone if the Responsible Party cannot be reached during an emergency.</p>
       <form id="emergency-form"><div class="form-grid">
         <div class="field"><label for="emergency-name">Emergency contact name</label><input id="emergency-name" name="emergencyName" value="${esc(recipientDraft.emergencyName)}" required></div>
         <div class="field"><label for="emergency-phone">Emergency contact phone</label><input id="emergency-phone" name="emergencyPhone" type="tel" value="${esc(recipientDraft.emergencyPhone)}" required></div>
-        <div class="field"><label for="emergency-relation">Relationship</label><input id="emergency-relation" name="emergencyRelation" value="${esc(recipientDraft.emergencyRelation)}" required></div>
         ${codeRequired ? `<div class="field"><label for="recipient-code">Invitation code</label><input id="recipient-code" name="recipientCode" value="${esc(recipientDraft.recipientCode)}" required><small>Prototype testing code: HOPE26</small></div>` : ""}
         <div class="field field--span-2"><label>Supporting paperwork</label><div class="file-drop"><div><strong>Choose demonstration documents</strong><input id="recipient-documents" name="documents" type="file" multiple accept=".pdf,.jpg,.jpeg,.png"><small>No files leave this device in the prototype.</small></div></div>${recipientDraft.documents.length ? `<small>Selected: ${recipientDraft.documents.map(esc).join(", ")}</small>` : ""}</div>
       </div><div class="inline-note"><strong>Production security:</strong> Actual documents will be encrypted, kept private, and shown only through temporary links to authorized reviewers.</div><div id="code-error" class="validation-summary" hidden>The invitation code does not match this event.</div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Review application <span>→</span></button></div></form>`;
@@ -469,20 +473,20 @@
         document.querySelector("#code-error").hidden = false;
         return;
       }
-      recipientStep = 4;
+      recipientStep = 4; recipientMaxStep = Math.max(recipientMaxStep, 4);
       renderRecipient();
     });
   }
 
   function saveEmergency(data) {
-    ["emergencyName", "emergencyPhone", "emergencyRelation", "recipientCode"].forEach((key) => { recipientDraft[key] = String(data.get(key) || recipientDraft[key] || "").trim(); });
+    ["emergencyName", "emergencyPhone", "recipientCode"].forEach((key) => { recipientDraft[key] = String(data.get(key) || recipientDraft[key] || "").trim(); });
   }
 
   function renderReview(panel) {
     panel.innerHTML = `
       <p class="eyebrow">Step 5 of 5</p><h2>Review and sign.</h2><p>Confirm the key information below. You can return to any previous section if something needs to change.</p>
       <div class="review-list">
-        <div class="review-row"><span>Parent / guardian</span><strong>${esc(recipientDraft.guardian)}</strong></div>
+        <div class="review-row"><span>Responsible Party</span><strong>${esc(recipientDraft.guardian)}</strong></div>
         <div class="review-row"><span>Contact</span><strong>${esc(recipientDraft.email)} · ${esc(recipientDraft.phone)}</strong></div>
         <div class="review-row"><span>Address</span><strong>${esc(recipientDraft.address)}, ${esc(recipientDraft.city)}, AZ ${esc(recipientDraft.zip)}</strong></div>
         <div class="review-row"><span>Referral</span><strong>${esc(recipientDraft.referral)}</strong></div>
@@ -490,7 +494,7 @@
         <div class="review-row"><span>Emergency contact</span><strong>${esc(recipientDraft.emergencyName)} · ${esc(recipientDraft.emergencyPhone)}</strong></div>
         <div class="review-row"><span>Documents</span><strong>${recipientDraft.documents.length ? recipientDraft.documents.map(esc).join(", ") : "No demonstration documents selected"}</strong></div>
       </div>
-      <form id="signature-form"><div class="signature-box"><div class="form-grid"><div class="field field--span-2"><label for="signature">Electronic signature — type your full legal name</label><input id="signature" name="signature" autocomplete="name" required></div><div class="field field--span-2"><label class="checkbox-row"><input type="checkbox" name="authority" required><span>I am the parent or legal guardian, or I have authority to submit this application for the participating children.</span></label><label class="checkbox-row"><input type="checkbox" name="accuracy" required><span>I certify that this application is complete and accurate and that I agree to every acknowledgment initialed at the beginning.</span></label></div></div></div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Submit application <span>→</span></button></div></form>`;
+      <form id="signature-form"><div class="signature-box"><div class="review-row"><span>Agreement signed by</span><strong>${esc(recipientDraft.agreementSignature)}</strong></div><label class="checkbox-row"><input type="checkbox" name="authority" required><span>I am the Responsible Party, or I have authority to submit this application for the participating children.</span></label><label class="checkbox-row"><input type="checkbox" name="accuracy" required><span>I certify that this application is complete and accurate and confirm the agreements I checked and signed at the beginning.</span></label></div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Submit application <span>→</span></button></div></form>`;
     document.querySelector("[data-recipient-back]").addEventListener("click", () => { recipientStep = 3; renderRecipient(); });
     document.querySelector("#signature-form").addEventListener("submit", submitRecipient);
   }
@@ -515,9 +519,8 @@
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
-    const data = new FormData(form);
-    if (normalize(data.get("signature")) !== normalize(recipientDraft.guardian)) {
-      toast("The electronic signature must match the parent or guardian name.");
+    if (normalize(recipientDraft.agreementSignature) !== normalize(recipientDraft.guardian)) {
+      toast("The agreement signature must match the Responsible Party name.");
       return;
     }
     const flags = findApplicationFlags(recipientDraft);
@@ -537,7 +540,7 @@
     const reviewCount = state.applications.filter((item) => !item.archived && ["submitted", "review", "info"].includes(item.status)).length;
     const preview = previewRole ? `<div class="role-preview-banner"><strong>Previewing as ${esc(role)}</strong><span>You are seeing exactly what this role can access.</span><button type="button" data-return-owner>Return to Executive Owner</button></div>` : "";
     return `${preview}<div class="organizer-shell ${role === "Read-Only Coordinator" ? "is-read-only" : ""}"><aside class="organizer-sidebar"><div class="organizer-sidebar__title"><span>Private workspace</span><strong>Organizer tools</strong></div><nav class="organizer-menu" aria-label="Organizer sections">
-      ${organizerLink("dashboard", "Overview", subroute)}${organizerLink("events", "Event setup", subroute)}${organizerLink("volunteers", "Volunteer directory", subroute)}${organizerLink("applications", "Applications", subroute, reviewCount)}${organizerLink("checkin", "Check-in", subroute)}${organizerLink("packets", "Print packets", subroute)}${organizerLink("emails", "Email center", subroute)}${organizerLink("reports", "Reports & history", subroute)}${organizerLink("settings", "Settings", subroute)}
+      ${organizerLink("dashboard", "Overview", subroute)}${organizerLink("events", "Event Management", subroute)}${organizerLink("volunteers", "Volunteers", subroute)}${organizerLink("applications", "Recipients", subroute, reviewCount)}${organizerLink("checkin", "Check-in", subroute)}${organizerLink("packets", "Print packets", subroute)}${organizerLink("badges", "Print badges", subroute)}${organizerLink("emails", "Email center", subroute)}${organizerLink("reports", "Reports & history", subroute)}${organizerLink("settings", "Settings", subroute)}
       </nav><p class="organizer-sidebar__footer">Signed in as ${esc(role)} · <button type="button" data-portal-logout>Sign out</button></p></aside><section class="organizer-main">${content}</section></div>`;
   }
 
@@ -553,15 +556,16 @@
       main.innerHTML = organizerShell(subroute, `<section class="locked-panel"><span>🔒</span><p class="eyebrow">Restricted for ${esc(role)}</p><h1>This area is locked.</h1><p>Your account can see the navigation, but it cannot open this private section.</p>${role === "Check-In Staff" ? `<button class="button button--green" type="button" data-elevate>Unlock with organizer PIN</button>` : ""}</section>`); bindOrganizer(subroute); return;
     }
     let content;
-    if (subroute === "events") content = organizerEvents();
-    else if (subroute === "volunteers") content = organizerVolunteersV6();
+    if (subroute === "events") content = organizerEventsV8();
+    else if (subroute === "volunteers") content = organizerVolunteersV8();
     else if (subroute === "applications") content = organizerApplicationsV7();
     else if (subroute === "checkin") content = organizerCheckin();
     else if (subroute === "packets") content = organizerPacketsV5();
-    else if (subroute === "emails") content = organizerEmails();
-    else if (subroute === "reports") content = organizerReports();
+    else if (subroute === "badges") content = organizerBadges();
+    else if (subroute === "emails") content = organizerEmailsV8();
+    else if (subroute === "reports") content = organizerReportsV8();
     else if (subroute === "settings") content = organizerSettingsV5();
-    else content = organizerDashboard();
+    else content = organizerDashboardV8();
     main.innerHTML = organizerShell(subroute, content);
     bindOrganizer(subroute);
   }
@@ -574,7 +578,7 @@
   }
 
   function heading(kicker, title, description, action) {
-    const contextualTabs = title === "Volunteer directory" ? `<div class="view-tabs section-view-tabs"><button class="${volunteerView === "all" ? "is-active" : ""}" type="button" data-volunteer-view="all">All volunteers (${state.volunteers.length})</button><button class="${volunteerView === "current" ? "is-active" : ""}" type="button" data-volunteer-view="current">Current event roster (${state.volunteers.filter((item)=>item.currentEvent).length})</button></div>` : title === "Applications" ? `<div class="view-tabs section-view-tabs"><button class="${applicationView === "current" ? "is-active" : ""}" type="button" data-application-view="current">Current applications</button><button class="${applicationView === "log" ? "is-active" : ""}" type="button" data-application-view="log">Application Log (${state.applications.filter((item)=>item.archived).length})</button></div>` : "";
+    const contextualTabs = title === "Volunteer directory" ? `<div class="view-tabs section-view-tabs"><button class="${volunteerView === "all" ? "is-active" : ""}" type="button" data-volunteer-view="all">Entire volunteer directory (${state.volunteers.length})</button><button class="${volunteerView === "current" ? "is-active" : ""}" type="button" data-volunteer-view="current">Current event signups (${state.volunteers.filter((item)=>item.currentEvent).length})</button></div>` : title === "Applications" ? `<div class="view-tabs section-view-tabs"><button class="${applicationView === "current" ? "is-active" : ""}" type="button" data-application-view="current">Current applications</button><button class="${applicationView === "log" ? "is-active" : ""}" type="button" data-application-view="log">Past Recipients / History (${state.applications.filter((item)=>item.archived).length})</button></div>` : "";
     return `<header class="organizer-heading"><div><p class="eyebrow">${esc(kicker)}</p><h1>${esc(title)}</h1><p>${esc(description)}</p>${contextualTabs}</div>${action || ""}</header>`;
   }
 
@@ -612,7 +616,7 @@
   }
 
   function organizerVolunteers(filter = "") {
-    return organizerVolunteersV6(filter);
+    return organizerVolunteersV8(filter);
     /* Legacy layout retained below for reference during prototype iteration. */
     const normalized = normalize(filter);
     const rows = state.volunteers.filter((item) => (volunteerView === "all" || item.currentEvent) && (!normalized || normalize(`${item.name} ${item.email} ${item.phone} ${item.role} ${item.currentEvent}`).includes(normalized)));
@@ -627,6 +631,10 @@
     const lastName = (item)=>item.name.trim().split(/\s+/).slice(-1)[0];
     if(volunteerSort==="name-az")rows.sort((a,b)=>a.name.localeCompare(b.name)); else if(volunteerSort==="last-az")rows.sort((a,b)=>lastName(a).localeCompare(lastName(b))); else if(volunteerSort==="role")rows.sort((a,b)=>a.role.localeCompare(b.role)); else if(volunteerSort==="no-shows")rows.sort((a,b)=>(b.history||[]).filter(x=>x.result==="No-show").length-(a.history||[]).filter(x=>x.result==="No-show").length);
     return `${heading("People & participation", "Volunteer directory", volunteerView === "all" ? "Every current and past volunteer remains searchable here." : `People currently registered for ${state.event.title}.`, `<button class="button button--light" type="button" data-export="volunteers">Download volunteers.csv</button>`)}<div class="table-tools"><label class="search-field"><span class="screen-reader-only">Search volunteers</span><input id="volunteer-search" type="search" value="${esc(filter)}" placeholder="Search name, email, phone, role, or event"></label><span>${rows.length} volunteers</span></div>${sortBar("volunteers",volunteerSort,[["name-az","First name"],["last-az","Last name"],["role","Role"],["no-shows","No-shows"]])}<div class="directory-list">${rows.map((item)=>{const history=item.history||[];const noShows=history.filter(x=>x.result==="No-show").length;return `<details class="directory-card"><summary><span><strong>${esc(item.name)}</strong><small>${esc(item.email)} · ${esc(item.phone)}</small></span><span><b>${esc(item.role)}</b><small>${history.length} prior event${history.length===1?"":"s"}${noShows?` · ${noShows} no-show`:""}</small></span>${item.currentEvent?statusPill("approved","Currently registered"):statusPill("closed","Past volunteer")}</summary><div class="directory-card__body"><div><h3>Current registration</h3><p>${item.currentEvent?`${esc(item.currentEvent)} · ${esc(item.role)} · ${esc(item.shift)}`:"Not registered for a current event."}</p><p><strong>Organizer note:</strong> ${esc(item.notes||"No notes")}</p></div><div><h3>Event history</h3>${history.length?history.map((entry)=>`<p class="history-row"><span>${esc(entry.event)} · ${esc(entry.role)}</span><b class="${entry.result==="No-show"?"text-danger":""}">${esc(entry.result)}</b></p>`).join(""):`<p>No prior events recorded.</p>`}</div></div></details>`;}).join("")}</div>`;
+  }
+
+  function organizerVolunteersV8(filter = "") {
+    return organizerVolunteersV6(filter).replace('<div class="table-tools">', '<div class="directory-actions"><button class="button button--green" type="button" data-add-volunteer>+ Add volunteer</button></div><div class="table-tools">');
   }
 
   function organizerApplications(filter = "") {
@@ -706,6 +714,39 @@
   function organizerSettingsV5() {
     const previewPanel = `<article class="panel role-viewer"><div><p class="eyebrow">Permission preview</p><h2>View portal as…</h2><p>Temporarily experience exactly what another person can see.</p></div><div class="role-viewer__options"><button type="button" data-preview-role="Signed out visitor">Nobody / signed out</button><button type="button" data-preview-role="Check-In Staff">Check-In Staff</button><button type="button" data-preview-role="Read-Only Coordinator">Read-Only Coordinator</button><button type="button" data-preview-role="Event Administrator">Event Administrator</button><button type="button" data-preview-role="Executive Owner">Executive Owner</button></div></article>`;
     return organizerSettings().replace('<article class="panel">', `${previewPanel}<article class="panel">`);
+  }
+
+  function organizerDashboardV8() {
+    const children = state.applications.filter((item)=>!item.archived).reduce((sum,item)=>sum+item.children.length,0);
+    const volunteers = state.volunteers.filter((item)=>item.currentEvent).length;
+    return `${heading("Organizer overview", "Upcoming event", "The information your team needs first, without extra setup shortcuts.")}<article class="panel upcoming-event"><div><p class="eyebrow">Next scheduled event</p><h2>${esc(state.event.title)}</h2><p>${esc(state.event.date)} · ${esc(state.event.time)}</p><p>${esc(state.event.location)}<br>${esc(state.event.address)}</p></div><div class="upcoming-status"><span>${statusPill(state.event.volunteerStatus,"Volunteer signup "+formatStatus(state.event.volunteerStatus))}</span><span>${statusPill(state.event.recipientStatus,"Recipient signup "+formatStatus(state.event.recipientStatus))}</span><a class="button button--green" href="#organizer/checkin">Open event check-in →</a></div></article><div class="metric-grid"><article class="metric-card"><span>Current volunteers</span><strong>${volunteers}</strong><small>${Math.max(0,state.event.volunteerCapacity-volunteers)} spots remaining</small></article><article class="metric-card"><span>Children requested</span><strong>${children}</strong><small>Current applications</small></article><article class="metric-card"><span>Applications needing review</span><strong>${state.applications.filter((item)=>!item.archived&&["submitted","review","info"].includes(item.status)).length}</strong><small>Organizer attention</small></article><article class="metric-card"><span>Approved children</span><strong>${state.applications.filter((item)=>!item.archived).reduce((sum,item)=>sum+item.children.filter((child)=>child.decision==="approved").length,0)}</strong><small>Ready for event</small></article></div><article class="panel"><div class="panel-header"><div><h2>Recent activity</h2><p>Latest organizer and signup changes</p></div></div><div class="activity-list">${state.activity.slice(0,8).map((item)=>`<div class="activity-item"><span class="activity-dot"></span><p>${esc(item.text)}</p><time>${esc(item.time)}</time></div>`).join("")}</div></article>`;
+  }
+
+  function organizerEventsV8() {
+    const remembered = JSON.parse(sessionStorage.getItem("ccc-event-sections") || "null");
+    let html = organizerEvents().replace('Event setup', 'Event Management').replace('<form id="event-form">', `<div class="event-context event-context--simple"><label>Event being edited<select><option>${esc(state.event.title)}</option><option>Christmas Shopping 2025 (closed record)</option></select></label></div><form id="event-form">`);
+    html = html.replace('<details class="settings-section" open>', '<details class="settings-section">');
+    html = html.replace('<h3>Volunteer registration</h3>', '<div class="configuration-heading"><span>Volunteer configuration</span><small>Access, public questions, roles, and capacity</small></div><h3>Volunteer registration</h3>');
+    html = html.replace('<h3>Recipient applications</h3>', '<div class="configuration-heading"><span>Recipient configuration</span><small>Access and application questions are managed separately</small></div><h3>Recipient applications</h3>');
+    html += `<article class="finish-event-panel"><div><p class="eyebrow">End-of-event action</p><h2>Finished with this event?</h2><p>Close-out records are preserved in reports, the volunteer directory, and Past Recipients / History.</p></div><button class="button button--danger" type="button" data-finish-event>Finish Event</button></article>`;
+    setTimeout(()=>{ document.querySelectorAll(".settings-section").forEach((section,index)=>{ if (remembered) section.open=Boolean(remembered[index]); section.addEventListener("toggle",()=>sessionStorage.setItem("ccc-event-sections",JSON.stringify([...document.querySelectorAll(".settings-section")].map((item)=>item.open)))); }); },0);
+    return html;
+  }
+
+  function organizerBadges() {
+    const volunteerBadges = state.volunteers.filter((item)=>item.currentEvent);
+    const childBadges = state.applications.filter((item)=>!item.archived).flatMap((household)=>household.children.filter((child)=>child.decision==="approved").map((child)=>({child,household})));
+    return `${heading("Event-day printing", "Print badges", "Print one badge, a complete batch, or a second recipient copy for the child's shopping bag.", `<button class="button button--green" type="button" data-print-badges="all">Print all badges</button>`)}<div class="badge-settings panel"><div class="field"><label>Badge size<select><option>3 × 4 inches (recommended)</option><option>2.25 × 3.5 inches</option><option>4 × 6 inches</option></select></label></div><p>Production printing will honor your selected label stock. This prototype uses a clean standard badge layout.</p></div><h2 class="section-title">Volunteer badges</h2><div class="badge-grid">${volunteerBadges.map((person)=>`<article class="badge-card"><span>Campbell's Crew Cares</span><strong>${esc(person.name)}</strong><b>${esc(person.role)}</b><button class="button button--small button--ghost" type="button" data-print-badge="${esc(person.id)}">Print this badge</button></article>`).join("")}</div><h2 class="section-title">Recipient badges</h2><div class="badge-grid">${childBadges.map(({child,household})=>`<article class="badge-card badge-card--recipient"><div class="badge-photo">${child.photoName?"Photo":"Photo"}</div><span>Campbell's Crew Cares</span><strong>${esc(child.name)}</strong><b>${esc(household.id)}</b><div><button class="button button--small button--ghost" type="button" data-print-badge="${esc(child.id)}">One badge</button><button class="button button--small button--green" type="button" data-print-badge="${esc(child.id)}-bag">Badge + bag copy</button></div></article>`).join("")}</div>`;
+  }
+
+  function organizerEmailsV8() {
+    return organizerEmails().replace('<div class="email-layout">', `<article class="panel email-sender"><div><p class="eyebrow">Authorized sender</p><h2>Submission@Campbellscrew.com</h2><p>Signup confirmations, reminders, application notices, and organizer alerts will use this address once secure delivery is connected.</p></div><div><strong>Organizer notifications</strong><p>Campbell@Campbellscrew.com</p></div></article><div class="email-layout">`);
+  }
+
+  function organizerReportsV8() {
+    const latest = state.reports[0];
+    const stats = state.publicStats || { families: 640, children: 1280, volunteers: 910, years: 9 };
+    return `${heading("Event records", "Reports & history", "Permanent completed-event records and editable public impact totals.")}<article class="panel"><div class="panel-header"><div><h2>Public impact statistics</h2><p>Edit the totals shown on the public Campbell's Crew Cares website.</p></div></div><form id="impact-form" class="form-grid"><div class="field"><label>Families served<input name="families" type="number" value="${stats.families}"></label></div><div class="field"><label>Children served<input name="children" type="number" value="${stats.children}"></label></div><div class="field"><label>Volunteers engaged<input name="volunteers" type="number" value="${stats.volunteers}"></label></div><div class="field"><label>Years serving<input name="years" type="number" value="${stats.years}"></label></div><button class="button button--green" type="submit">Save public totals</button></form></article><article class="panel"><h2>Completed event records</h2>${state.reports.map((report)=>`<div class="report-row"><span><strong>${esc(report.event)}</strong><small>${esc(report.status)} · Permanent record</small></span><b>${report.childrenAttended}/${report.childrenRegistered} children · ${report.volunteerHours} hours · $${Number(report.totalSpent).toLocaleString()}</b><button class="button button--small button--ghost" type="button" data-demo-action="view-report">View details</button></div>`).join("")}</article>${latest?`<div class="metric-grid"><article class="metric-card"><span>Latest child attendance</span><strong>${latest.childrenAttended}/${latest.childrenRegistered}</strong></article><article class="metric-card"><span>Latest volunteer hours</span><strong>${latest.volunteerHours}</strong></article><article class="metric-card"><span>Latest spending</span><strong>$${Number(latest.totalSpent).toLocaleString()}</strong></article></div>`:""}`;
   }
 
   function bindOrganizer(subroute) {
@@ -792,6 +833,13 @@
     });
     const addUser = document.querySelector("[data-add-user]");
     if (addUser) addUser.addEventListener("click", openAddUser);
+    const finishEvent = document.querySelector("[data-finish-event]");
+    if (finishEvent) finishEvent.addEventListener("click", openFinishEvent);
+    const impactForm = document.querySelector("#impact-form");
+    if (impactForm) impactForm.addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); state.publicStats = Object.fromEntries(["families","children","volunteers","years"].map((key)=>[key,Number(data.get(key)||0)])); saveState(); toast("Public impact totals saved in this demonstration browser."); });
+    const addVolunteer = document.querySelector("[data-add-volunteer]");
+    if (addVolunteer) addVolunteer.addEventListener("click", openAddVolunteer);
+    document.querySelectorAll("[data-print-badge], [data-print-badges]").forEach((button)=>button.addEventListener("click",()=>{ document.body.dataset.printBadge = button.dataset.printBadge || "all"; window.print(); }));
     document.querySelectorAll("[data-demo-action]").forEach((button) => button.addEventListener("click", () => {
       const messages = { duplicate: "A copied event draft would open here; permanent event creation needs the secure database.", create: "The event builder is ready for the secure database phase.", "add-role": "Additional custom roles will save once the secure database is connected.", "new-email": "Use the blast-email composer already shown on this page.", "test-email": "No email was sent; delivery remains disabled in this fictional-data prototype.", closeout: "Complete the close-out worksheet below to save a demonstration report.", "view-report": "The full historical-report view is planned for the next reporting pass.", "user-menu": "User editing will activate with real Google Workspace accounts." }; toast(messages[button.dataset.demoAction] || "This demonstration action is not connected yet.");
     }));
@@ -868,6 +916,19 @@
     dialogContent.innerHTML = `<form class="dialog-body" id="email-draft-form"><p class="eyebrow">Automatic email draft</p><h2 id="dialog-title">${esc(template.title)}</h2><div class="field"><label>Subject<input name="subject" value="${esc(template.subject)}" required></label></div><div class="field"><label>Message<textarea name="body" rows="10" required>${esc(template.body || `Hello {{first_name}},\n\nYour submission for ${state.event.title} was received.\n\nDate: ${state.event.date}\nTime: ${state.event.time}\nLocation: ${state.event.location}\n\nPlease arrive a few minutes early so we can begin on time.`)}</textarea></label></div><p class="field-help">Placeholders such as {{first_name}} will be filled automatically in production.</p><button class="button button--green" type="submit">Save draft →</button></form>`;
     appDialog.showModal(); document.body.classList.add("dialog-open");
     dialogContent.querySelector("#email-draft-form").addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); template.subject = String(data.get("subject")); template.body = String(data.get("body")); saveState(); closeDialog(); toast("Email draft saved."); renderOrganizer("emails"); });
+  }
+
+  function openAddVolunteer() {
+    dialogContent.innerHTML = `<form class="dialog-body" id="add-volunteer-form"><p class="eyebrow">Volunteer directory</p><h2 id="dialog-title">Add a volunteer</h2><p>Add someone to the permanent directory and optionally register them for the current event.</p><div class="form-grid"><div class="field"><label>First name<input name="firstName" required></label></div><div class="field"><label>Last name<input name="lastName" required></label></div><div class="field"><label>Email<input name="email" type="email" required></label></div><div class="field"><label>Phone<input name="phone" type="tel" required></label></div><div class="field"><label>Role<select name="role">${state.event.roles.filter((role)=>role.enabled).map((role)=>`<option>${esc(role.title)}</option>`).join("")}</select></label></div><label class="question-toggle"><input type="checkbox" name="currentEvent" checked><span><strong>Register for current event</strong><small>${esc(state.event.title)}</small></span></label><div class="field field--span-2"><label>Organizer note<textarea name="notes"></textarea></label></div></div><button class="button button--green" type="submit">Add volunteer →</button></form>`;
+    appDialog.showModal(); document.body.classList.add("dialog-open");
+    dialogContent.querySelector("#add-volunteer-form").addEventListener("submit",(event)=>{ event.preventDefault(); const data=new FormData(event.currentTarget); const role=String(data.get("role")); const roleRecord=state.event.roles.find((item)=>item.title===role); state.volunteers.push({id:makeId("VOL",state.volunteers),name:`${data.get("firstName")} ${data.get("lastName")}`,email:String(data.get("email")),phone:String(data.get("phone")),role,shift:roleRecord?.shift||"",currentEvent:data.has("currentEvent")?state.event.title:"",notes:String(data.get("notes")||""),history:[],status:"confirmed",checkedIn:false,checkedAt:""}); saveState(); closeDialog(); toast("Volunteer added to the directory."); renderOrganizer("volunteers"); });
+  }
+
+  function openFinishEvent() {
+    const currentChildren=state.applications.filter((item)=>!item.archived).reduce((sum,item)=>sum+item.children.length,0);
+    const currentVolunteers=state.volunteers.filter((item)=>item.currentEvent).length;
+    dialogContent.innerHTML=`<form class="dialog-body finish-dialog" id="finish-event-form"><p class="eyebrow">Permanent event close-out</p><h2 id="dialog-title">Finish ${esc(state.event.title)}?</h2><p>Enter final totals. Finishing moves recipient applications to Past Recipients / History and converts current volunteer signups into event history.</p><div class="form-grid"><div class="field"><label>Children registered<input name="childrenRegistered" type="number" value="${currentChildren}" required></label></div><div class="field"><label>Children attended<input name="childrenAttended" type="number" value="${state.applications.flatMap((item)=>item.children).filter((child)=>child.attendance==="checked").length}" required></label></div><div class="field"><label>Volunteers registered<input name="volunteersRegistered" type="number" value="${currentVolunteers}" required></label></div><div class="field"><label>Volunteers attended<input name="volunteersAttended" type="number" value="${state.volunteers.filter((item)=>item.currentEvent&&item.checkedIn).length}" required></label></div><div class="field"><label>Volunteer hours<input name="volunteerHours" type="number" value="0" required></label></div><div class="field"><label>Total event spending<input name="totalSpent" type="number" value="0" required></label></div><div class="field field--span-2"><label>Close-out notes<textarea name="notes"></textarea></label></div></div><div class="finish-confirm"><strong>Slide all the way right to confirm</strong><input id="finish-slider" type="range" min="0" max="100" value="0"><small id="finish-slider-copy">Event is not yet finished.</small></div><button class="button button--danger button--wide" id="finish-submit" type="submit" disabled>Finish Event permanently</button></form>`;
+    appDialog.showModal();document.body.classList.add("dialog-open"); const slider=dialogContent.querySelector("#finish-slider");const submit=dialogContent.querySelector("#finish-submit");slider.addEventListener("input",()=>{submit.disabled=Number(slider.value)<100;dialogContent.querySelector("#finish-slider-copy").textContent=submit.disabled?"Keep sliding to confirm.":"Confirmed. You may now finish the event.";});dialogContent.querySelector("#finish-event-form").addEventListener("submit",(event)=>{event.preventDefault();if(Number(slider.value)<100)return;const data=new FormData(event.currentTarget);const num=(key)=>Number(data.get(key)||0);state.reports.unshift({event:state.event.title,status:"Closed out",childrenRegistered:num("childrenRegistered"),childrenAttended:num("childrenAttended"),volunteersRegistered:num("volunteersRegistered"),volunteersAttended:num("volunteersAttended"),volunteerHours:num("volunteerHours"),totalSpent:num("totalSpent"),notes:String(data.get("notes")||"")});state.applications.filter((item)=>!item.archived).forEach((item)=>{item.archived=true;item.eventName=state.event.title;});state.volunteers.filter((item)=>item.currentEvent).forEach((item)=>{item.history=item.history||[];item.history.unshift({event:state.event.title,role:item.role,result:item.checkedIn?"Attended":(item.attendanceStatus==="excused"?"Excused absence":"No-show")});item.currentEvent="";});state.event.volunteerStatus="closed";state.event.recipientStatus="closed";state.activity.unshift({text:`${state.event.title} was finished and moved to permanent history.`,time:"Just now"});saveState();closeDialog();toast("Event finished. Records are now in permanent history.");renderOrganizer("reports");});
   }
 
   function openAddUser() {
