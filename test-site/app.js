@@ -182,7 +182,7 @@
   function createRecipientDraft() {
     return {
       acknowledgments: {}, agreementSignature: "", guardian: "", email: "", phone: "", address: "", city: "", zip: "", referral: "", preferredContact: "Email", notes: "",
-      children: [{ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", underwear: "", coat: "", preferences: "", accommodations: "" }],
+      children: [{ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" }],
       emergencyName: "", emergencyPhone: "", emergencyRelation: "", recipientCode: "", documents: []
     };
   }
@@ -446,16 +446,17 @@
       <form id="children-form">${recipientDraft.children.map((child, index) => childFormHtml(child, index)).join("")}<button class="button button--ghost" type="button" id="add-child">+ Add another child</button><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Continue <span>→</span></button></div></form>`;
     document.querySelector("#add-child").addEventListener("click", () => {
       syncChildren();
-      recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", underwear: "", coat: "", preferences: "", accommodations: "" });
+      recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" });
       renderRecipient();
     });
     document.querySelectorAll("[data-remove-child]").forEach((button) => button.addEventListener("click", () => {
       syncChildren();
       recipientDraft.children.splice(Number(button.dataset.removeChild), 1);
-      if (!recipientDraft.children.length) recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", underwear: "", coat: "", preferences: "", accommodations: "" });
+      if (!recipientDraft.children.length) recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" });
       renderRecipient();
     }));
     document.querySelector("[data-recipient-back]").addEventListener("click", () => { syncChildren(); recipientStep = 1; renderRecipient(); });
+    document.querySelectorAll("[data-size-select]").forEach((select) => select.addEventListener("change", () => updateManualSizeField(select)));
     document.querySelector("#children-form").addEventListener("submit", (event) => {
       event.preventDefault();
       if (!event.currentTarget.reportValidity()) return;
@@ -470,16 +471,28 @@
       <div class="field"><label for="child-${index}-firstName">Child's first name</label><input id="child-${index}-firstName" name="child-${index}-firstName" value="${esc(child.firstName || "")}" required></div><div class="field"><label for="child-${index}-lastName">Child's last name</label><input id="child-${index}-lastName" name="child-${index}-lastName" value="${esc(child.lastName || "")}" required></div>
       <div class="field"><label for="child-${index}-birthdate">Date of birth</label><input id="child-${index}-birthdate" name="child-${index}-birthdate" type="date" value="${esc(child.birthdate)}" required></div>
       <div class="field"><label for="child-${index}-gender">Sizing category</label><select id="child-${index}-gender" name="child-${index}-gender" required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This guides the standard size choices below and does not limit identity.</small></div>
-      ${sizeField(index,"shirt","Shirt",child.shirt)}${sizeField(index,"pants","Pants",child.pants)}${sizeField(index,"shoes","Shoes",child.shoes)}${sizeField(index,"underwear","Underwear",child.underwear)}${sizeField(index,"coat","Coat",child.coat)}
+      ${sizeField(index,"shirt","Shirt",child.shirt,"apparel")}${sizeField(index,"pants","Pants",child.pants,"apparel")}${sizeField(index,"shoes","Shoes",child.shoes,"shoes")}${sizeField(index,"socks","Socks",child.socks,"socks")}${sizeField(index,"underwear","Underwear",child.underwear,"apparel")}${sizeField(index,"coat","Coat",child.coat,"apparel")}
       <div class="field field--span-2"><label for="child-${index}-photo">Recent photo of this child</label><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png"><small>JPG or PNG. Used by authorized event staff for identification and badge printing. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div>
       <div class="field field--span-2"><label for="child-${index}-preferences">Colors, styles, interests, likes, or dislikes</label><textarea id="child-${index}-preferences" name="child-${index}-preferences" required>${esc(child.preferences)}</textarea></div>
       <div class="field field--span-2"><label for="child-${index}-accommodations">Medical, sensory, communication, mobility, or behavioral accommodations</label><textarea id="child-${index}-accommodations" name="child-${index}-accommodations" required>${esc(child.accommodations)}</textarea><small>Enter “None” if no accommodation is needed.</small></div>
     </div></section>`;
   }
 
-  function sizeField(index, key, label, value) {
-    const common = ["2T","3T","4T","5T","Youth XS","Youth S","Youth M","Youth L","Youth XL","Adult XS","Adult S","Adult M","Adult L","Adult XL","Manual / other"];
-    return `<div class="field size-field"><label for="child-${index}-${key}">${label} size</label><input id="child-${index}-${key}" name="child-${index}-${key}" value="${esc(value)}" list="size-options-${index}-${key}" placeholder="Choose or type exact size" required><datalist id="size-options-${index}-${key}">${common.map((size)=>`<option value="${size}">`).join("")}</datalist><small>Select a standard size or type the exact size from the child's clothing.</small></div>`;
+  function sizeChoices(kind) {
+    if (kind === "shoes") return Array.from({ length: 31 }, (_, index) => String(index / 2));
+    if (kind === "socks") return ["Toddler 0–4","Toddler 4.5–8","Toddler 8.5–13","Youth 1–4","Youth 4.5–7","Adult 5–9","Adult 9–11","Adult 10–13","Adult 13–15"];
+    return ["Preemie","Newborn","0–3 months","3–6 months","6–9 months","9–12 months","12–18 months","18–24 months","2T","3T","4T","5T","4","5","6","7","8","10","12","14","16","18","20","Youth XS","Youth S","Youth M","Youth L","Youth XL","Adult XS","Adult S","Adult M","Adult L","Adult XL","Adult 2XL","Adult 3XL"];
+  }
+
+  function sizeField(index, key, label, value, kind) {
+    const choices = sizeChoices(kind); const manual = value && !choices.includes(value); const selectId = `child-${index}-${key}`; const manualId = `${selectId}-manual-wrap`;
+    return `<div class="field size-field"><label for="${selectId}">${label} size</label><select id="${selectId}" name="${selectId}" data-size-select data-manual-id="${manualId}" required><option value="">Choose a size</option>${choices.map((size) => `<option value="${esc(size)}" ${value === size ? "selected" : ""}>${kind === "shoes" ? `Size ${esc(size)}` : esc(size)}</option>`).join("")}<option value="__manual__" ${manual ? "selected" : ""}>Other / enter manually</option></select><div class="manual-size-field" id="${manualId}" ${manual ? "" : "hidden"}><label for="${selectId}-manual">Enter the size shown on the child’s clothing</label><input id="${selectId}-manual" name="${selectId}-manual" value="${manual ? esc(value) : ""}" placeholder="For example: 8 slim or 16 husky"></div><small>${kind === "shoes" ? "Choose the numbered shoe size shown on the child’s shoes." : kind === "socks" ? "Choose the shoe-size range that matches the child’s socks." : "Choose the standard clothing size. Use Other only when the exact label is not listed."}</small></div>`;
+  }
+
+  function updateManualSizeField(select) {
+    const manual = document.querySelector(`#${select.dataset.manualId}`); if (!manual) return;
+    const input = manual.querySelector("input"); const shown = select.value === "__manual__";
+    manual.hidden = !shown; input.required = shown; if (shown) input.focus();
   }
 
   function syncChildren() {
@@ -488,7 +501,7 @@
     const data = new FormData(form);
     recipientDraft.children = recipientDraft.children.map((child, index) => {
       const next = {};
-      ["firstName", "lastName", "birthdate", "gender", "shirt", "pants", "shoes", "underwear", "coat", "preferences", "accommodations"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || ""); next.name = `${next.firstName} ${next.lastName}`.trim();
+      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); ["shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => { const selected = String(data.get(`child-${index}-${key}`) || ""); next[key] = selected === "__manual__" ? String(data.get(`child-${index}-${key}-manual`) || "").trim() : selected; }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || ""); next.name = `${next.firstName} ${next.lastName}`.trim();
       return next;
     });
   }
@@ -1111,12 +1124,12 @@
 
   function applicationWorkbookSheets() {
     const households = [["Application ID", "Event", "Responsible party", "Email", "Phone", "Address", "City", "ZIP", "Referral", "Emergency contact", "Emergency phone", "Relationship", "Submitted", "Status", "Updated since review", "Archived"]];
-    const children = [["Application ID", "Child ID", "First name", "Last name", "Birthdate", "Age", "Gender / sizing category", "Shirt", "Pants", "Shoes", "Underwear", "Coat", "Preferences", "Accommodations", "Decision", "Attendance", "Attendance note"]];
+    const children = [["Application ID", "Child ID", "First name", "Last name", "Birthdate", "Age", "Gender / sizing category", "Shirt", "Pants", "Shoes", "Socks", "Underwear", "Coat", "Preferences", "Accommodations", "Decision", "Attendance", "Attendance note"]];
     const flags = [["Application ID", "Responsible party", "Flag"]];
     const attendance = [["Application ID", "Responsible party", "Event", "Result"]];
     state.applications.forEach((item) => {
       households.push([item.id, item.eventName || state.event.title, item.guardian, item.email, item.phone, item.address, item.city, item.zip, item.referral, item.emergencyName, item.emergencyPhone, item.emergencyRelation, item.submitted, formatStatus(item.status), item.updated ? "Yes" : "No", item.archived ? "Yes" : "No"]);
-      (item.children || []).forEach((child) => children.push([item.id, child.id, child.firstName || child.name, child.lastName || "", child.birthdate || "", child.age ?? "", child.gender || "", child.shirt || "", child.pants || "", child.shoes || "", child.underwear || "", child.coat || "", child.preferences || "", child.accommodations || "", formatStatus(child.decision || item.status), formatStatus(child.attendance || "expected"), child.attendanceNote || ""]));
+      (item.children || []).forEach((child) => children.push([item.id, child.id, child.firstName || child.name, child.lastName || "", child.birthdate || "", child.age ?? "", child.gender || "", child.shirt || "", child.pants || "", child.shoes || "", child.socks || "", child.underwear || "", child.coat || "", child.preferences || "", child.accommodations || "", formatStatus(child.decision || item.status), formatStatus(child.attendance || "expected"), child.attendanceNote || ""]));
       (item.flags || []).forEach((flag) => flags.push([item.id, item.guardian, flag]));
       (item.previousAttendance || []).forEach((entry) => attendance.push([item.id, item.guardian, entry.event || "", entry.result || ""]));
     });
