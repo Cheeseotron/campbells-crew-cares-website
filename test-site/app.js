@@ -145,6 +145,9 @@
       if (!event.id) event.id = `event-${index + 1}`;
       if (event.volunteerEnabled === undefined) event.volunteerEnabled = true;
       if (event.recipientEnabled === undefined) event.recipientEnabled = true;
+      if (!event.type) event.type = "shopping";
+      if (!Number.isFinite(event.bagGoal)) event.bagGoal = 100;
+      if (!Array.isArray(event.bagItems)) event.bagItems = [{ id: "rice", label: "Rice", quantity: 1 }, { id: "beans", label: "Beans", quantity: 2 }, { id: "pasta", label: "Pasta", quantity: 1 }];
     });
     if (!target.activeEventId || !target.events.some((event) => event.id === target.activeEventId)) target.activeEventId = target.events.find((event) => !event.closed)?.id || target.events[0]?.id || "";
     delete target.event;
@@ -599,11 +602,9 @@
 
   function roleRoutes(role) {
     const all = ["dashboard", "events", "volunteer-signups", "applications", "checkin", "packets", "badges", "emails", "volunteers", "recipient-history", "reports", "settings"];
-    if (role === "Executive Owner") return all;
-    if (role === "Event Administrator") return all.filter((route) => route !== "settings");
-    if (role === "Read-Only Coordinator") return ["dashboard", "events", "volunteer-signups", "applications", "volunteers", "recipient-history", "reports"];
-    if (role === "Check-In Staff") return ["checkin"];
-    return [];
+    let routes = role === "Executive Owner" ? all : role === "Event Administrator" ? all.filter((route) => route !== "settings") : role === "Read-Only Coordinator" ? ["dashboard", "events", "volunteer-signups", "applications", "volunteers", "recipient-history", "reports"] : role === "Check-In Staff" ? ["checkin"] : [];
+    if (state.event?.type === "food-bag") routes = routes.filter((route) => !["applications", "recipient-history", "packets"].includes(route));
+    return routes;
   }
 
   function organizerLink(route, label, current, count) {
@@ -660,12 +661,23 @@
 
   function organizerEvents() {
     const e = state.event;
+    if (e.type === "food-bag") return organizerFoodBagEvent(e);
     const budgetTotal = e.budgetItems.filter((item) => item.enabled).reduce((sum, item) => sum + Number(item.amount), 0);
     return `${heading("Event management", "Event setup", "Configure the public forms, event-day rules, budgets and access in one place.", `<a class="button button--light" href="#volunteer">Preview volunteer page</a>`)}
       <form id="event-form"><details class="settings-section" open><summary><span><b>01</b><strong>Event basics</strong></span><small>Date, place and overall capacity</small></summary><div class="settings-section__body"><div class="form-grid"><div class="field field--span-2"><label for="event-title">Event name</label><input id="event-title" name="title" value="${esc(e.title)}" required></div><div class="field"><label for="event-date">Date</label><input id="event-date" name="date" value="${esc(e.date)}" required></div><div class="field"><label for="event-time">Time</label><input id="event-time" name="time" value="${esc(e.time)}" required></div><div class="field"><label for="event-location">Meeting location</label><input id="event-location" name="location" value="${esc(e.location)}" required></div><div class="field"><label for="event-address">Address</label><input id="event-address" name="address" value="${esc(e.address)}" required></div><div class="field"><label for="vol-capacity">Overall volunteer capacity</label><input id="vol-capacity" name="volunteerCapacity" type="number" min="1" value="${esc(e.volunteerCapacity)}"></div><div class="field"><label for="rec-capacity">Recipient child capacity</label><input id="rec-capacity" name="recipientCapacity" type="number" min="1" value="${esc(e.recipientCapacity)}"></div></div></div></details>
       <details class="settings-section" open><summary><span><b>02</b><strong>Volunteer roles & spots</strong></span><small>Names, shifts and limits</small></summary><div class="settings-section__body"><div class="editor-table"><div class="editor-row editor-row--head"><span>Open</span><span>Role</span><span>Shift</span><span>Spots</span></div>${e.roles.map((role) => `<div class="editor-row"><label class="switch"><input type="checkbox" name="role-enabled-${role.id}" ${role.enabled ? "checked" : ""}><span></span></label><input aria-label="${esc(role.title)} role name" name="role-title-${role.id}" value="${esc(role.title)}"><input aria-label="${esc(role.title)} shift" name="role-shift-${role.id}" value="${esc(role.shift)}"><input aria-label="${esc(role.title)} spots" name="role-capacity-${role.id}" type="number" min="0" value="${esc(role.capacity)}"></div>`).join("")}</div><button class="button button--light" type="button" data-demo-action="add-role">+ Add another role</button></div></details>
       <details class="settings-section"><summary><span><b>03</b><strong>Signup access & questions</strong></span><small>Open, code, closed and field visibility</small></summary><div class="settings-section__body"><h3>Volunteer registration</h3><div class="event-editor-grid">${statusChoice("volunteerStatus", "open", "Open", "Anyone can register.", e.volunteerStatus)}${statusChoice("volunteerStatus", "code", "Access code", "Require an invitation code.", e.volunteerStatus)}${statusChoice("volunteerStatus", "closed", "Closed", "Show a closed message.", e.volunteerStatus)}</div><div class="field"><label for="volunteer-access-code">Volunteer invitation code</label><input id="volunteer-access-code" name="volunteerCode" value="${esc(e.volunteerCode)}"></div><h3>Recipient applications</h3><div class="event-editor-grid">${statusChoice("recipientStatus", "open", "Open", "Applications without a code.", e.recipientStatus)}${statusChoice("recipientStatus", "code", "Access code", "Require referral code.", e.recipientStatus)}${statusChoice("recipientStatus", "closed", "Closed", "Stop new applications.", e.recipientStatus)}</div><div class="field"><label for="recipient-access-code">Recipient invitation code</label><input id="recipient-access-code" name="recipientCode" value="${esc(e.recipientCode)}"></div><div class="toggle-grid">${questionToggle("shirtSize", "Volunteer T-shirt size", e.questions.shirtSize)}${questionToggle("volunteerNotes", "Volunteer special notes", e.questions.volunteerNotes)}${questionToggle("preferences", "Child preferences", e.questions.preferences)}${questionToggle("accommodations", "Child accommodations", e.questions.accommodations)}${questionToggle("documents", "Supporting documents", e.questions.documents)}</div></div></details>
       <details class="settings-section" open><summary><span><b>04</b><strong>Shopping rules & budgets</strong></span><small>Current enabled total: <b id="budget-total">$${budgetTotal}</b></small></summary><div class="settings-section__body"><div class="budget-header"><div><label for="budget">Overall per-child maximum</label><input id="budget" name="shoppingBudget" type="number" min="0" value="${esc(e.shoppingBudget)}"></div><p>Enable only what this event offers. Amounts print automatically on every shopping guide.</p></div><div class="budget-grid">${e.budgetItems.map((item) => `<label class="budget-item"><input type="checkbox" name="budget-enabled-${item.id}" ${item.enabled ? "checked" : ""}><span class="switch-control" aria-hidden="true"></span><span><strong>${esc(item.label)}</strong><small>${esc(item.mode === "relevant" ? "When relevant" : item.mode === "optional" ? "Optional" : "Standard item")}</small></span><b>$</b><input aria-label="${esc(item.label)} budget" name="budget-amount-${item.id}" type="number" min="0" value="${esc(item.amount)}"></label>`).join("")}</div></div></details>
+      <div class="sticky-save"><span>Changes remain in this demonstration browser.</span><button class="button button--green" type="submit">Save & update event →</button></div></form>`;
+  }
+
+  function organizerFoodBagEvent(e) {
+    const itemTotal = (item) => Number(item.quantity || 0) * Number(e.bagGoal || 0);
+    return `${heading("Event management", "Food Bag Event setup", "Configure volunteer signups and the plan for every food bag.", `<a class="button button--light" href="#volunteer">Preview volunteer page</a>`)}
+      <form id="event-form"><details class="settings-section" open><summary><span><b>01</b><strong>Event basics</strong></span><small>Date, place and overall capacity</small></summary><div class="settings-section__body"><div class="form-grid"><div class="field field--span-2"><label for="event-title">Event name</label><input id="event-title" name="title" value="${esc(e.title)}" required></div><div class="field"><label for="event-date">Date</label><input id="event-date" name="date" value="${esc(e.date)}" required></div><div class="field"><label for="event-time">Time</label><input id="event-time" name="time" value="${esc(e.time)}" required></div><div class="field"><label for="event-location">Meeting location</label><input id="event-location" name="location" value="${esc(e.location)}" required></div><div class="field"><label for="event-address">Address</label><input id="event-address" name="address" value="${esc(e.address)}" required></div><div class="field"><label for="vol-capacity">Overall volunteer capacity</label><input id="vol-capacity" name="volunteerCapacity" type="number" min="1" value="${esc(e.volunteerCapacity)}"></div></div></div></details>
+      <details class="settings-section" open><summary><span><b>02</b><strong>Volunteer roles & spots</strong></span><small>Names, shifts and limits</small></summary><div class="settings-section__body"><div class="editor-table"><div class="editor-row editor-row--head"><span>Open</span><span>Role</span><span>Shift</span><span>Spots</span></div>${e.roles.map((role) => `<div class="editor-row"><label class="switch"><input type="checkbox" name="role-enabled-${role.id}" ${role.enabled ? "checked" : ""}><span></span></label><input aria-label="${esc(role.title)} role name" name="role-title-${role.id}" value="${esc(role.title)}"><input aria-label="${esc(role.title)} shift" name="role-shift-${role.id}" value="${esc(role.shift)}"><input aria-label="${esc(role.title)} spots" name="role-capacity-${role.id}" type="number" min="0" value="${esc(role.capacity)}"></div>`).join("")}</div><button class="button button--light" type="button" data-demo-action="add-role">+ Add another role</button></div></details>
+      <details class="settings-section"><summary><span><b>03</b><strong>Volunteer signup access</strong></span><small>Open, code or closed</small></summary><div class="settings-section__body"><div class="configuration-heading"><span>Volunteer configuration</span><small>Control public access and the optional volunteer questions.</small></div><div class="event-editor-grid">${statusChoice("volunteerStatus", "open", "Open", "Anyone can register.", e.volunteerStatus)}${statusChoice("volunteerStatus", "code", "Access code", "Require an invitation code.", e.volunteerStatus)}${statusChoice("volunteerStatus", "closed", "Closed", "Show a closed message.", e.volunteerStatus)}</div><div class="field"><label for="volunteer-access-code">Volunteer invitation code</label><input id="volunteer-access-code" name="volunteerCode" value="${esc(e.volunteerCode)}"></div><div class="toggle-grid">${questionToggle("shirtSize", "Volunteer T-shirt size", e.questions.shirtSize)}${questionToggle("volunteerNotes", "Volunteer special notes", e.questions.volunteerNotes)}</div></div></details>
+      <details class="settings-section" open><summary><span><b>04</b><strong>Bag plan & order totals</strong></span><small>${esc(e.bagGoal)} bags planned</small></summary><div class="settings-section__body"><div class="bag-plan-intro"><div class="field"><label for="bag-goal">Goal number of bags</label><input id="bag-goal" name="bagGoal" type="number" min="1" value="${esc(e.bagGoal)}"></div><p>Enter what goes in one bag. The total needed updates automatically for the goal number of bags.</p></div><div class="bag-plan-table"><div class="bag-plan-row bag-plan-row--head"><span>Item for each bag</span><span>Quantity per bag</span><span>Total to order</span></div>${e.bagItems.map((item) => `<div class="bag-plan-row"><input name="bag-item-label-${item.id}" value="${esc(item.label)}" aria-label="Bag item"><input name="bag-item-quantity-${item.id}" type="number" min="0" value="${esc(item.quantity)}" aria-label="Quantity per bag"><strong data-bag-total="${item.id}">${itemTotal(item)}</strong></div>`).join("")}</div><div class="bag-plan-actions"><button class="button button--light" type="button" data-add-bag-item>+ Add item</button><button class="button button--light" type="button" data-export="bag-plan">Download order spreadsheet</button><button class="button button--green" type="button" data-print-bag-guide>Print packing guide</button></div><article class="bag-packing-guide"><img src="../assets/images/ccc-logo.png" alt="Campbell's Crew Cares logo"><p class="eyebrow">Volunteer packing guide</p><h2>${esc(e.title)}</h2><p>Pack <strong>each bag</strong> with the following items.</p><div class="bag-guide-list">${e.bagItems.map((item) => `<p><b>${esc(item.quantity)}</b><span>${esc(item.label)}</span></p>`).join("")}</div><footer>Goal: ${esc(e.bagGoal)} bags · Campbell's Crew Cares</footer></article></div></details>
       <div class="sticky-save"><span>Changes remain in this demonstration browser.</span><button class="button button--green" type="submit">Save & update event →</button></div></form>`;
   }
 
@@ -848,8 +860,10 @@
         if (!event.currentTarget.reportValidity()) return;
         const openSections = [...document.querySelectorAll(".settings-section")].map((section) => section.open);
         const data = new FormData(event.currentTarget);
-        ["title", "date", "time", "location", "address", "volunteerStatus", "recipientStatus", "volunteerCode", "recipientCode"].forEach((key) => { state.event[key] = String(data.get(key) || "").trim(); });
-        ["volunteerCapacity", "recipientCapacity", "shoppingBudget"].forEach((key) => { state.event[key] = Number(data.get(key)); });
+        ["title", "date", "time", "location", "address", "volunteerStatus", "volunteerCode"].forEach((key) => { state.event[key] = String(data.get(key) || "").trim(); });
+        if (state.event.type !== "food-bag") ["recipientStatus", "recipientCode"].forEach((key) => { state.event[key] = String(data.get(key) || "").trim(); });
+        ["volunteerCapacity"].forEach((key) => { state.event[key] = Number(data.get(key)); });
+        if (state.event.type !== "food-bag") ["recipientCapacity", "shoppingBudget"].forEach((key) => { state.event[key] = Number(data.get(key)); });
         state.event.roles.forEach((role) => {
           role.enabled = data.has(`role-enabled-${role.id}`);
           role.title = String(data.get(`role-title-${role.id}`) || role.title).trim();
@@ -857,7 +871,10 @@
           role.capacity = Number(data.get(`role-capacity-${role.id}`) || 0);
         });
         Object.keys(state.event.questions).forEach((key) => { state.event.questions[key] = data.has(`question-${key}`); });
-        state.event.budgetItems.forEach((item) => {
+        if (state.event.type === "food-bag") {
+          state.event.bagGoal = Number(data.get("bagGoal") || 0);
+          state.event.bagItems.forEach((item) => { item.label = String(data.get(`bag-item-label-${item.id}`) || "").trim(); item.quantity = Number(data.get(`bag-item-quantity-${item.id}`) || 0); });
+        } else state.event.budgetItems.forEach((item) => {
           item.enabled = data.has(`budget-enabled-${item.id}`);
           item.amount = Number(data.get(`budget-amount-${item.id}`) || 0);
         });
@@ -875,6 +892,15 @@
         }, 0);
         document.querySelector("#budget-total").textContent = `$${total}`;
       }));
+      const refreshBagTotals = () => {
+        const goal = Number(document.querySelector("#bag-goal")?.value || 0);
+        (state.event.bagItems || []).forEach((item) => { const total = document.querySelector(`[data-bag-total="${item.id}"]`); const quantity = Number(document.querySelector(`[name="bag-item-quantity-${item.id}"]`)?.value || 0); if (total) total.textContent = String(goal * quantity); });
+      };
+      document.querySelectorAll("#bag-goal, [name^=\"bag-item-quantity-\"]").forEach((input) => input.addEventListener("input", refreshBagTotals));
+      const addBagItem = document.querySelector("[data-add-bag-item]");
+      if (addBagItem) addBagItem.addEventListener("click", () => { state.event.bagItems.push({ id: `bag-${Date.now()}`, label: "New bag item", quantity: 1 }); saveState(); renderOrganizer("events"); });
+      const printBagGuide = document.querySelector("[data-print-bag-guide]");
+      if (printBagGuide) printBagGuide.addEventListener("click", () => { document.body.dataset.printBagGuide = "true"; window.print(); });
     }
 
     const volunteerSearch = document.querySelector("#volunteer-search");
@@ -1045,7 +1071,7 @@
   }
 
   function openCreateEvent() {
-    dialogContent.innerHTML = `<form class="dialog-body" id="create-event-form"><p class="eyebrow">New event workspace</p><h2 id="dialog-title">Create a new event</h2><p>This starts a clean draft with public signups closed. Configure everything before opening registration.</p><div class="form-grid"><div class="field field--span-2"><label>Event name<input name="title" placeholder="2027 Winter Clothing for Kids" required></label></div><div class="field"><label>Date<input name="date" type="date" required></label></div><div class="field"><label>Time<input name="time" placeholder="6:00 AM – 10:00 AM" required></label></div><div class="field field--span-2"><label>Location name<input name="location" placeholder="Queen Creek Walmart · Garden Center" required></label></div><div class="field field--span-2"><label>Street address<input name="address" placeholder="21055 E Rittenhouse Rd, Queen Creek, AZ"></label></div><label class="question-toggle"><input type="checkbox" name="volunteerEnabled" checked><span class="switch-control" aria-hidden="true"></span><span><strong>Volunteer signup</strong><small>Use roles, capacity, confirmations, and check-in.</small></span></label><label class="question-toggle"><input type="checkbox" name="recipientEnabled" checked><span class="switch-control" aria-hidden="true"></span><span><strong>Recipient applications</strong><small>Use household review, packets, and recipient check-in.</small></span></label></div><button class="button button--green button--wide" type="submit">Create Event Draft</button></form>`;
+    dialogContent.innerHTML = `<form class="dialog-body" id="create-event-form"><p class="eyebrow">New event workspace</p><h2 id="dialog-title">Create a new event</h2><p>Choose the event type first. Its management tools are set up specifically for that kind of event.</p><div class="form-grid"><div class="field field--span-2"><label>Event type<select name="eventType" required><option value="shopping">Kids Shopping Event</option><option value="food-bag">Food Bag Event</option></select></label><small>Shopping events include recipient applications and clothing packets. Food Bag Events use a bag plan and order totals instead.</small></div><div class="field field--span-2"><label>Event name<input name="title" placeholder="2027 Winter Clothing for Kids" required></label></div><div class="field"><label>Date<input name="date" type="date" required></label></div><div class="field"><label>Time<input name="time" placeholder="6:00 AM – 10:00 AM" required></label></div><div class="field field--span-2"><label>Location name<input name="location" placeholder="Queen Creek Walmart · Garden Center" required></label></div><div class="field field--span-2"><label>Street address<input name="address" placeholder="21055 E Rittenhouse Rd, Queen Creek, AZ"></label></div><label class="question-toggle"><input type="checkbox" name="volunteerEnabled" checked><span class="switch-control" aria-hidden="true"></span><span><strong>Volunteer signup</strong><small>Use roles, capacity, confirmations, and check-in.</small></span></label><label class="question-toggle" id="recipient-create-option"><input type="checkbox" name="recipientEnabled" checked><span class="switch-control" aria-hidden="true"></span><span><strong>Recipient applications</strong><small>For Kids Shopping Events only.</small></span></label></div><button class="button button--green button--wide" type="submit">Create Event Draft</button></form>`;
     appDialog.showModal(); document.body.classList.add("dialog-open");
     dialogContent.querySelector("#create-event-form").addEventListener("submit", (event) => {
       event.preventDefault(); if (!event.currentTarget.reportValidity()) return;
@@ -1053,10 +1079,20 @@
       fresh.title = String(data.get("title") || "").trim();
       fresh.date = dateValue ? new Intl.DateTimeFormat("en-US", { weekday:"long", year:"numeric", month:"long", day:"numeric", timeZone:"UTC" }).format(new Date(`${dateValue}T00:00:00Z`)) : "";
       fresh.time = String(data.get("time") || "").trim(); fresh.location = String(data.get("location") || "").trim(); fresh.address = String(data.get("address") || "").trim();
-      fresh.id = `event-${Date.now()}`; fresh.volunteerEnabled = data.has("volunteerEnabled"); fresh.recipientEnabled = data.has("recipientEnabled");
+      fresh.id = `event-${Date.now()}`; fresh.type = String(data.get("eventType") || "shopping"); fresh.volunteerEnabled = data.has("volunteerEnabled"); fresh.recipientEnabled = fresh.type === "shopping" && data.has("recipientEnabled");
+      fresh.bagGoal = 100; fresh.bagItems = [{ id: "rice", label: "Rice", quantity: 1 }, { id: "beans", label: "Beans", quantity: 2 }, { id: "pasta", label: "Pasta", quantity: 1 }];
+      if (fresh.type === "food-bag") fresh.roles = [
+        { id: "bag-packer", title: "Bag Packer", description: "Pack planned food items into completed bags.", shift: fresh.time, capacity: 40, enabled: true },
+        { id: "inventory", title: "Inventory Checker", description: "Keep item counts organized and restock packing stations.", shift: fresh.time, capacity: 8, enabled: true },
+        { id: "supply-runner", title: "Supply Runner", description: "Bring food and packing supplies where they are needed.", shift: fresh.time, capacity: 8, enabled: true },
+        { id: "greeter", title: "Greeter / Sign-In", description: "Welcome volunteers and direct them to their station.", shift: fresh.time, capacity: 4, enabled: true },
+        { id: "floater", title: "Floater", description: "Go wherever the packing team needs an extra hand.", shift: fresh.time, capacity: 10, enabled: true }
+      ];
       fresh.volunteerStatus = "closed"; fresh.recipientStatus = "closed"; fresh.closed = false;
       state.events.push(fresh); state.activeEventId = fresh.id; publicVolunteerEventId = ""; publicRecipientEventId = ""; sessionStorage.removeItem("ccc-public-volunteer-event"); sessionStorage.removeItem("ccc-public-recipient-event"); state.activity.unshift({ text:`${fresh.title} was created as a new event draft.`, time:"Just now" }); saveState(); closeDialog(); toast("New event draft created. Signups remain closed until you open them."); renderOrganizer("events");
     });
+    const typeSelect = dialogContent.querySelector('[name="eventType"]'); const recipientOption = dialogContent.querySelector("#recipient-create-option");
+    typeSelect.addEventListener("change", () => { const foodBag = typeSelect.value === "food-bag"; recipientOption.hidden = foodBag; recipientOption.querySelector("input").disabled = foodBag; });
   }
 
   function openAddUser() {
@@ -1104,6 +1140,7 @@
     delete document.body.dataset.printChild;
     delete document.body.dataset.printBadge;
     delete document.body.dataset.printBadgeGroup;
+    delete document.body.dataset.printBagGuide;
     document.querySelectorAll(".badge-print-copy").forEach((copy)=>copy.remove());
     document.querySelectorAll(".badge-card").forEach((card)=>card.classList.remove("is-badge-print-target"));
     document.querySelectorAll(".packet-card").forEach((card)=>card.classList.remove("is-print-target"));
@@ -1149,9 +1186,9 @@
       toast("The Excel exporter could not load. Please refresh and try again.");
       return;
     }
-    const sheets = type === "volunteers" ? volunteerWorkbookSheets() : applicationWorkbookSheets();
+    const sheets = type === "volunteers" ? volunteerWorkbookSheets() : type === "bag-plan" ? bagPlanWorkbookSheets() : applicationWorkbookSheets();
     window.CCCXlsx.downloadWorkbook(`campbells-crew-${type}-demo.xlsx`, sheets);
-    toast(`${type === "volunteers" ? "Volunteer" : "Application"} Excel workbook created.`);
+    toast(`${type === "volunteers" ? "Volunteer" : type === "bag-plan" ? "Food bag order" : "Application"} Excel workbook created.`);
   }
 
   function volunteerWorkbookSheets() {
@@ -1176,6 +1213,12 @@
       (item.previousAttendance || []).forEach((entry) => attendance.push([item.id, item.guardian, entry.event || "", entry.result || ""]));
     });
     return [{ name: "Households", rows: households }, { name: "Children", rows: children }, { name: "Flags", rows: flags }, { name: "Attendance History", rows: attendance }];
+  }
+
+  function bagPlanWorkbookSheets() {
+    const plan = [["Campbell's Crew Cares Food Bag Order"], ["Event", state.event.title], ["Bag goal", state.event.bagGoal], [], ["Item", "Quantity per bag", "Total to order"]];
+    (state.event.bagItems || []).forEach((item) => plan.push([item.label, item.quantity, Number(item.quantity || 0) * Number(state.event.bagGoal || 0)]));
+    return [{ name: "Food Bag Order", rows: plan }];
   }
 
   pinForm.addEventListener("submit", (event) => {

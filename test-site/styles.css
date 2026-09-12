@@ -607,6 +607,23 @@ h1, h2, h3, p { margin-top: 0; }
 .event-context--simple select { width:100%; min-width:0; min-height:48px; padding:0 42px 0 14px; color:var(--ink); background:#fff; border:2px solid #799b86; font-size:15px; font-weight:750; }
 .event-context--simple select:focus { outline:3px solid rgba(47,211,54,.25); outline-offset:2px; border-color:var(--green-dark); }
 .event-context--single { display:flex; align-items:center; width:100%; min-height:48px; padding:0 14px; color:var(--ink); background:#fff; border:2px solid #799b86; font-size:15px; font-weight:750; }
+.bag-plan-intro { display:grid; grid-template-columns:minmax(180px,260px) 1fr; align-items:end; gap:24px; margin-bottom:20px; padding:18px; background:#f0f8f1; border-left:5px solid var(--green); }
+.bag-plan-intro p { margin:0 0 8px; color:var(--muted); }
+.bag-plan-table { border:1px solid var(--line); }
+.bag-plan-row { display:grid; grid-template-columns:1fr 180px 150px; gap:12px; align-items:center; padding:10px 14px; border-top:1px solid var(--line); background:#fff; }
+.bag-plan-row--head { border-top:0; background:var(--mist-2); color:var(--gray); font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+.bag-plan-row input { min-width:0; }
+.bag-plan-row strong { color:var(--green-dark); font-size:18px; }
+.bag-plan-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+.bag-packing-guide { margin-top:28px; padding:32px; text-align:center; border:2px solid var(--green-dark); background:linear-gradient(135deg,#f6fff6,#eef8f0); }
+.bag-packing-guide img { width:64px; height:64px; object-fit:contain; }
+.bag-packing-guide h2 { margin:5px 0 8px; font-size:30px; }
+.bag-packing-guide > p:not(.eyebrow) { color:var(--muted); }
+.bag-guide-list { max-width:560px; margin:22px auto; border-top:1px solid #b7d5be; }
+.bag-guide-list p { display:grid; grid-template-columns:58px 1fr; margin:0; padding:11px 0; border-bottom:1px solid #b7d5be; text-align:left; }
+.bag-guide-list b { color:var(--green-dark); font-size:20px; text-align:center; }
+.bag-guide-list span { font-weight:750; }
+.bag-packing-guide footer { margin-top:20px; color:var(--green-dark); font-weight:800; }
 .configuration-heading { margin: 28px 0 14px; padding: 15px 18px; border-left: 5px solid var(--green); background: #f1f7ef; }
 .configuration-heading span,.configuration-heading small { display: block; }
 .configuration-heading span { font-weight: 800; }
@@ -663,6 +680,10 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   .badge-settings { grid-template-columns:1fr; }
   .upcoming-status { align-items:stretch; min-width:0; }
   .badge-settings .field { min-width:0; }
+  .bag-plan-intro { grid-template-columns:1fr; }
+  .bag-plan-row { grid-template-columns:1fr; gap:7px; }
+  .bag-plan-row--head { display:none; }
+  .bag-plan-row strong::before { content:"Total to order: "; color:var(--gray); font-size:12px; text-transform:uppercase; }
 }
 
 @media print {
@@ -678,4 +699,8 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-grid--children { grid-template-columns:repeat(3,2.25in); gap:.1in; }
   body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:2.25in; height:3.5in; }
   body[data-print-badge] .badge-card button { display:none!important; }
+  body[data-print-bag-guide] .organizer-main > *:not(#event-form), body[data-print-bag-guide] .event-context, body[data-print-bag-guide] .settings-section:not(:has(.bag-packing-guide)), body[data-print-bag-guide] .bag-plan-intro, body[data-print-bag-guide] .bag-plan-table, body[data-print-bag-guide] .bag-plan-actions, body[data-print-bag-guide] .sticky-save { display:none!important; }
+  body[data-print-bag-guide] .settings-section { display:block!important; border:0!important; }
+  body[data-print-bag-guide] .settings-section summary, body[data-print-bag-guide] .settings-section__body > :not(.bag-packing-guide) { display:none!important; }
+  body[data-print-bag-guide] .bag-packing-guide { display:block!important; margin:0!important; border-width:3px!important; }
 }
