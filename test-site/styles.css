@@ -593,7 +593,10 @@ h1, h2, h3, p { margin-top: 0; }
 .ack-item p { margin: 0; line-height: 1.55; }
 .ack-item strong { font-size: 1.02em; letter-spacing: 0; }
 .size-field small { line-height: 1.35; }
-.event-context--simple { justify-content: flex-start; }
+.event-context--simple { width:min(100%,560px); margin:28px 0 34px; padding:22px 24px; justify-content:flex-start; border:1px solid #9bc9ad; border-left:7px solid var(--green); background:linear-gradient(135deg,#edf8f0 0%,#f8fbf8 100%); box-shadow:0 8px 22px rgba(15,82,50,.08); }
+.event-context--simple label { width:100%; gap:10px; color:var(--green-dark); font-size:11px; letter-spacing:.08em; }
+.event-context--simple select { width:100%; min-width:0; min-height:48px; padding:0 42px 0 14px; color:var(--ink); background:#fff; border:2px solid #799b86; font-size:15px; font-weight:750; }
+.event-context--simple select:focus { outline:3px solid rgba(47,211,54,.25); outline-offset:2px; border-color:var(--green-dark); }
 .configuration-heading { margin: 28px 0 14px; padding: 15px 18px; border-left: 5px solid var(--green); background: #f1f7ef; }
 .configuration-heading span,.configuration-heading small { display: block; }
 .configuration-heading span { font-weight: 800; }
