@@ -932,7 +932,8 @@
     if (impactForm) impactForm.addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); state.publicStats = Object.fromEntries(["families","children","volunteers","years"].map((key)=>[key,Number(data.get(key)||0)])); saveState(); toast("Public impact totals saved in this demonstration browser."); });
     const addVolunteer = document.querySelector("[data-add-volunteer]");
     if (addVolunteer) addVolunteer.addEventListener("click", openAddVolunteer);
-    document.querySelectorAll("[data-badge-setting]").forEach((select)=>select.addEventListener("change",()=>{ const volunteer=select.dataset.badgeSetting === "volunteer"; document.body.dataset[volunteer ? "volunteerBadgeSize" : "childBadgeSize"] = select.value; const summary=document.querySelector(volunteer?"#volunteer-size-summary":"#child-size-summary"); if(summary) summary.textContent=volunteer?(select.value==="avery-8395"?"Avery 8395-compatible removable adhesive badges, 3⅜ × 2⅓ inches, horizontal, 8 per letter-size sheet.":"Generic 3½ × 2¼ inch horizontal badge layout."):(select.value==="vertical-3x4"?"3 × 4 inch vertical cardstock inserts, arranged 4 per letter-size page.":"2¼ × 3½ inch vertical cardstock inserts, arranged up to 9 per letter-size page."); }));
+    configureBadgeFormats();
+    document.querySelectorAll("[data-badge-setting]").forEach((select) => select.addEventListener("change", () => applyBadgeFormat(select.dataset.badgeSetting, select.value)));
     document.querySelectorAll("[data-print-badge], [data-print-badges]").forEach((button)=>button.addEventListener("click",(event)=>{
       event.preventDefault(); event.stopPropagation();
       if (window.location.hash !== "#organizer/badges") return;
@@ -1101,6 +1102,41 @@
     document.querySelectorAll(".badge-print-copy").forEach((copy)=>copy.remove());
     document.querySelectorAll(".badge-card").forEach((card)=>card.classList.remove("is-badge-print-target"));
     document.querySelectorAll(".packet-card").forEach((card)=>card.classList.remove("is-print-target"));
+  }
+
+  const badgeFormats = {
+    "avery-8395": { label:"Avery 8395 name badge", width:3.375, height:2.333, columns:2, perPage:8, orientation:"horizontal", description:"Avery 8395 name badge · 3⅜ × 2⅓ in · horizontal · 8 per letter page" },
+    "name-tag-35x225": { label:"Standard name tag", width:3.5, height:2.25, columns:2, perPage:8, orientation:"horizontal", description:"Standard name tag · 3½ × 2¼ in · horizontal · 8 per letter page" },
+    "business-card": { label:"Business card", width:3.5, height:2, columns:2, perPage:10, orientation:"horizontal", description:"Business card · 3½ × 2 in · horizontal · 10 per letter page" },
+    "large-horizontal": { label:"Large event badge", width:4, height:3, columns:2, perPage:6, orientation:"horizontal", description:"Large event badge · 4 × 3 in · horizontal · 6 per letter page" },
+    "vertical-3x4": { label:"Standard holder insert", width:3, height:4, columns:2, perPage:4, orientation:"vertical", description:"Standard holder insert · 3 × 4 in · vertical · 4 per letter page" },
+    "vertical-225x35": { label:"Compact holder insert", width:2.25, height:3.5, columns:3, perPage:9, orientation:"vertical", description:"Compact holder insert · 2¼ × 3½ in · vertical · 9 per letter page" },
+    "standard-id": { label:"Standard ID badge", width:2.125, height:3.375, columns:3, perPage:9, orientation:"vertical", description:"Standard ID badge · 2⅛ × 3⅜ in · vertical · 9 per letter page" },
+    "photo-card": { label:"Large photo card", width:4, height:6, columns:2, perPage:2, orientation:"vertical", description:"Large photo card · 4 × 6 in · vertical · 2 per letter page" }
+  };
+
+  function applyBadgeFormat(kind, value) {
+    const format = badgeFormats[value] || badgeFormats[kind === "volunteer" ? "avery-8395" : "vertical-3x4"];
+    const prefix = `--${kind}-badge-`;
+    document.body.dataset[`${kind}BadgeSize`] = value;
+    document.body.dataset[`${kind}BadgeOrientation`] = format.orientation;
+    document.body.style.setProperty(`${prefix}width`, `${format.width}in`);
+    document.body.style.setProperty(`${prefix}height`, `${format.height}in`);
+    document.body.style.setProperty(`${prefix}columns`, String(format.columns));
+    document.body.style.setProperty(`${prefix}ratio`, `${format.width} / ${format.height}`);
+    const summary = document.querySelector(kind === "volunteer" ? "#volunteer-size-summary" : "#child-size-summary");
+    if (summary) summary.textContent = format.description;
+  }
+
+  function configureBadgeFormats() {
+    document.querySelectorAll("[data-badge-setting]").forEach((select) => {
+      const kind = select.dataset.badgeSetting; const fallback = kind === "volunteer" ? "avery-8395" : "vertical-3x4"; const selected = badgeFormats[select.value] ? select.value : fallback;
+      select.innerHTML = Object.entries(badgeFormats).map(([value, format]) => `<option value="${value}">${format.description}</option>`).join("");
+      select.value = selected;
+      const label = select.closest("label"); const text = [...label.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
+      if (text) text.nodeValue = kind === "volunteer" ? "Volunteer badge format" : "Child badge format";
+      applyBadgeFormat(kind, selected);
+    });
   }
 
   function exportWorkbook(type) {
