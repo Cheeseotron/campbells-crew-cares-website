@@ -540,7 +540,9 @@
     const reviewCount = state.applications.filter((item) => !item.archived && ["submitted", "review", "info"].includes(item.status)).length;
     const preview = previewRole ? `<div class="role-preview-banner"><strong>Previewing as ${esc(role)}</strong><span>You are seeing exactly what this role can access.</span><button type="button" data-return-owner>Return to Executive Owner</button></div>` : "";
     return `${preview}<div class="organizer-shell ${role === "Read-Only Coordinator" ? "is-read-only" : ""}"><aside class="organizer-sidebar"><div class="organizer-sidebar__title"><span>Private workspace</span><strong>Organizer tools</strong></div><nav class="organizer-menu" aria-label="Organizer sections">
-      ${organizerLink("dashboard", "Overview", subroute)}${organizerLink("events", "Event Management", subroute)}${organizerLink("volunteers", "Volunteers", subroute)}${organizerLink("applications", "Recipients", subroute, reviewCount)}${organizerLink("checkin", "Check-in", subroute)}${organizerLink("packets", "Print packets", subroute)}${organizerLink("badges", "Print badges", subroute)}${organizerLink("emails", "Email center", subroute)}${organizerLink("reports", "Reports & history", subroute)}${organizerLink("settings", "Settings", subroute)}
+      <div class="organizer-menu__group"><span>Event operations</span>${organizerLink("dashboard", "Overview", subroute)}${organizerLink("events", "Event Management", subroute)}${organizerLink("volunteer-signups", "Volunteer Signups", subroute)}${organizerLink("applications", "Current Applications", subroute, reviewCount)}${organizerLink("checkin", "Check-in", subroute)}${organizerLink("packets", "Print Packets", subroute)}${organizerLink("badges", "Print Badges", subroute)}${organizerLink("emails", "Email Center", subroute)}</div>
+      <div class="organizer-menu__group"><span>Records & logs</span>${organizerLink("volunteers", "Volunteer Directory", subroute)}${organizerLink("recipient-history", "Past Recipients", subroute)}${organizerLink("reports", "Reports & History", subroute)}</div>
+      <div class="organizer-menu__group"><span>Management</span>${organizerLink("settings", "Settings & Users", subroute)}</div>
       </nav><p class="organizer-sidebar__footer">Signed in as ${esc(role)} · <button type="button" data-portal-logout>Sign out</button></p></aside><section class="organizer-main">${content}</section></div>`;
   }
 
@@ -557,8 +559,10 @@
     }
     let content;
     if (subroute === "events") content = organizerEventsV8();
-    else if (subroute === "volunteers") content = organizerVolunteersV8();
-    else if (subroute === "applications") content = organizerApplicationsV7();
+    else if (subroute === "volunteer-signups") { volunteerView = "current"; content = organizerVolunteersV8(); }
+    else if (subroute === "volunteers") { volunteerView = "all"; content = organizerVolunteersV8(); }
+    else if (subroute === "recipient-history") { applicationView = "log"; content = organizerApplicationsV7(); }
+    else if (subroute === "applications") { applicationView = "current"; content = organizerApplicationsV7(); }
     else if (subroute === "checkin") content = organizerCheckin();
     else if (subroute === "packets") content = organizerPacketsV5();
     else if (subroute === "badges") content = organizerBadges();
@@ -578,7 +582,7 @@
   }
 
   function heading(kicker, title, description, action) {
-    const contextualTabs = title === "Volunteer directory" ? `<div class="view-tabs section-view-tabs"><button class="${volunteerView === "all" ? "is-active" : ""}" type="button" data-volunteer-view="all">Entire volunteer directory (${state.volunteers.length})</button><button class="${volunteerView === "current" ? "is-active" : ""}" type="button" data-volunteer-view="current">Current event signups (${state.volunteers.filter((item)=>item.currentEvent).length})</button></div>` : title === "Applications" ? `<div class="view-tabs section-view-tabs"><button class="${applicationView === "current" ? "is-active" : ""}" type="button" data-application-view="current">Current applications</button><button class="${applicationView === "log" ? "is-active" : ""}" type="button" data-application-view="log">Past Recipients / History (${state.applications.filter((item)=>item.archived).length})</button></div>` : "";
+    const contextualTabs = "";
     return `<header class="organizer-heading"><div><p class="eyebrow">${esc(kicker)}</p><h1>${esc(title)}</h1><p>${esc(description)}</p>${contextualTabs}</div>${action || ""}</header>`;
   }
 
@@ -634,7 +638,9 @@
   }
 
   function organizerVolunteersV8(filter = "") {
-    return organizerVolunteersV6(filter).replace('<div class="table-tools">', '<div class="directory-actions"><button class="button button--green" type="button" data-add-volunteer>+ Add volunteer</button></div><div class="table-tools">');
+    let html = organizerVolunteersV6(filter).replace('<div class="table-tools">', '<div class="directory-actions"><button class="button button--green" type="button" data-add-volunteer>+ Add volunteer</button></div><div class="table-tools">');
+    if (volunteerView === "current") html = html.replace("VOLUNTEER DIRECTORY", "CURRENT VOLUNTEER SIGNUPS").replace("Volunteer directory", "Current volunteer signups");
+    return html;
   }
 
   function organizerApplications(filter = "") {
@@ -786,9 +792,9 @@
     }
 
     const volunteerSearch = document.querySelector("#volunteer-search");
-    if (volunteerSearch) volunteerSearch.addEventListener("input", () => { main.innerHTML = organizerShell("volunteers", organizerVolunteers(volunteerSearch.value)); bindOrganizer("volunteers"); const next = document.querySelector("#volunteer-search"); next.focus(); next.setSelectionRange(next.value.length, next.value.length); });
+    if (volunteerSearch) volunteerSearch.addEventListener("input", () => { const route = volunteerView === "current" ? "volunteer-signups" : "volunteers"; main.innerHTML = organizerShell(route, organizerVolunteers(volunteerSearch.value)); bindOrganizer(route); const next = document.querySelector("#volunteer-search"); next.focus(); next.setSelectionRange(next.value.length, next.value.length); });
     const applicationSearch = document.querySelector("#application-search");
-    if (applicationSearch) applicationSearch.addEventListener("input", () => { main.innerHTML = organizerShell("applications", organizerApplications(applicationSearch.value)); bindOrganizer("applications"); const next = document.querySelector("#application-search"); next.focus(); next.setSelectionRange(next.value.length, next.value.length); });
+    if (applicationSearch) applicationSearch.addEventListener("input", () => { const route = applicationView === "log" ? "recipient-history" : "applications"; main.innerHTML = organizerShell(route, organizerApplications(applicationSearch.value)); bindOrganizer(route); const next = document.querySelector("#application-search"); next.focus(); next.setSelectionRange(next.value.length, next.value.length); });
     const checkinSearch = document.querySelector("#checkin-search");
     if (checkinSearch) checkinSearch.addEventListener("input", () => { main.innerHTML = organizerShell("checkin", organizerCheckin(checkinSearch.value)); bindOrganizer("checkin"); const next = document.querySelector("#checkin-search"); next.focus(); next.setSelectionRange(next.value.length, next.value.length); });
 
@@ -797,7 +803,8 @@
     document.querySelectorAll("[data-sort-group]").forEach((button) => button.addEventListener("click", () => {
       const group = button.dataset.sortGroup; const value = button.dataset.sortValue;
       if (group === "volunteers") volunteerSort = value; else if (group === "applications") applicationSort = value; else if (group === "checkin") checkinSort = value; else if (group === "packets") packetSort = value;
-      renderOrganizer(group === "packets" ? "packets" : group === "checkin" ? "checkin" : group);
+      const route = group === "volunteers" && volunteerView === "current" ? "volunteer-signups" : group === "applications" && applicationView === "log" ? "recipient-history" : group;
+      renderOrganizer(group === "packets" ? "packets" : group === "checkin" ? "checkin" : route);
     }));
     document.querySelectorAll("[data-volunteer-view]").forEach((button)=>button.addEventListener("click",()=>{volunteerView=button.dataset.volunteerView;renderOrganizer("volunteers");}));
     document.querySelectorAll("[data-application-view]").forEach((button)=>button.addEventListener("click",()=>{applicationView=button.dataset.applicationView;renderOrganizer("applications");}));
