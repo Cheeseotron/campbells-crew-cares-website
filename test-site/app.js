@@ -174,6 +174,8 @@
   let packetSort = "child-az";
   let volunteerView = "all";
   let applicationView = "current";
+  let publicVolunteerEventId = sessionStorage.getItem("ccc-public-volunteer-event") || "";
+  let publicRecipientEventId = sessionStorage.getItem("ccc-public-recipient-event") || "";
   let portalUser = sessionStorage.getItem("ccc-portal-user") || "";
   let previewRole = sessionStorage.getItem("ccc-preview-role") || "";
 
@@ -288,7 +290,12 @@
   function renderPublicEventChooser(kind, events) {
     const title = kind === "volunteer" ? "Choose a volunteer opportunity" : "Choose an event to apply for";
     main.innerHTML = `<div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><section class="content-card"><p class="eyebrow">Campbell's Crew Cares</p><h1>${title}</h1><p>More than one event is accepting signups right now. Pick the one that fits you.</p><div class="event-choice-list">${events.map((event) => `<button type="button" class="event-choice" data-public-event="${esc(event.id)}"><span><strong>${esc(event.title)}</strong><small>${esc(event.date)} · ${esc(event.time)}</small><small>${esc(event.location)}</small></span><b>Choose →</b></button>`).join("")}</div></section></div>`;
-    main.querySelectorAll("[data-public-event]").forEach((button) => button.addEventListener("click", () => { state.activeEventId = button.dataset.publicEvent; saveState(); volunteerStep = 0; recipientStep = 0; recipientMaxStep = 0; kind === "volunteer" ? renderVolunteer() : renderRecipient(); }));
+    main.querySelectorAll("[data-public-event]").forEach((button) => button.addEventListener("click", () => {
+      state.activeEventId = button.dataset.publicEvent;
+      if (kind === "volunteer") { publicVolunteerEventId = button.dataset.publicEvent; sessionStorage.setItem("ccc-public-volunteer-event", publicVolunteerEventId); }
+      else { publicRecipientEventId = button.dataset.publicEvent; sessionStorage.setItem("ccc-public-recipient-event", publicRecipientEventId); }
+      saveState(); volunteerStep = 0; recipientStep = 0; recipientMaxStep = 0; kind === "volunteer" ? renderVolunteer() : renderRecipient();
+    }));
   }
 
   function renderVolunteer() {
@@ -299,7 +306,8 @@
     }
 
     const volunteerEvents = activeEvents().filter((event) => event.volunteerEnabled && event.volunteerStatus !== "closed");
-    if (volunteerEvents.length > 1) { renderPublicEventChooser("volunteer", volunteerEvents); return; }
+    if (volunteerEvents.some((event) => event.id === publicVolunteerEventId)) state.activeEventId = publicVolunteerEventId;
+    if (volunteerEvents.length > 1 && !volunteerEvents.some((event) => event.id === publicVolunteerEventId)) { renderPublicEventChooser("volunteer", volunteerEvents); return; }
     const event = state.event;
     if (!event.volunteerEnabled) { main.innerHTML = `<div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><div class="content-card"><h1>Volunteer signups are not part of this event.</h1><p>Please return to see other Campbell's Crew opportunities.</p></div></div>`; return; }
     const roles = event.roles.filter((role) => role.enabled);
@@ -363,7 +371,8 @@
     }
 
     const recipientEvents = activeEvents().filter((event) => event.recipientEnabled && event.recipientStatus !== "closed");
-    if (recipientEvents.length > 1) { renderPublicEventChooser("recipient", recipientEvents); return; }
+    if (recipientEvents.some((event) => event.id === publicRecipientEventId)) state.activeEventId = publicRecipientEventId;
+    if (recipientEvents.length > 1 && !recipientEvents.some((event) => event.id === publicRecipientEventId)) { renderPublicEventChooser("recipient", recipientEvents); return; }
     if (!state.event.recipientEnabled) {
       main.innerHTML = `<div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><div class="content-card"><h1>Recipient applications are not part of this event.</h1><p>This event is volunteer-only. Please return to see available assistance opportunities.</p></div></div>`;
       return;
@@ -1026,7 +1035,7 @@
       fresh.time = String(data.get("time") || "").trim(); fresh.location = String(data.get("location") || "").trim(); fresh.address = String(data.get("address") || "").trim();
       fresh.id = `event-${Date.now()}`; fresh.volunteerEnabled = data.has("volunteerEnabled"); fresh.recipientEnabled = data.has("recipientEnabled");
       fresh.volunteerStatus = "closed"; fresh.recipientStatus = "closed"; fresh.closed = false;
-      state.events.push(fresh); state.activeEventId = fresh.id; state.activity.unshift({ text:`${fresh.title} was created as a new event draft.`, time:"Just now" }); saveState(); closeDialog(); toast("New event draft created. Signups remain closed until you open them."); renderOrganizer("events");
+      state.events.push(fresh); state.activeEventId = fresh.id; publicVolunteerEventId = ""; publicRecipientEventId = ""; sessionStorage.removeItem("ccc-public-volunteer-event"); sessionStorage.removeItem("ccc-public-recipient-event"); state.activity.unshift({ text:`${fresh.title} was created as a new event draft.`, time:"Just now" }); saveState(); closeDialog(); toast("New event draft created. Signups remain closed until you open them."); renderOrganizer("events");
     });
   }
 
