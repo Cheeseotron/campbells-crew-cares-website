@@ -561,8 +561,8 @@
     if (subroute === "events") content = organizerEventsV8();
     else if (subroute === "volunteer-signups") { volunteerView = "current"; content = organizerVolunteersV8(); }
     else if (subroute === "volunteers") { volunteerView = "all"; content = organizerVolunteersV8(); }
-    else if (subroute === "recipient-history") { applicationView = "log"; content = organizerApplicationsV7(); }
-    else if (subroute === "applications") { applicationView = "current"; content = organizerApplicationsV7(); }
+    else if (subroute === "recipient-history") { applicationView = "log"; content = organizerApplicationsV8(); }
+    else if (subroute === "applications") { applicationView = "current"; content = organizerApplicationsV8(); }
     else if (subroute === "checkin") content = organizerCheckin();
     else if (subroute === "packets") content = organizerPacketsV5();
     else if (subroute === "badges") content = organizerBadges();
@@ -644,7 +644,7 @@
   }
 
   function organizerApplications(filter = "") {
-    return organizerApplicationsV7(filter);
+    return organizerApplicationsV8(filter);
     /* Legacy layout retained below for reference during prototype iteration. */
     const normalized = normalize(filter);
     let rows = state.applications.filter((item) => !normalized || normalize(`${item.guardian} ${item.email} ${item.phone} ${item.id} ${item.children.map((child) => child.name).join(" ")}`).includes(normalized));
@@ -677,6 +677,10 @@
     const title=applicationView === "log" ? "Application Log" : "Applications";
     const cards = rows.map((item)=>`<article class="application-row application-row--${esc(item.status)}"><div><strong>${esc(item.guardian)}</strong><small>${esc(item.id)} · ${esc(item.eventName)} · ${esc(item.submitted)}</small></div><div class="child-chip-list">${item.children.map((child)=>`<span class="child-status child-status--${esc(child.decision)}"><b>${esc(child.firstName)} ${esc(child.lastName)}</b><small>Age ${esc(child.age)} · ${esc(formatStatus(child.decision))}</small></span>`).join("")}</div>${applicationFlagsHtml(item)}<div>${statusPill(item.status)}<button class="button button--small button--ghost" type="button" data-open-application="${esc(item.id)}">${applicationView==="log"?"View record":"Review children"}</button></div></article>`).join("");
     return `${heading("Recipient review", "Applications", applicationView === "log" ? "Permanent records from closed-out events remain searchable here." : "Current households stay grouped while every child has an unmistakable decision.", `<button class="button button--light" type="button" data-export="applications">Download applications.csv</button>`)}<div class="table-tools table-tools--wrap"><label class="search-field"><span class="screen-reader-only">Search ${esc(title)}</span><input id="application-search" type="search" value="${esc(filter)}" placeholder="Search guardian, child, phone, ID, or event"></label><span>${rows.length} households</span></div>${sortBar("applications",applicationSort,[["submitted-newest","Newest"],["submitted-oldest","Oldest"],["name-az","Guardian A–Z"],["child-az","Child A–Z"],["child-last","Child last name"],["status","Status"],["flags","Flags"]])}<div class="application-list">${cards || `<div class="empty-state"><strong>No applications in this view</strong>Try the other tab or clear your search.</div>`}</div>`;
+  }
+
+  function organizerApplicationsV8(filter = "") {
+    return organizerApplicationsV7(filter).replace("<h1>Applications</h1>", applicationView === "log" ? "<h1>Past Recipients</h1>" : "<h1>Current Applications</h1>");
   }
 
   function organizerCheckin(filter = "") {
