@@ -644,12 +644,15 @@ body[data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:min
 
 @media print {
   body[data-print-badge] .badge-settings, body[data-print-badge] .section-title, body[data-print-badge] .badge-section-heading, body[data-print-badge] .badge-size-note { display:none!important; }
-  body[data-print-badge] .badge-grid { display:contents; }
+  body[data-print-badge] .badge-grid { display:none; }
+  body[data-print-badge][data-print-badge-group="volunteers"] .badge-grid--volunteers { display:grid; grid-template-columns:repeat(2,3.375in); gap:0; justify-content:center; }
+  body[data-print-badge][data-print-badge-group="children"] .badge-grid--children { display:grid; grid-template-columns:repeat(2,3in); gap:.15in; justify-content:center; align-content:start; }
   body[data-print-badge] .badge-card { display:none; break-inside:avoid; box-sizing:border-box; }
   body[data-print-badge] .badge-card.is-badge-print-target, body[data-print-badge] .badge-card.badge-print-copy { display:flex; }
-  body[data-print-badge] .badge-card--volunteer { width:3.375in; height:2.333in; aspect-ratio:auto; float:left; margin:0; }
+  body[data-print-badge] .badge-card--volunteer { width:3.375in; height:2.333in; aspect-ratio:auto; margin:0; }
   body[data-print-badge][data-volunteer-badge-size="horizontal-35"] .badge-card--volunteer { width:3.5in; height:2.25in; }
-  body[data-print-badge] .badge-card--recipient { width:3in; height:4in; aspect-ratio:auto; margin:0 auto; break-after:page; }
+  body[data-print-badge] .badge-card--recipient { width:3in; height:4in; aspect-ratio:auto; margin:0; break-after:auto; }
+  body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-grid--children { grid-template-columns:repeat(3,2.25in); gap:.1in; }
   body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:2.25in; height:3.5in; }
   body[data-print-badge] .badge-card button { display:none!important; }
 }
