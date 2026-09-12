@@ -606,6 +606,7 @@ h1, h2, h3, p { margin-top: 0; }
 .event-context--simple label { width:100%; gap:10px; color:var(--green-dark); font-size:11px; letter-spacing:.08em; }
 .event-context--simple select { width:100%; min-width:0; min-height:48px; padding:0 42px 0 14px; color:var(--ink); background:#fff; border:2px solid #799b86; font-size:15px; font-weight:750; }
 .event-context--simple select:focus { outline:3px solid rgba(47,211,54,.25); outline-offset:2px; border-color:var(--green-dark); }
+.event-context--single { display:flex; align-items:center; width:100%; min-height:48px; padding:0 14px; color:var(--ink); background:#fff; border:2px solid #799b86; font-size:15px; font-weight:750; }
 .configuration-heading { margin: 28px 0 14px; padding: 15px 18px; border-left: 5px solid var(--green); background: #f1f7ef; }
 .configuration-heading span,.configuration-heading small { display: block; }
 .configuration-heading span { font-weight: 800; }
