@@ -605,6 +605,12 @@ h1, h2, h3, p { margin-top: 0; }
 .no-active-event { max-width:760px; padding:36px; border-left:8px solid var(--green); }
 .no-active-event h2 { margin:6px 0 10px; font-size:clamp(28px,4vw,42px); }
 .no-active-event .button { margin-top:12px; }
+.event-choice-list { display:grid; gap:12px; margin-top:24px; }
+.event-choice { display:flex; align-items:center; justify-content:space-between; gap:18px; width:100%; padding:20px; border:2px solid var(--ink); background:#fff; color:var(--ink); font:inherit; text-align:left; cursor:pointer; }
+.event-choice:hover { border-color:var(--green-dark); background:#f1fff0; }
+.event-choice span { display:grid; gap:4px; }
+.event-choice small { color:var(--muted); }
+.event-choice b { color:var(--green-dark); white-space:nowrap; }
 .finish-confirm { margin:24px 0; padding:20px; background:#fff1ef; border:1px solid #d99a94; }
 .finish-confirm input { width:100%; accent-color:#b52d25; }
 .upcoming-event { display:flex; justify-content:space-between; gap:28px; border-left:8px solid var(--green); }
