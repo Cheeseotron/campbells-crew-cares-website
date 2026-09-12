@@ -328,8 +328,13 @@ h1, h2, h3, p { margin-top: 0; }
 .switch input:checked + span { background: var(--green-dark); }
 .switch input:checked + span::after { transform: translateX(18px); }
 .toggle-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin-top: 22px; }
-.question-toggle { display: flex; padding: 14px; align-items: center; gap: 12px; background: var(--mist-2); border: 1px solid var(--line); }
-.question-toggle input { width: 18px; height: 18px; accent-color: var(--green-dark); }
+.question-toggle { display: flex; padding: 14px; align-items: center; gap: 12px; background: var(--mist-2); border: 1px solid var(--line); cursor: pointer; }
+.question-toggle input, .budget-item > input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+.switch-control { position: relative; display: block; width: 40px; height: 22px; flex: 0 0 auto; background: #aab2b8; border-radius: 22px; transition: .15s; }
+.switch-control::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: var(--white); border-radius: 50%; transition: .15s; }
+.question-toggle input:checked + .switch-control, .budget-item > input[type="checkbox"]:checked + .switch-control { background: var(--green-dark); }
+.question-toggle input:checked + .switch-control::after, .budget-item > input[type="checkbox"]:checked + .switch-control::after { transform: translateX(18px); }
+.question-toggle input:focus-visible + .switch-control, .budget-item > input[type="checkbox"]:focus-visible + .switch-control { outline: 3px solid rgba(53, 211, 47, .45); outline-offset: 3px; }
 .question-toggle strong, .question-toggle small { display: block; }
 .question-toggle small { color: var(--gray); }
 .budget-header { display: flex; margin: 18px 0; justify-content: space-between; gap: 24px; }
@@ -337,7 +342,7 @@ h1, h2, h3, p { margin-top: 0; }
 .budget-header label { display: block; margin-bottom: 7px; font-weight: 800; }
 .budget-header p { max-width: 420px; color: var(--gray); }
 .budget-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
-.budget-item { display: grid; grid-template-columns: 20px 1fr 14px 74px; padding: 14px; align-items: center; gap: 9px; background: var(--mist-2); border: 1px solid var(--line); }
+.budget-item { display: grid; grid-template-columns: 40px 1fr 14px 74px; padding: 14px; align-items: center; gap: 9px; background: var(--mist-2); border: 1px solid var(--line); cursor: pointer; }
 .budget-item > span strong, .budget-item > span small { display: block; }
 .budget-item > span small { color: var(--gray); }
 .sticky-save { position: sticky; z-index: 3; bottom: 10px; display: flex; padding: 13px 15px; align-items: center; justify-content: space-between; gap: 16px; color: var(--white); background: var(--ink); box-shadow: var(--shadow); }
