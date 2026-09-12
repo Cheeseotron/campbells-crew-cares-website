@@ -877,7 +877,10 @@
     const returnOwner = document.querySelector("[data-return-owner]"); if (returnOwner) returnOwner.addEventListener("click", () => { previewRole = ""; sessionStorage.removeItem("ccc-preview-role"); renderOrganizer("dashboard"); });
     const logout = document.querySelector("[data-portal-logout]"); if (logout) logout.addEventListener("click", () => { portalUser = ""; previewRole = ""; sessionStorage.removeItem("ccc-portal-user"); sessionStorage.removeItem("ccc-preview-role"); renderOrganizer("dashboard"); window.scrollTo(0, 0); });
     const elevate = document.querySelector("[data-elevate]"); if (elevate) elevate.addEventListener("click", () => { const pin = window.prompt("Enter the organizer elevation PIN"); if (pin === TEST_PIN) { previewRole = "Event Administrator"; sessionStorage.setItem("ccc-preview-role", previewRole); renderOrganizer(subroute); } else if (pin !== null) toast("That organizer PIN is incorrect."); });
-    document.querySelectorAll("[data-export]").forEach((button) => button.addEventListener("click", () => exportCsv(button.dataset.export)));
+    document.querySelectorAll("[data-export]").forEach((button) => {
+      button.textContent = "Download Excel workbook";
+      button.addEventListener("click", () => exportWorkbook(button.dataset.export));
+    });
     const reset = document.querySelector("[data-reset-demo]");
     if (reset) reset.addEventListener("click", () => {
       if (!window.confirm("Reset every fictional signup and organizer change in this prototype?")) return;
@@ -1011,20 +1014,38 @@
     document.querySelectorAll(".packet-card").forEach((card)=>card.classList.remove("is-print-target"));
   }
 
-  function exportCsv(type) {
-    const rows = type === "volunteers"
-      ? [["ID", "Name", "Email", "Phone", "Role", "Shift", "Checked in"], ...state.volunteers.map((item) => [item.id, item.name, item.email, item.phone, item.role, item.shift, item.checkedIn ? "Yes" : "No"])]
-      : [["ID", "Guardian", "Email", "Phone", "Children", "Status", "Flags"], ...state.applications.map((item) => [item.id, item.guardian, item.email, item.phone, item.children.map((child) => child.name).join("; "), formatStatus(item.status), item.flags.join("; ")])];
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\r\n");
-    const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `campbells-crew-${type}-demo.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast(`${type === "volunteers" ? "Volunteer" : "Application"} CSV created.`);
+  function exportWorkbook(type) {
+    if (!window.CCCXlsx) {
+      toast("The Excel exporter could not load. Please refresh and try again.");
+      return;
+    }
+    const sheets = type === "volunteers" ? volunteerWorkbookSheets() : applicationWorkbookSheets();
+    window.CCCXlsx.downloadWorkbook(`campbells-crew-${type}-demo.xlsx`, sheets);
+    toast(`${type === "volunteers" ? "Volunteer" : "Application"} Excel workbook created.`);
+  }
+
+  function volunteerWorkbookSheets() {
+    const directory = [["Volunteer ID", "Name", "Email", "Phone", "Current event", "Current role", "Current shift", "Status", "Organizer notes"]];
+    const history = [["Volunteer ID", "Volunteer name", "Event", "Role", "Result"]];
+    state.volunteers.forEach((item) => {
+      directory.push([item.id, item.name, item.email, item.phone, item.currentEvent || "", item.role || "", item.shift || "", item.currentEvent ? "Currently registered" : "Past volunteer", item.notes || ""]);
+      (item.history || []).forEach((entry) => history.push([item.id, item.name, entry.event || "", entry.role || "", entry.result || ""]));
+    });
+    return [{ name: "Volunteer Directory", rows: directory }, { name: "Event History", rows: history }];
+  }
+
+  function applicationWorkbookSheets() {
+    const households = [["Application ID", "Event", "Responsible party", "Email", "Phone", "Address", "City", "ZIP", "Referral", "Emergency contact", "Emergency phone", "Relationship", "Submitted", "Status", "Updated since review", "Archived"]];
+    const children = [["Application ID", "Child ID", "First name", "Last name", "Birthdate", "Age", "Gender / sizing category", "Shirt", "Pants", "Shoes", "Underwear", "Coat", "Preferences", "Accommodations", "Decision", "Attendance", "Attendance note"]];
+    const flags = [["Application ID", "Responsible party", "Flag"]];
+    const attendance = [["Application ID", "Responsible party", "Event", "Result"]];
+    state.applications.forEach((item) => {
+      households.push([item.id, item.eventName || state.event.title, item.guardian, item.email, item.phone, item.address, item.city, item.zip, item.referral, item.emergencyName, item.emergencyPhone, item.emergencyRelation, item.submitted, formatStatus(item.status), item.updated ? "Yes" : "No", item.archived ? "Yes" : "No"]);
+      (item.children || []).forEach((child) => children.push([item.id, child.id, child.firstName || child.name, child.lastName || "", child.birthdate || "", child.age ?? "", child.gender || "", child.shirt || "", child.pants || "", child.shoes || "", child.underwear || "", child.coat || "", child.preferences || "", child.accommodations || "", formatStatus(child.decision || item.status), formatStatus(child.attendance || "expected"), child.attendanceNote || ""]));
+      (item.flags || []).forEach((flag) => flags.push([item.id, item.guardian, flag]));
+      (item.previousAttendance || []).forEach((entry) => attendance.push([item.id, item.guardian, entry.event || "", entry.result || ""]));
+    });
+    return [{ name: "Households", rows: households }, { name: "Children", rows: children }, { name: "Flags", rows: flags }, { name: "Attendance History", rows: attendance }];
   }
 
   pinForm.addEventListener("submit", (event) => {
