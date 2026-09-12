@@ -341,11 +341,6 @@ h1, h2, h3, p { margin-top: 0; }
 .question-toggle input:focus-visible + .switch-control, .budget-item > input[type="checkbox"]:focus-visible + .switch-control { outline: 3px solid rgba(53, 211, 47, .45); outline-offset: 3px; }
 .question-toggle strong, .question-toggle small { display: block; }
 .question-toggle small { color: var(--gray); }
-.manual-size-field { margin-top:9px; padding:10px; background:var(--white); border:1px solid var(--line); }
-.manual-size-field label { display:block; margin-bottom:6px; color:var(--gray); font-size:12px; font-weight:700; }
-.manual-size-field input { width:100%; }
-.manual-size-toggle { display:flex; align-items:center; gap:8px; margin-top:9px; color:var(--ink); font-size:13px; font-weight:700; cursor:pointer; }
-.manual-size-toggle input { width:16px; height:16px; accent-color:var(--green-dark); }
 .budget-header { display: flex; margin: 18px 0; justify-content: space-between; gap: 24px; }
 .budget-header > div { width: 220px; }
 .budget-header label { display: block; margin-bottom: 7px; font-weight: 800; }
