@@ -631,8 +631,9 @@ h1, h2, h3, p { margin-top: 0; }
 .directory-actions { display:flex; justify-content:flex-end; margin:-8px 0 16px; }
 .heading-actions { display:flex; gap:8px; flex-wrap:wrap; }
 .email-sender { display:grid; grid-template-columns:2fr 1fr; gap:30px; border-left:6px solid var(--green); }
-.badge-settings { display:flex; align-items:end; gap:28px; }
+.badge-settings { display:grid; grid-template-columns:minmax(260px,1fr) minmax(260px,1fr); align-items:end; gap:18px 28px; }
 .badge-settings .field { min-width:280px; }
+.badge-settings > p { grid-column:1 / -1; margin:0; padding-top:14px; border-top:1px solid var(--line); color:var(--muted); }
 .section-title { margin:32px 0 14px; }
 .badge-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; }
 .badge-card { min-height:190px; padding:22px; border:2px solid var(--ink); background:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:9px; }
@@ -644,21 +645,24 @@ h1, h2, h3, p { margin-top: 0; }
 .badge-section-heading .section-title { margin:0 0 5px; }
 .badge-section-heading p { margin:0; color:var(--muted); }
 .badge-grid--volunteers { grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); }
-.badge-card--volunteer { width:100%; min-height:0; aspect-ratio:3.375 / 2.333; padding:18px; flex-direction:row; justify-content:flex-start; text-align:left; }
+.badge-card--volunteer { width:min(100%, var(--volunteer-badge-width, 330px)); min-height:0; aspect-ratio:var(--volunteer-badge-ratio, 3.375 / 2.333); padding:18px; flex-direction:row; justify-content:flex-start; text-align:left; }
 .badge-card--volunteer > img { width:72px; height:72px; object-fit:contain; flex:0 0 auto; }
 .badge-card--volunteer > div { display:flex; min-width:0; flex:1; flex-direction:column; gap:5px; }
 .badge-card--volunteer > button { align-self:flex-end; }
-.badge-card--recipient { width:min(100%,300px); min-height:0; aspect-ratio:3 / 4; justify-self:center; }
+.badge-card--recipient { width:min(100%, var(--child-badge-width, 300px)); min-height:0; aspect-ratio:var(--child-badge-ratio, 3 / 4); justify-self:center; }
 .badge-card--recipient .badge-logo { width:40px; height:40px; object-fit:contain; }
 .badge-card--recipient .badge-photo { width:96px; height:96px; }
 body[data-volunteer-badge-size="horizontal-35"] .badge-card--volunteer { aspect-ratio:3.5 / 2.25; }
 body[data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:min(100%,260px); aspect-ratio:2.25 / 3.5; }
+body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer { flex-direction:column; justify-content:center; text-align:center; }
+body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div { align-items:center; }
 .badge-size-note { margin-top:38px; padding:24px 28px; border:1px solid var(--line); background:#f3f6f4; }
 .badge-size-note h2 { margin-top:0; }
 .badge-size-note p:last-child { margin-bottom:0; }
 
 @media (max-width: 760px) {
-  .upcoming-event,.finish-event-panel,.email-sender,.badge-settings { display:flex; flex-direction:column; align-items:stretch; }
+  .upcoming-event,.finish-event-panel,.email-sender { display:flex; flex-direction:column; align-items:stretch; }
+  .badge-settings { grid-template-columns:1fr; }
   .upcoming-status { align-items:stretch; min-width:0; }
   .badge-settings .field { min-width:0; }
 }
@@ -666,13 +670,13 @@ body[data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:min
 @media print {
   body[data-print-badge] .badge-settings, body[data-print-badge] .section-title, body[data-print-badge] .badge-section-heading, body[data-print-badge] .badge-size-note { display:none!important; }
   body[data-print-badge] .badge-grid { display:none; }
-  body[data-print-badge][data-print-badge-group="volunteers"] .badge-grid--volunteers { display:grid; grid-template-columns:repeat(2,3.375in); gap:0; justify-content:center; }
-  body[data-print-badge][data-print-badge-group="children"] .badge-grid--children { display:grid; grid-template-columns:repeat(2,3in); gap:.15in; justify-content:center; align-content:start; }
+  body[data-print-badge][data-print-badge-group="volunteers"] .badge-grid--volunteers { display:grid; grid-template-columns:repeat(var(--volunteer-badge-columns, 2), var(--volunteer-badge-width, 3.375in)); gap:.1in; justify-content:center; align-content:start; }
+  body[data-print-badge][data-print-badge-group="children"] .badge-grid--children { display:grid; grid-template-columns:repeat(var(--child-badge-columns, 2), var(--child-badge-width, 3in)); gap:.1in; justify-content:center; align-content:start; }
   body[data-print-badge] .badge-card { display:none; break-inside:avoid; box-sizing:border-box; }
   body[data-print-badge] .badge-card.is-badge-print-target, body[data-print-badge] .badge-card.badge-print-copy { display:flex; }
-  body[data-print-badge] .badge-card--volunteer { width:3.375in; height:2.333in; aspect-ratio:auto; margin:0; }
+  body[data-print-badge] .badge-card--volunteer { width:var(--volunteer-badge-width, 3.375in); height:var(--volunteer-badge-height, 2.333in); aspect-ratio:auto; margin:0; }
   body[data-print-badge][data-volunteer-badge-size="horizontal-35"] .badge-card--volunteer { width:3.5in; height:2.25in; }
-  body[data-print-badge] .badge-card--recipient { width:3in; height:4in; aspect-ratio:auto; margin:0; break-after:auto; }
+  body[data-print-badge] .badge-card--recipient { width:var(--child-badge-width, 3in); height:var(--child-badge-height, 4in); aspect-ratio:auto; margin:0; break-after:auto; }
   body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-grid--children { grid-template-columns:repeat(3,2.25in); gap:.1in; }
   body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:2.25in; height:3.5in; }
   body[data-print-badge] .badge-card button { display:none!important; }
