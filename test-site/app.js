@@ -583,11 +583,27 @@
     const role = previewRole || portalUser;
     const reviewCount = state.applications.filter((item) => !item.archived && ["submitted", "review", "info"].includes(item.status)).length;
     const preview = previewRole ? `<div class="role-preview-banner"><strong>Previewing as ${esc(role)}</strong><span>You are seeing exactly what this role can access.</span><button type="button" data-return-owner>Return to Executive Owner</button></div>` : "";
+    const routes = roleRoutes(role);
+    const eventLinks = [["dashboard", "Overview"], ["events", "Event Management"], ["volunteer-signups", "Volunteer Signups"], ["applications", "Current Applications", reviewCount], ["checkin", "Check-in"], ["packets", "Print Packets"], ["badges", "Print Badges"], ["emails", "Email Center"]];
+    const recordLinks = [["volunteers", "Volunteer Directory"], ["recipient-history", "Past Recipients"], ["reports", "Reports & History"]];
+    const linksFor = (items) => items.filter(([route]) => routes.includes(route)).map(([route, label, count]) => organizerLink(route, label, subroute, count)).join("");
+    const eventMenu = linksFor(eventLinks);
+    const recordMenu = linksFor(recordLinks);
+    const managementMenu = routes.includes("settings") ? organizerLink("settings", "Settings & Users", subroute) : "";
     return `${preview}<div class="organizer-shell ${role === "Read-Only Coordinator" ? "is-read-only" : ""}"><aside class="organizer-sidebar"><div class="organizer-sidebar__title"><span>Private workspace</span><strong>Organizer tools</strong></div><nav class="organizer-menu" aria-label="Organizer sections">
-      <div class="organizer-menu__group"><span>Event operations</span>${organizerLink("dashboard", "Overview", subroute)}${organizerLink("events", "Event Management", subroute)}${organizerLink("volunteer-signups", "Volunteer Signups", subroute)}${organizerLink("applications", "Current Applications", subroute, reviewCount)}${organizerLink("checkin", "Check-in", subroute)}${organizerLink("packets", "Print Packets", subroute)}${organizerLink("badges", "Print Badges", subroute)}${organizerLink("emails", "Email Center", subroute)}</div>
-      <div class="organizer-menu__group"><span>Records & logs</span>${organizerLink("volunteers", "Volunteer Directory", subroute)}${organizerLink("recipient-history", "Past Recipients", subroute)}${organizerLink("reports", "Reports & History", subroute)}</div>
-      <div class="organizer-menu__group"><span>Management</span>${organizerLink("settings", "Settings & Users", subroute)}</div>
+      ${eventMenu ? `<div class="organizer-menu__group"><span>Event operations</span>${eventMenu}</div>` : ""}
+      ${recordMenu ? `<div class="organizer-menu__group"><span>Records & logs</span>${recordMenu}</div>` : ""}
+      ${managementMenu ? `<div class="organizer-menu__group"><span>Management</span>${managementMenu}</div>` : ""}
       </nav><p class="organizer-sidebar__footer">Signed in as ${esc(role)} · <button type="button" data-portal-logout>Sign out</button></p></aside><section class="organizer-main">${content}</section></div>`;
+  }
+
+  function roleRoutes(role) {
+    const all = ["dashboard", "events", "volunteer-signups", "applications", "checkin", "packets", "badges", "emails", "volunteers", "recipient-history", "reports", "settings"];
+    if (role === "Executive Owner") return all;
+    if (role === "Event Administrator") return all.filter((route) => route !== "settings");
+    if (role === "Read-Only Coordinator") return ["dashboard", "events", "volunteer-signups", "applications", "volunteers", "recipient-history", "reports"];
+    if (role === "Check-In Staff") return ["checkin"];
+    return [];
   }
 
   function organizerLink(route, label, current, count) {
@@ -597,9 +613,9 @@
   function renderOrganizer(subroute) {
     if (!portalUser) { renderOrganizerLogin(); return; }
     const role = previewRole || portalUser;
-    const allowed = role === "Executive Owner" || role === "Event Administrator" || role === "Read-Only Coordinator" || (role === "Check-In Staff" && subroute === "checkin");
-    if (!allowed || (role === "Event Administrator" && subroute === "settings")) {
-      main.innerHTML = organizerShell(subroute, `<section class="locked-panel"><span>🔒</span><p class="eyebrow">Restricted for ${esc(role)}</p><h1>This area is locked.</h1><p>Your account can see the navigation, but it cannot open this private section.</p>${role === "Check-In Staff" ? `<button class="button button--green" type="button" data-elevate>Unlock with organizer PIN</button>` : ""}</section>`); bindOrganizer(subroute); return;
+    const allowed = roleRoutes(role).includes(subroute);
+    if (!allowed) {
+      main.innerHTML = organizerShell(subroute, `<section class="locked-panel"><span>🔒</span><p class="eyebrow">Restricted for ${esc(role)}</p><h1>This area is not part of your access.</h1><p>Your workspace navigation only shows the tools assigned to your role.</p></section>`); bindOrganizer(subroute); return;
     }
     let content;
     if (subroute === "events") content = organizerEventsV8();
