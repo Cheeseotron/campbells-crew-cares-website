@@ -470,6 +470,7 @@
       <div class="field"><label for="child-${index}-firstName">Child's first name</label><input id="child-${index}-firstName" name="child-${index}-firstName" value="${esc(child.firstName || "")}" required></div><div class="field"><label for="child-${index}-lastName">Child's last name</label><input id="child-${index}-lastName" name="child-${index}-lastName" value="${esc(child.lastName || "")}" required></div>
       <div class="field"><label for="child-${index}-birthdate">Date of birth</label><input id="child-${index}-birthdate" name="child-${index}-birthdate" type="date" value="${esc(child.birthdate)}" required></div>
       <div class="field"><label for="child-${index}-gender">Sizing category</label><select id="child-${index}-gender" name="child-${index}-gender" required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This helps the organizers understand the child’s typical sizing.</small></div>
+      <div class="field field--span-2 size-guidance"><strong>Clothing sizes</strong><small>Please enter each size exactly as it appears on the clothing, shoes, or package. Spell out letter sizes—for example: <b>Medium</b>, <b>Large</b>, 8, 30 × 32, 4T, or 3.5 youth.</small></div>
       ${sizeField(index,"shirt","Shirt",child.shirt)}${sizeField(index,"pants","Pants",child.pants)}${sizeField(index,"shoes","Shoes",child.shoes)}${sizeField(index,"socks","Socks",child.socks)}${sizeField(index,"underwear","Underwear",child.underwear)}${sizeField(index,"coat","Coat",child.coat)}
       <div class="field field--span-2"><label for="child-${index}-photo">Recent photo of this child</label><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png"><small>We kindly ask you to share a photo of the child so we can pre-make a badge for them to wear on the day of the event. The badge will also be attached to their clothing bag at the end of the event to help ensure it stays with them. Thank you! JPG or PNG only. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div>
       <div class="field field--span-2"><label for="child-${index}-preferences">Colors, styles, interests, likes, or dislikes</label><textarea id="child-${index}-preferences" name="child-${index}-preferences" required>${esc(child.preferences)}</textarea></div>
@@ -479,8 +480,7 @@
 
   function sizeField(index, key, label, value) {
     const inputId = `child-${index}-${key}`;
-    const hint = key === "shoes" ? "Enter the number shown on the child’s shoes (for example, 3.5 or 8 youth)." : key === "socks" ? "Enter the sock size or shoe-size range on the package." : "Enter the exact size shown on the child’s clothing (for example, 8, M, 30 × 32, or 4T).";
-    return `<div class="field size-field"><label for="${inputId}">${label} size</label><input id="${inputId}" name="${inputId}" value="${esc(value || "")}" placeholder="Enter size" required><small>${hint}</small></div>`;
+    return `<div class="field size-field"><label for="${inputId}">${label} size</label><input id="${inputId}" name="${inputId}" value="${esc(value || "")}" placeholder="Enter size" required></div>`;
   }
 
   function syncChildren() {
