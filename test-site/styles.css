@@ -610,10 +610,13 @@ h1, h2, h3, p { margin-top: 0; }
 .bag-plan-intro { display:grid; grid-template-columns:minmax(180px,260px) 1fr; align-items:end; gap:24px; margin-bottom:20px; padding:18px; background:#f0f8f1; border-left:5px solid var(--green); }
 .bag-plan-intro p { margin:0 0 8px; color:var(--muted); }
 .bag-plan-table { border:1px solid var(--line); }
-.bag-plan-row { display:grid; grid-template-columns:1fr 180px 150px; gap:12px; align-items:center; padding:10px 14px; border-top:1px solid var(--line); background:#fff; }
+.bag-quick-add { display:grid; grid-template-columns:minmax(220px,1fr) auto auto; align-items:end; gap:10px; margin:0 0 18px; padding:16px; background:#f7faf7; border:1px solid var(--line); }
+.bag-quick-add label { display:grid; gap:6px; color:var(--gray); font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+.bag-plan-row { display:grid; grid-template-columns:1fr 180px 150px auto; gap:12px; align-items:center; padding:10px 14px; border-top:1px solid var(--line); background:#fff; }
 .bag-plan-row--head { border-top:0; background:var(--mist-2); color:var(--gray); font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
 .bag-plan-row input { min-width:0; }
 .bag-plan-row strong { color:var(--green-dark); font-size:18px; }
+.bag-remove { border:0; background:transparent; color:#a42a21; font:inherit; font-size:12px; font-weight:800; cursor:pointer; text-decoration:underline; }
 .bag-plan-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
 .bag-packing-guide { margin-top:28px; padding:32px; text-align:center; border:2px solid var(--green-dark); background:linear-gradient(135deg,#f6fff6,#eef8f0); }
 .bag-packing-guide img { width:64px; height:64px; object-fit:contain; }
@@ -681,6 +684,7 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   .upcoming-status { align-items:stretch; min-width:0; }
   .badge-settings .field { min-width:0; }
   .bag-plan-intro { grid-template-columns:1fr; }
+  .bag-quick-add { grid-template-columns:1fr; align-items:stretch; }
   .bag-plan-row { grid-template-columns:1fr; gap:7px; }
   .bag-plan-row--head { display:none; }
   .bag-plan-row strong::before { content:"Total to order: "; color:var(--gray); font-size:12px; text-transform:uppercase; }
