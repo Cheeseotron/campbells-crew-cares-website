@@ -782,7 +782,8 @@
 
   function bindOrganizer(subroute) {
     if (subroute === "events") {
-      document.querySelector("#event-form").addEventListener("submit", (event) => {
+      const eventForm = document.querySelector("#event-form");
+      if (eventForm) eventForm.addEventListener("submit", (event) => {
         event.preventDefault();
         if (!event.currentTarget.reportValidity()) return;
         const openSections = [...document.querySelectorAll(".settings-section")].map((section) => section.open);
