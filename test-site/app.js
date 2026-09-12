@@ -817,7 +817,7 @@
     }
     const remembered = JSON.parse(sessionStorage.getItem("ccc-event-sections") || "null");
     let html = organizerEvents().replace('Event setup', 'Event Management').replace('<form id="event-form">', `<div class="event-context event-context--simple"><label>Event being edited<select><option>${esc(state.event.title)}</option><option>Christmas Shopping 2025 (closed record)</option></select></label></div><form id="event-form">`);
-    const activeEventControl = activeEvents().length > 1 ? `<select aria-label="Active event being edited" data-active-event>${activeEventOptions()}</select>` : `<div class="event-context__single" aria-label="Active event being edited">${esc(state.event.title)}</div>`;
+    const activeEventControl = activeEvents().length > 1 ? `<select aria-label="Active event being edited" data-active-event>${activeEventOptions()}</select>` : `<div class="event-context--single" aria-label="Active event being edited">${esc(state.event.title)}</div>`;
     html = html.replace(`<div class="event-context event-context--simple"><label>Event being edited<select><option>${esc(state.event.title)}</option><option>Christmas Shopping 2025 (closed record)</option></select></label></div>`, `<div class="event-context event-context--simple"><label>Active event being edited${activeEventControl}</label><button class="button button--green" type="button" data-create-event>+ Add Event</button></div>`);
     html = html.replace('<details class="settings-section" open>', '<details class="settings-section">');
     html = html.replace('<h3>Volunteer registration</h3>', '<div class="configuration-heading"><span>Volunteer configuration</span><small>Access, public questions, roles, and capacity</small></div><h3>Volunteer registration</h3>');
