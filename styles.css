@@ -259,6 +259,7 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 .site-header > .mobile-menu { min-height: 82px; align-items: center; }
 .site-header:has(> .desktop-nav) { display: flex; align-items: center; gap: 28px; }
 .site-header:has(> .desktop-nav) > .header-social { margin-left: auto; }
+.site-header__inner > .header-social { margin-left: auto; }
 .desktop-nav { display: flex; gap: 25px; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .desktop-nav a { display: flex; align-items: center; min-height: 82px; border-bottom: 3px solid transparent; }
 .desktop-nav a:hover, .desktop-nav a[aria-current="page"] { color: var(--logo-bright); border-color: var(--logo-bright); }
