@@ -610,7 +610,7 @@ h1, h2, h3, p { margin-top: 0; }
 .bag-plan-intro { display:grid; grid-template-columns:minmax(180px,260px) 1fr; align-items:end; gap:24px; margin-bottom:20px; padding:18px; background:#f0f8f1; border-left:5px solid var(--green); }
 .bag-plan-intro p { margin:0 0 8px; color:var(--muted); }
 .bag-plan-table { border:1px solid var(--line); }
-.bag-quick-add { display:grid; grid-template-columns:minmax(220px,1fr) auto auto; align-items:end; gap:10px; margin:0 0 18px; padding:18px; background:linear-gradient(135deg,#e2f6df,#f7fff5); border:2px solid var(--green-dark); border-left:7px solid var(--green); box-shadow:0 7px 16px rgba(15,82,50,.09); }
+.bag-quick-add { display:grid; grid-template-columns:minmax(220px,1fr) auto auto auto; align-items:end; gap:10px; margin:0 0 18px; padding:18px; background:linear-gradient(135deg,#e2f6df,#f7fff5); border:2px solid var(--green-dark); border-left:7px solid var(--green); box-shadow:0 7px 16px rgba(15,82,50,.09); }
 .bag-quick-add label { display:grid; gap:6px; color:var(--green-dark); font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
 .bag-quick-add select { border:2px solid #638d70; background:#fff; font-weight:750; }
 .bag-plan-row { display:grid; grid-template-columns:1fr 180px 150px auto; gap:12px; align-items:center; padding:10px 14px; border-top:1px solid var(--line); background:#fff; }
