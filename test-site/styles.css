@@ -196,6 +196,10 @@ h1, h2, h3, p { margin-top: 0; }
 .review-row { display: grid; grid-template-columns: 180px 1fr; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .review-row span { color: var(--gray); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .signature-box { padding: 24px; background: var(--mist); border-left: 5px solid var(--green-dark); }
+.signature-confirmation { margin-bottom:18px; }
+.signature-confirmation label { display:block; margin-bottom:7px; font-weight:800; }
+.virtual-signature { width:100%; padding:8px 2px!important; border:0!important; border-bottom:1px solid var(--line)!important; border-radius:0!important; background:transparent!important; font-family:"Segoe Script", "Bradley Hand", "Brush Script MT", cursive!important; font-size:26px!important; line-height:1.2; }
+.signature-confirmation small { display:block; margin-top:7px; color:var(--gray); }
 
 /* Organizer */
 .organizer-shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: calc(100vh - 116px); background: var(--mist-2); }
