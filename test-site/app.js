@@ -241,6 +241,7 @@
 
   function renderRoute() {
     if (sessionStorage.getItem(SESSION_KEY) !== "yes") return;
+    clearPrintState();
     const [route, subroute = "dashboard"] = routeParts();
     updateNav(route);
     if (route === "volunteer") renderVolunteer();
@@ -822,7 +823,10 @@
     document.querySelectorAll("[data-checkin-type]").forEach((button) => button.addEventListener("click", () => { checkinType = button.dataset.checkinType; renderOrganizer("checkin"); }));
     document.querySelectorAll("[data-confirm-checkin]").forEach((button) => button.addEventListener("click", () => openCheckinConfirmation(button.dataset.confirmCheckin)));
     document.querySelectorAll("[data-checkin-note]").forEach((button) => button.addEventListener("click", () => openCheckinNote(button.dataset.checkinNote)));
-    document.querySelectorAll("[data-print-mode]").forEach((button) => button.addEventListener("click", () => {
+    document.querySelectorAll("[data-print-mode]").forEach((button) => button.addEventListener("click", (event) => {
+      event.preventDefault(); event.stopPropagation();
+      if (window.location.hash !== "#organizer/packets") return;
+      clearPrintState();
       document.body.dataset.printMode = button.dataset.printMode;
       document.body.dataset.printChild = button.dataset.printChild || "all";
       document.querySelectorAll(".packet-card").forEach((card) => card.classList.toggle("is-print-target", !button.dataset.printChild || card.dataset.packetChild === button.dataset.printChild));
@@ -855,7 +859,10 @@
     const addVolunteer = document.querySelector("[data-add-volunteer]");
     if (addVolunteer) addVolunteer.addEventListener("click", openAddVolunteer);
     document.querySelectorAll("[data-badge-setting]").forEach((select)=>select.addEventListener("change",()=>{ const volunteer=select.dataset.badgeSetting === "volunteer"; document.body.dataset[volunteer ? "volunteerBadgeSize" : "childBadgeSize"] = select.value; const summary=document.querySelector(volunteer?"#volunteer-size-summary":"#child-size-summary"); if(summary) summary.textContent=volunteer?(select.value==="avery-8395"?"Avery 8395-compatible removable adhesive badges, 3⅜ × 2⅓ inches, horizontal, 8 per letter-size sheet.":"Generic 3½ × 2¼ inch horizontal badge layout."):(select.value==="vertical-3x4"?"3 × 4 inch vertical cardstock inserts for clear badge holders.":"2¼ × 3½ inch vertical cardstock inserts for compact badge holders."); }));
-    document.querySelectorAll("[data-print-badge], [data-print-badges]").forEach((button)=>button.addEventListener("click",()=>{
+    document.querySelectorAll("[data-print-badge], [data-print-badges]").forEach((button)=>button.addEventListener("click",(event)=>{
+      event.preventDefault(); event.stopPropagation();
+      if (window.location.hash !== "#organizer/badges") return;
+      clearPrintState();
       const requested = button.dataset.printBadge || "";
       document.body.dataset.printBadge = requested.replace(/-bag$/, "") || "all";
       document.body.dataset.printBadgeGroup = button.dataset.printBadges || "single";
@@ -994,6 +1001,16 @@
     document.body.classList.remove("dialog-open");
   }
 
+  function clearPrintState() {
+    delete document.body.dataset.printMode;
+    delete document.body.dataset.printChild;
+    delete document.body.dataset.printBadge;
+    delete document.body.dataset.printBadgeGroup;
+    document.querySelectorAll(".badge-print-copy").forEach((copy)=>copy.remove());
+    document.querySelectorAll(".badge-card").forEach((card)=>card.classList.remove("is-badge-print-target"));
+    document.querySelectorAll(".packet-card").forEach((card)=>card.classList.remove("is-print-target"));
+  }
+
   function exportCsv(type) {
     const rows = type === "volunteers"
       ? [["ID", "Name", "Email", "Phone", "Role", "Shift", "Checked in"], ...state.volunteers.map((item) => [item.id, item.name, item.email, item.phone, item.role, item.shift, item.checkedIn ? "Yes" : "No"])]
@@ -1035,7 +1052,7 @@
   document.querySelector("[data-close-dialog]").addEventListener("click", closeDialog);
   appDialog.addEventListener("click", (event) => { if (event.target === appDialog) closeDialog(); });
   window.addEventListener("hashchange", renderRoute);
-  window.addEventListener("afterprint", () => { delete document.body.dataset.printMode; delete document.body.dataset.printChild; delete document.body.dataset.printBadge; delete document.body.dataset.printBadgeGroup; document.querySelectorAll(".badge-print-copy").forEach((copy)=>copy.remove()); document.querySelectorAll(".badge-card").forEach((card)=>card.classList.remove("is-badge-print-target")); document.querySelectorAll(".packet-card").forEach((card) => card.classList.remove("is-print-target")); });
+  window.addEventListener("afterprint", clearPrintState);
 
   setUnlocked(SERVER_AUTH || sessionStorage.getItem(SESSION_KEY) === "yes");
 })();
