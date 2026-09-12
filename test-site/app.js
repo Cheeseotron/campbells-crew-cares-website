@@ -509,15 +509,12 @@
   function renderEmergency(panel) {
     const codeRequired = state.event.recipientStatus === "code";
     panel.innerHTML = `
-      <p class="eyebrow">Step 4 of 5</p><h2>Emergency contact & files.</h2><p>We only need a name and phone number so authorized event staff can quickly reach someone if the Responsible Party cannot be reached during an emergency.</p>
+      <p class="eyebrow">Step 4 of 5</p><h2>Emergency contact.</h2><p>We only need a name and phone number so authorized event staff can quickly reach someone if the Responsible Party cannot be reached during an emergency.</p>
       <form id="emergency-form"><div class="form-grid">
         <div class="field"><label for="emergency-name">Emergency contact name</label><input id="emergency-name" name="emergencyName" value="${esc(recipientDraft.emergencyName)}" required></div>
         <div class="field"><label for="emergency-phone">Emergency contact phone</label><input id="emergency-phone" name="emergencyPhone" type="tel" value="${esc(recipientDraft.emergencyPhone)}" required></div>
         ${codeRequired ? `<div class="field"><label for="recipient-code">Invitation code</label><input id="recipient-code" name="recipientCode" value="${esc(recipientDraft.recipientCode)}" required><small>Prototype testing code: HOPE26</small></div>` : ""}
-        <div class="field field--span-2"><label>Supporting paperwork</label><div class="file-drop"><div><strong>Choose demonstration documents</strong><input id="recipient-documents" name="documents" type="file" multiple accept=".pdf,.jpg,.jpeg,.png"><small>No files leave this device in the prototype.</small></div></div>${recipientDraft.documents.length ? `<small>Selected: ${recipientDraft.documents.map(esc).join(", ")}</small>` : ""}</div>
-      </div><div class="inline-note"><strong>Production security:</strong> Actual documents will be encrypted, kept private, and shown only through temporary links to authorized reviewers.</div><div id="code-error" class="validation-summary" hidden>The invitation code does not match this event.</div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Review application <span>→</span></button></div></form>`;
-    const fileInput = document.querySelector("#recipient-documents");
-    fileInput.addEventListener("change", () => { recipientDraft.documents = Array.from(fileInput.files).map((file) => file.name); });
+      </div><div id="code-error" class="validation-summary" hidden>The invitation code does not match this event.</div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Review application <span>→</span></button></div></form>`;
     document.querySelector("[data-recipient-back]").addEventListener("click", () => { saveEmergency(new FormData(document.querySelector("#emergency-form"))); recipientStep = 2; renderRecipient(); });
     document.querySelector("#emergency-form").addEventListener("submit", (event) => {
       event.preventDefault();
@@ -547,7 +544,6 @@
         <div class="review-row"><span>Referral</span><strong>${esc(recipientDraft.referral)}</strong></div>
         <div class="review-row"><span>Children</span><strong>${recipientDraft.children.map((child) => esc(child.name)).join(", ")}</strong></div>
         <div class="review-row"><span>Emergency contact</span><strong>${esc(recipientDraft.emergencyName)} · ${esc(recipientDraft.emergencyPhone)}</strong></div>
-        <div class="review-row"><span>Documents</span><strong>${recipientDraft.documents.length ? recipientDraft.documents.map(esc).join(", ") : "No demonstration documents selected"}</strong></div>
       </div>
       <form id="signature-form"><div class="signature-box"><div class="review-row"><span>Agreement signed by</span><strong>${esc(recipientDraft.agreementSignature)}</strong></div><label class="checkbox-row"><input type="checkbox" name="authority" required><span>I am the Responsible Party, or I have authority to submit this application for the participating children.</span></label><label class="checkbox-row"><input type="checkbox" name="accuracy" required><span>I certify that this application is complete and accurate and confirm the agreements I checked and signed at the beginning.</span></label></div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Submit application <span>→</span></button></div></form>`;
     document.querySelector("[data-recipient-back]").addEventListener("click", () => { recipientStep = 3; renderRecipient(); });
@@ -664,7 +660,7 @@
       <div class="sticky-save"><span>Changes remain in this demonstration browser.</span><button class="button button--green" type="submit">Save & update event →</button></div></form>`;
   }
 
-  function questionToggle(id, label, checked) { return `<label class="question-toggle"><input type="checkbox" name="question-${id}" ${checked ? "checked" : ""}><span class="switch-control" aria-hidden="true"></span><span><strong>${esc(label)}</strong><small>${checked ? "Shown" : "Hidden"} on the public form</small></span></label>`; }
+  function questionToggle(id, label, checked) { if (id === "documents") return ""; return `<label class="question-toggle"><input type="checkbox" name="question-${id}" ${checked ? "checked" : ""}><span class="switch-control" aria-hidden="true"></span><span><strong>${esc(label)}</strong><small>${checked ? "Shown" : "Hidden"} on the public form</small></span></label>`; }
 
   function statusChoice(name, value, title, copy, current) {
     return `<div class="status-choice"><input id="${name}-${value}" type="radio" name="${name}" value="${value}" ${current === value ? "checked" : ""}><label for="${name}-${value}"><strong>${esc(title)}</strong><span>${esc(copy)}</span></label></div>`;
