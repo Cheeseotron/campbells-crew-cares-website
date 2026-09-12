@@ -181,7 +181,7 @@
 
   function createRecipientDraft() {
     return {
-      acknowledgments: {}, agreementSignature: "", guardian: "", email: "", phone: "", address: "", city: "", zip: "", referral: "", preferredContact: "Email", notes: "",
+      acknowledgments: {}, agreementSignature: "", finalSignature: "", guardian: "", email: "", phone: "", address: "", city: "", zip: "", referral: "", preferredContact: "Email", notes: "",
       children: [{ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" }],
       emergencyName: "", emergencyPhone: "", emergencyRelation: "", recipientCode: "", documents: []
     };
@@ -545,7 +545,7 @@
         <div class="review-row"><span>Children</span><strong>${recipientDraft.children.map((child) => esc(child.name)).join(", ")}</strong></div>
         <div class="review-row"><span>Emergency contact</span><strong>${esc(recipientDraft.emergencyName)} · ${esc(recipientDraft.emergencyPhone)}</strong></div>
       </div>
-      <form id="signature-form"><div class="signature-box"><div class="review-row"><span>Agreement signed by</span><strong>${esc(recipientDraft.agreementSignature)}</strong></div><label class="checkbox-row"><input type="checkbox" name="authority" required><span>I am the Responsible Party, or I have authority to submit this application for the participating children.</span></label><label class="checkbox-row"><input type="checkbox" name="accuracy" required><span>I certify that this application is complete and accurate and confirm the agreements I checked and signed at the beginning.</span></label></div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Submit application <span>→</span></button></div></form>`;
+      <form id="signature-form"><div class="signature-box"><div class="field signature-confirmation"><label for="final-signature">Type your full name again to sign this application</label><input id="final-signature" class="virtual-signature" name="finalSignature" value="${esc(recipientDraft.finalSignature)}" autocomplete="name" placeholder="Your full name" required><small>Your typed signature must match the Responsible Party name above.</small></div><label class="checkbox-row"><input type="checkbox" name="authority" required><span>I am the Responsible Party, or I have authority to submit this application for the participating children.</span></label><label class="checkbox-row"><input type="checkbox" name="accuracy" required><span>I certify that this application is complete and accurate and confirm the agreements I checked and signed at the beginning.</span></label></div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Submit application <span>→</span></button></div></form>`;
     document.querySelector("[data-recipient-back]").addEventListener("click", () => { recipientStep = 3; renderRecipient(); });
     document.querySelector("#signature-form").addEventListener("submit", submitRecipient);
   }
@@ -570,13 +570,18 @@
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
+    recipientDraft.finalSignature = String(new FormData(form).get("finalSignature") || "").trim();
     if (normalize(recipientDraft.agreementSignature) !== normalize(recipientDraft.guardian)) {
       toast("The agreement signature must match the Responsible Party name.");
       return;
     }
+    if (normalize(recipientDraft.finalSignature) !== normalize(recipientDraft.guardian)) {
+      toast("Please type the Responsible Party’s full name again to sign the application.");
+      return;
+    }
     const flags = findApplicationFlags(recipientDraft);
     const record = {
-      id: makeId("CCC", state.applications), guardian: recipientDraft.guardian, email: recipientDraft.email, phone: recipientDraft.phone, address: recipientDraft.address, city: recipientDraft.city, zip: recipientDraft.zip, referral: recipientDraft.referral, emergencyName: recipientDraft.emergencyName, emergencyPhone: recipientDraft.emergencyPhone, emergencyRelation: recipientDraft.emergencyRelation, submitted: "Just now", status: flags.length ? "review" : "submitted", flags, checkedIn: false, archived: false, eventName: state.event.title,
+      id: makeId("CCC", state.applications), guardian: recipientDraft.guardian, email: recipientDraft.email, phone: recipientDraft.phone, address: recipientDraft.address, city: recipientDraft.city, zip: recipientDraft.zip, referral: recipientDraft.referral, emergencyName: recipientDraft.emergencyName, emergencyPhone: recipientDraft.emergencyPhone, emergencyRelation: recipientDraft.emergencyRelation, signedBy: recipientDraft.finalSignature, submitted: "Just now", status: flags.length ? "review" : "submitted", flags, checkedIn: false, archived: false, eventName: state.event.title,
       children: recipientDraft.children.map((child, index) => ({ ...child, id: `child-${Date.now()}-${index}`, decision: "review", attendance: "expected", attendanceNote: "", age: child.birthdate ? Math.max(0, new Date().getFullYear() - Number(child.birthdate.slice(0, 4))) : "" }))
     };
     state.applications.unshift(record);
