@@ -456,7 +456,11 @@
       renderRecipient();
     }));
     document.querySelector("[data-recipient-back]").addEventListener("click", () => { syncChildren(); recipientStep = 1; renderRecipient(); });
-    document.querySelectorAll("[data-size-select]").forEach((select) => select.addEventListener("change", () => updateManualSizeField(select)));
+    document.querySelectorAll("[data-sizing-category]").forEach((select) => select.addEventListener("change", () => {
+      syncChildren();
+      renderRecipient();
+    }));
+    document.querySelectorAll("[data-manual-size-toggle]").forEach((toggle) => toggle.addEventListener("change", () => updateManualSizeField(toggle)));
     document.querySelector("#children-form").addEventListener("submit", (event) => {
       event.preventDefault();
       if (!event.currentTarget.reportValidity()) return;
@@ -470,29 +474,46 @@
     return `<section class="child-card"><div class="child-card__header"><h3>Child ${index + 1}</h3>${recipientDraft.children.length > 1 ? `<button class="link-button" type="button" data-remove-child="${index}">Remove</button>` : ""}</div><div class="form-grid">
       <div class="field"><label for="child-${index}-firstName">Child's first name</label><input id="child-${index}-firstName" name="child-${index}-firstName" value="${esc(child.firstName || "")}" required></div><div class="field"><label for="child-${index}-lastName">Child's last name</label><input id="child-${index}-lastName" name="child-${index}-lastName" value="${esc(child.lastName || "")}" required></div>
       <div class="field"><label for="child-${index}-birthdate">Date of birth</label><input id="child-${index}-birthdate" name="child-${index}-birthdate" type="date" value="${esc(child.birthdate)}" required></div>
-      <div class="field"><label for="child-${index}-gender">Sizing category</label><select id="child-${index}-gender" name="child-${index}-gender" required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This guides the standard size choices below and does not limit identity.</small></div>
-      ${sizeField(index,"shirt","Shirt",child.shirt,"apparel")}${sizeField(index,"pants","Pants",child.pants,"apparel")}${sizeField(index,"shoes","Shoes",child.shoes,"shoes")}${sizeField(index,"socks","Socks",child.socks,"socks")}${sizeField(index,"underwear","Underwear",child.underwear,"apparel")}${sizeField(index,"coat","Coat",child.coat,"apparel")}
+      <div class="field"><label for="child-${index}-gender">Sizing group</label><select id="child-${index}-gender" name="child-${index}-gender" data-sizing-category required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This changes the standard choices below. It does not limit identity.</small></div>
+      ${sizeField(index,"shirt","Shirt",child.shirt,"apparel",child.gender,child.shirtManual)}${sizeField(index,"pants","Pants",child.pants,"pants",child.gender,child.pantsManual)}${sizeField(index,"shoes","Shoes",child.shoes,"shoes",child.gender,child.shoesManual)}${sizeField(index,"socks","Socks",child.socks,"socks",child.gender,child.socksManual)}${sizeField(index,"underwear","Underwear",child.underwear,"apparel",child.gender,child.underwearManual)}${sizeField(index,"coat","Coat",child.coat,"apparel",child.gender,child.coatManual)}
       <div class="field field--span-2"><label for="child-${index}-photo">Recent photo of this child</label><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png"><small>JPG or PNG. Used by authorized event staff for identification and badge printing. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div>
       <div class="field field--span-2"><label for="child-${index}-preferences">Colors, styles, interests, likes, or dislikes</label><textarea id="child-${index}-preferences" name="child-${index}-preferences" required>${esc(child.preferences)}</textarea></div>
       <div class="field field--span-2"><label for="child-${index}-accommodations">Medical, sensory, communication, mobility, or behavioral accommodations</label><textarea id="child-${index}-accommodations" name="child-${index}-accommodations" required>${esc(child.accommodations)}</textarea><small>Enter “None” if no accommodation is needed.</small></div>
     </div></section>`;
   }
 
-  function sizeChoices(kind) {
+  function sizeChoices(kind, category) {
+    const youth = ["4","5","6","6X","7","8","10","12","14","16","18","20","Youth XS","Youth S","Youth M","Youth L","Youth XL"];
+    const infant = ["Preemie","Newborn","0–3 months","3–6 months","6–9 months","9–12 months","12–18 months","18–24 months"];
+    const letters = ["Adult XS","Adult S","Adult M","Adult L","Adult XL","Adult 2XL","Adult 3XL","Adult 4XL"];
     if (kind === "shoes") return Array.from({ length: 31 }, (_, index) => String(index / 2));
-    if (kind === "socks") return ["Toddler 0–4","Toddler 4.5–8","Toddler 8.5–13","Youth 1–4","Youth 4.5–7","Adult 5–9","Adult 9–11","Adult 10–13","Adult 13–15"];
-    return ["Preemie","Newborn","0–3 months","3–6 months","6–9 months","9–12 months","12–18 months","18–24 months","2T","3T","4T","5T","4","5","6","7","8","10","12","14","16","18","20","Youth XS","Youth S","Youth M","Youth L","Youth XL","Adult XS","Adult S","Adult M","Adult L","Adult XL","Adult 2XL","Adult 3XL"];
+    if (kind === "socks") return category === "Infant / Baby" ? ["0–3 months","3–6 months","6–12 months","12–24 months"] : category === "Toddler" ? ["Toddler 0–4","Toddler 4.5–8","Toddler 8.5–13"] : category === "Girls" || category === "Boys" ? ["Youth 1–4","Youth 4.5–7"] : ["Adult 5–9","Adult 9–11","Adult 10–13","Adult 13–15"];
+    if (kind === "pants") {
+      if (category === "Girls") return ["0","1","2","3","4","5","6","7","8","10","12","14","16","18","20","Youth XS","Youth S","Youth M","Youth L","Youth XL"];
+      if (category === "Women") return ["0","2","4","6","8","10","12","14","16","18","20","22","Adult XS","Adult S","Adult M","Adult L","Adult XL","Adult 2XL","Adult 3XL"];
+      if (category === "Boys" || category === "Men") {
+        const waists = category === "Boys" ? ["20","22","24","26","28","30","32","34","36","38","40"] : ["28","30","32","34","36","38","40","42","44","46","48","50"];
+        const inseams = category === "Boys" ? ["22","24","26","28","30","32","34"] : ["28","30","32","34","36"];
+        return [...waists.flatMap((waist) => inseams.map((inseam) => `${waist}W × ${inseam}L`)), ...letters];
+      }
+    }
+    if (category === "Infant / Baby") return infant;
+    if (category === "Toddler") return ["2T","3T","4T","5T"];
+    if (category === "Girls" || category === "Boys") return youth;
+    if (category === "Women") return ["0","2","4","6","8","10","12","14","16","18","20","22",...letters];
+    return letters;
   }
 
-  function sizeField(index, key, label, value, kind) {
-    const choices = sizeChoices(kind); const manual = value && !choices.includes(value); const selectId = `child-${index}-${key}`; const manualId = `${selectId}-manual-wrap`;
-    return `<div class="field size-field"><label for="${selectId}">${label} size</label><select id="${selectId}" name="${selectId}" data-size-select data-manual-id="${manualId}" required><option value="">Choose a size</option>${choices.map((size) => `<option value="${esc(size)}" ${value === size ? "selected" : ""}>${kind === "shoes" ? `Size ${esc(size)}` : esc(size)}</option>`).join("")}<option value="__manual__" ${manual ? "selected" : ""}>Other / enter manually</option></select><div class="manual-size-field" id="${manualId}" ${manual ? "" : "hidden"}><label for="${selectId}-manual">Enter the size shown on the child’s clothing</label><input id="${selectId}-manual" name="${selectId}-manual" value="${manual ? esc(value) : ""}" placeholder="For example: 8 slim or 16 husky"></div><small>${kind === "shoes" ? "Choose the numbered shoe size shown on the child’s shoes." : kind === "socks" ? "Choose the shoe-size range that matches the child’s socks." : "Choose the standard clothing size. Use Other only when the exact label is not listed."}</small></div>`;
+  function sizeField(index, key, label, value, kind, category, savedManual) {
+    const choices = sizeChoices(kind, category); const manual = Boolean(savedManual) || Boolean(value && !choices.includes(value)); const selectId = `child-${index}-${key}`; const manualId = `${selectId}-manual-wrap`;
+    const hint = kind === "shoes" ? "Choose the numbered size shown on the child’s shoes." : kind === "socks" ? "Choose the sock range that fits the child’s shoe size." : kind === "pants" && (category === "Boys" || category === "Men") ? "Choose waist × inseam, or use the letter size when that is how the clothing is labeled." : "Choose the standard size shown on the child’s clothing.";
+    return `<div class="field size-field"><label for="${selectId}">${label} size</label><select id="${selectId}" name="${selectId}" ${manual ? "disabled" : "required"}><option value="">Choose a size</option>${choices.map((size) => `<option value="${esc(size)}" ${!manual && value === size ? "selected" : ""}>${kind === "shoes" ? `Size ${esc(size)}` : esc(size)}</option>`).join("")}</select><label class="manual-size-toggle"><input type="checkbox" name="${selectId}-manual-enabled" data-manual-size-toggle data-manual-id="${manualId}" data-select-id="${selectId}" ${manual ? "checked" : ""}> Type manually if the exact size is not listed</label><div class="manual-size-field" id="${manualId}" ${manual ? "" : "hidden"}><label for="${selectId}-manual">Enter the size shown on the child’s clothing</label><input id="${selectId}-manual" name="${selectId}-manual" value="${manual ? esc(value) : ""}" placeholder="For example: 8 slim or 16 husky" ${manual ? "required" : ""}></div><small>${hint}</small></div>`;
   }
 
-  function updateManualSizeField(select) {
-    const manual = document.querySelector(`#${select.dataset.manualId}`); if (!manual) return;
-    const input = manual.querySelector("input"); const shown = select.value === "__manual__";
-    manual.hidden = !shown; input.required = shown; if (shown) input.focus();
+  function updateManualSizeField(toggle) {
+    const manual = document.querySelector(`#${toggle.dataset.manualId}`); const select = document.querySelector(`#${toggle.dataset.selectId}`); if (!manual || !select) return;
+    const input = manual.querySelector("input"); const shown = toggle.checked;
+    manual.hidden = !shown; input.required = shown; select.disabled = shown; select.required = !shown; if (shown) input.focus();
   }
 
   function syncChildren() {
@@ -501,7 +522,7 @@
     const data = new FormData(form);
     recipientDraft.children = recipientDraft.children.map((child, index) => {
       const next = {};
-      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); ["shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => { const selected = String(data.get(`child-${index}-${key}`) || ""); next[key] = selected === "__manual__" ? String(data.get(`child-${index}-${key}-manual`) || "").trim() : selected; }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || ""); next.name = `${next.firstName} ${next.lastName}`.trim();
+      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); ["shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => { const manual = data.has(`child-${index}-${key}-manual-enabled`); next[`${key}Manual`] = manual; next[key] = manual ? String(data.get(`child-${index}-${key}-manual`) || "").trim() : String(data.get(`child-${index}-${key}`) || ""); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || ""); next.name = `${next.firstName} ${next.lastName}`.trim();
       return next;
     });
   }
