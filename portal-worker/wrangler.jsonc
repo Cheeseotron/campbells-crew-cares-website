@@ -15,20 +15,13 @@
     {
       "binding": "DB",
       "database_name": "campbells-crew-portal",
-      "database_id": "REPLACE_AFTER_CREATING_D1"
+      "database_id": "d3e2d113-1f43-4da2-a19a-79cd9e6f42bc"
     }
   ],
   "r2_buckets": [
     {
       "binding": "PRIVATE_UPLOADS",
       "bucket_name": "campbells-crew-portal-private"
-    }
-  ],
-  "ratelimits": [
-    {
-      "name": "LOGIN_RATE_LIMITER",
-      "namespace_id": "REPLACE_AFTER_CREATING_RATE_LIMITER",
-      "simple": { "limit": 8, "period": 60 }
     }
   ]
 }
