@@ -27,6 +27,15 @@ function randomId(prefix) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
 
+function photoFromDataUrl(value) {
+  if (!value || typeof value !== "string") return null;
+  const match = value.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return null;
+  const binary = atob(match[2]);
+  if (binary.length > 1024 * 1024) return null;
+  return { contentType: match[1], bytes: Uint8Array.from(binary, (character) => character.charCodeAt(0)) };
+}
+
 function base64Url(bytes) {
   let value = "";
   for (const byte of bytes) value += String.fromCharCode(byte);
@@ -141,8 +150,16 @@ async function api(request, env, url, user) {
       .bind(householdId, event.id, String(input.guardianName).slice(0, 120), String(input.email).trim().toLowerCase(), String(input.phone).slice(0, 30), JSON.stringify(input.address || {}), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000) })).run();
     for (const child of input.children.slice(0, 12)) {
       if (!child.firstName || !child.lastName) continue;
+      const childId = randomId("child");
+      const photo = photoFromDataUrl(child.photoDataUrl);
+      let photoKey = null;
+      if (photo) {
+        photoKey = `children/${householdId}/${childId}.jpg`;
+        await env.PRIVATE_UPLOADS.put(photoKey, photo.bytes, { httpMetadata: { contentType: photo.contentType }, customMetadata: { householdId, childId } });
+      }
       await env.DB.prepare("INSERT INTO recipient_children (id, household_id, first_name, last_name, birth_date, details_json) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(randomId("child"), householdId, String(child.firstName).slice(0, 80), String(child.lastName).slice(0, 80), child.birthDate || null, JSON.stringify(child.details || {})).run();
+        .bind(childId, householdId, String(child.firstName).slice(0, 80), String(child.lastName).slice(0, 80), child.birthDate || null, JSON.stringify(child.details || {})).run();
+      if (photoKey) await env.DB.prepare("UPDATE recipient_children SET photo_key = ? WHERE id = ?").bind(photoKey, childId).run();
     }
     await audit(env, null, "recipient_application_submitted", "recipient_household", householdId, event.id);
     return json({ id: householdId, message: "Your application has been received for review." }, 201);
