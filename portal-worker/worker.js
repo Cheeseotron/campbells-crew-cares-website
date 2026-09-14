@@ -156,6 +156,47 @@ async function activeEvents(env) {
   return results;
 }
 
+function eventSettings(event) {
+  try { return JSON.parse(event.settings_json || "{}"); } catch { return {}; }
+}
+
+async function publicVolunteerEvents(env) {
+  const { results } = await env.DB.prepare("SELECT id, title, event_date, settings_json FROM events WHERE status = 'open' AND event_type IN ('shopping', 'food_bag') ORDER BY event_date ASC").all();
+  return results.map((event) => ({ ...event, settings: eventSettings(event) })).filter((event) => event.settings.volunteerStatus === "open");
+}
+
+function volunteerSignupPage(events, message = "", error = "") {
+  if (!events.length) return portalStatusPage("Volunteer opportunities", "There are no public volunteer opportunities open right now. Please check back when the next event is announced.");
+  const event = events[0];
+  const roles = Array.isArray(event.settings.roles) ? event.settings.roles.filter((role) => role.enabled && role.title) : [];
+  const notice = error ? `<p class="notice error" role="alert">${escapeHtml(error)}</p>` : message ? `<p class="notice success">${escapeHtml(message)}</p>` : "";
+  const roleOptions = roles.map((role) => `<option value="${escapeHtml(role.title)}">${escapeHtml(role.title)}${role.shift ? ` · ${escapeHtml(role.shift)}` : ""}</option>`).join("");
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Volunteer signup | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--forest:#176b39;--mist:#edf3ed;--gray:#59665f}*{box-sizing:border-box}body{margin:0;background:var(--mist);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100% - 32px,760px);margin:54px auto;padding:clamp(28px,6vw,54px);background:#fff;border-left:7px solid var(--green);box-shadow:0 18px 55px rgba(17,24,33,.12)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:var(--forest)}h1{margin:10px 0 15px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(38px,7vw,62px);line-height:.94;letter-spacing:-.05em;text-transform:uppercase}p{line-height:1.55;color:var(--gray)}.event{margin:26px 0;padding:22px;background:var(--mist);border-left:4px solid var(--forest)}.event strong{display:block;font-size:21px}.event span{display:block;margin-top:7px;color:var(--gray)}label{display:block;margin:20px 0 7px}input,select{width:100%;min-height:50px;padding:12px;border:1px solid #bdc6c0;background:#fff;font:16px Arial,sans-serif}.check{display:flex;gap:10px;align-items:flex-start;margin-top:19px;color:var(--ink);font-size:14px;font-weight:700;line-height:1.4;text-transform:none;letter-spacing:0}.check input{width:18px;min-height:18px;margin:0;accent-color:var(--forest)}button{width:100%;min-height:52px;margin-top:24px;border:1px solid var(--green);background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.notice{padding:14px 16px;font-weight:700}.error{background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d}.success{background:#e9f7ea;border-left:4px solid var(--forest);color:#155b31}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Volunteer signup</h1><p>Join the crew for an upcoming event. We will email event details to registered volunteers.</p>${notice}<div class="event"><strong>${escapeHtml(event.title)}</strong><span>${escapeHtml(event.event_date || event.settings.date || "Date to be announced")}</span><span>${escapeHtml(event.settings.location || "Location to be announced")}</span></div><form method="post" action="/volunteer"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><label for="name">Full name</label><input id="name" name="name" autocomplete="name" required><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required><label for="phone">Phone number</label><input id="phone" name="phone" type="tel" autocomplete="tel" required><label for="role">Volunteer role</label><select id="role" name="role" required><option value="">Choose a role</option>${roleOptions}</select><label class="check"><input name="alertOptIn" type="checkbox"><span>Keep me on the volunteer alert list for future Campbell's Crew opportunities.</span></label><button>Complete volunteer signup →</button></form></main></body></html>`;
+  return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
+}
+
+async function registerVolunteer(env, input) {
+  const event = await env.DB.prepare("SELECT id, title, settings_json FROM events WHERE id = ? AND status = 'open'").bind(input.eventId).first();
+  const settings = event ? eventSettings(event) : null;
+  const roles = Array.isArray(settings?.roles) ? settings.roles.filter((role) => role.enabled).map((role) => role.title) : [];
+  if (!event || settings?.volunteerStatus !== "open" || !roles.includes(String(input.role || ""))) return { error: "That volunteer opportunity is not available." };
+  if (!input.name || !input.email || !input.phone || !input.role) return { error: "Please complete your name, email, phone number, and volunteer role." };
+  const email = String(input.email).trim().toLowerCase();
+  let profile = await env.DB.prepare("SELECT id FROM volunteer_profiles WHERE email = ?").bind(email).first();
+  if (!profile) {
+    profile = { id: randomId("volunteer") };
+    await env.DB.prepare("INSERT INTO volunteer_profiles (id, name, email, phone, alert_opt_in) VALUES (?, ?, ?, ?, ?)")
+      .bind(profile.id, String(input.name).slice(0, 120), email, String(input.phone).slice(0, 30), input.alertOptIn ? 1 : 0).run();
+  }
+  const signupId = randomId("signup");
+  try {
+    await env.DB.prepare("INSERT INTO volunteer_signups (id, event_id, volunteer_id, role) VALUES (?, ?, ?, ?)")
+      .bind(signupId, event.id, profile.id, String(input.role).slice(0, 100)).run();
+  } catch { return { error: "That email is already registered for this event." }; }
+  await audit(env, null, "volunteer_signed_up", "volunteer_signup", signupId, event.id);
+  return { id: signupId, event };
+}
+
 async function audit(env, actor, action, targetType, targetId, eventId = null, metadata = {}) {
   await env.DB.prepare("INSERT INTO audit_log (id, actor_user_id, event_id, action, target_type, target_id, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .bind(randomId("audit"), actor?.id || null, eventId, action, targetType, targetId, JSON.stringify(metadata)).run();
@@ -166,24 +207,10 @@ async function api(request, env, url, user) {
   if (url.pathname === "/portal-api/public/events" && request.method === "GET") return json({ events: await activeEvents(env), mode: env.PORTAL_MODE || "closed" });
 
   if (url.pathname === "/portal-api/public/volunteer-signups" && request.method === "POST") {
-    if ((env.PORTAL_MODE || "closed") !== "open") return json({ error: "Volunteer signups are not open right now." }, 403);
     const input = await request.json();
-    const event = await env.DB.prepare("SELECT id, settings_json FROM events WHERE id = ? AND status = 'open'").bind(input.eventId).first();
-    if (!event || !input.name || !input.email || !input.role) return json({ error: "Please select an open event and complete your name, email, and role." }, 400);
-    const email = String(input.email).trim().toLowerCase();
-    let profile = await env.DB.prepare("SELECT id FROM volunteer_profiles WHERE email = ?").bind(email).first();
-    if (!profile) {
-      profile = { id: randomId("volunteer") };
-      await env.DB.prepare("INSERT INTO volunteer_profiles (id, name, email, phone, alert_opt_in) VALUES (?, ?, ?, ?, ?)")
-        .bind(profile.id, String(input.name).slice(0, 120), email, String(input.phone || "").slice(0, 30), input.alertOptIn ? 1 : 0).run();
-    }
-    const signupId = randomId("signup");
-    try {
-      await env.DB.prepare("INSERT INTO volunteer_signups (id, event_id, volunteer_id, role) VALUES (?, ?, ?, ?)")
-        .bind(signupId, event.id, profile.id, String(input.role).slice(0, 100)).run();
-    } catch { return json({ error: "You are already signed up for this event." }, 409); }
-    await audit(env, null, "volunteer_signed_up", "volunteer_signup", signupId, event.id);
-    return json({ id: signupId, message: "You are registered. We will email event details before the event." }, 201);
+    const result = await registerVolunteer(env, input);
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ id: result.id, message: "You are registered. We will email event details before the event." }, 201);
   }
 
   if (url.pathname === "/portal-api/public/applications" && request.method === "POST") {
@@ -307,10 +334,16 @@ export default {
       if (!user) return Response.redirect(`${url.origin}/login`, 303);
       return serveOrganizerPrototype(request, env, url);
     }
-    if ((url.pathname === "/volunteer" || url.pathname === "/apply") && (env.PORTAL_MODE || "closed") !== "open") {
-      const isVolunteer = url.pathname === "/volunteer";
-      return portalStatusPage(isVolunteer ? "Volunteer opportunities" : "Recipient applications", isVolunteer ? "There are no public volunteer opportunities open right now. Please check back when the next event is announced." : "Recipient applications are not open right now. Please check back when the next event is announced.");
+    if (url.pathname === "/volunteer") {
+      const events = await publicVolunteerEvents(env);
+      if (request.method === "POST") {
+        const form = await request.formData();
+        const result = await registerVolunteer(env, Object.fromEntries(form));
+        return volunteerSignupPage(events, result.error ? "" : "You are registered. We will email event details before the event.", result.error || "");
+      }
+      return volunteerSignupPage(events);
     }
+    if (url.pathname === "/apply" && (env.PORTAL_MODE || "closed") !== "open") return portalStatusPage("Recipient applications", "Recipient applications are not open right now. Please check back when the next event is announced.");
     return servePortalAsset(request, env, url);
   }
 };
