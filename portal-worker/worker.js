@@ -160,6 +160,15 @@ async function tokenHash(token) {
   return base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))));
 }
 
+async function issueInvitation(env, userId) {
+  await env.DB.prepare("DELETE FROM user_invitations WHERE user_id = ? AND used_at IS NULL").bind(userId).run();
+  const token = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  await env.DB.prepare("INSERT INTO user_invitations (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)")
+    .bind(randomId("invite"), userId, await tokenHash(token), expiresAt).run();
+  return { token, expiresAt };
+}
+
 function accountSetupPage(token, message = "", status = 200) {
   const alert = message ? `<p role="alert" class="error">${escapeHtml(message)}</p>` : "";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Set up organizer account | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--ink);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,580px);padding:clamp(30px,6vw,58px);background:#fff;border-top:7px solid var(--green);box-shadow:0 24px 70px rgba(0,0,0,.32)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:#176b39}h1{margin:12px 0 14px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(36px,7vw,52px);line-height:1;letter-spacing:-.045em;text-transform:uppercase}p{color:var(--gray);line-height:1.55}label{display:block;margin:20px 0 7px}input{width:100%;height:52px;padding:12px;border:1px solid #bdc6c0;background:var(--mist);color:var(--ink);font:400 17px/26px Arial,sans-serif}button{width:100%;min-height:52px;margin-top:22px;border:1px solid var(--green);background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Set your password</h1><p>Create a password for your private organizer account. This one-time link expires in seven days.</p>${alert}<form method="post" action="/setup"><input type="hidden" name="token" value="${escapeHtml(token)}"><label for="password">New password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required autofocus><label for="confirm">Confirm password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="10" required><button>Activate organizer account →</button></form></main></body></html>`;
@@ -322,7 +331,7 @@ async function api(request, env, url, user) {
 
   if (url.pathname === "/portal-api/organizer/users" && request.method === "GET") {
     if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Executive Owner permission required." }, 403);
-    const { results } = await env.DB.prepare("SELECT id, email, display_name, role, status, created_at FROM users ORDER BY created_at ASC").all();
+    const { results } = await env.DB.prepare("SELECT u.id, u.email, u.display_name, u.role, u.status, u.created_at, (SELECT i.expires_at FROM user_invitations i WHERE i.user_id = u.id AND i.used_at IS NULL ORDER BY i.created_at DESC LIMIT 1) AS invitation_expires_at FROM users u ORDER BY u.created_at ASC").all();
     return json({ users: results });
   }
 
@@ -333,20 +342,29 @@ async function api(request, env, url, user) {
     const displayName = String(input.displayName || "").trim();
     const role = String(input.role || "");
     if (!/^\S+@\S+\.\S+$/.test(email) || !displayName || !["event_admin", "read_only", "checkin_staff"].includes(role)) return json({ error: "Enter a name, a valid email address, and a permission level." }, 400);
-    const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
-    if (existing) return json({ error: "An organizer account already uses that email address." }, 409);
-    const id = randomId("user");
-    const salt = base64Url(crypto.getRandomValues(new Uint8Array(18)));
-    const placeholderPassword = base64Url(crypto.getRandomValues(new Uint8Array(24)));
-    await env.DB.prepare("INSERT INTO users (id, email, display_name, role, password_hash, password_salt, status) VALUES (?, ?, ?, ?, ?, ?, 'disabled')")
-      .bind(id, email, displayName.slice(0, 100), role, await passwordHash(placeholderPassword, salt), salt).run();
-    const invitationId = randomId("invite");
-    const token = base64Url(crypto.getRandomValues(new Uint8Array(32)));
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    await env.DB.prepare("INSERT INTO user_invitations (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)")
-      .bind(invitationId, id, await tokenHash(token), expiresAt).run();
-    await audit(env, user, "organizer_invited", "user", id, null, { role });
-    return json({ id, setupUrl: `${url.origin}/setup?token=${encodeURIComponent(token)}`, expiresAt }, 201);
+    const existing = await env.DB.prepare("SELECT id, status FROM users WHERE email = ?").bind(email).first();
+    if (existing?.status === "active") return json({ error: "An active organizer account already uses that email address." }, 409);
+    let id = existing?.id;
+    if (!id) {
+      id = randomId("user");
+      const salt = base64Url(crypto.getRandomValues(new Uint8Array(18)));
+      const placeholderPassword = base64Url(crypto.getRandomValues(new Uint8Array(24)));
+      await env.DB.prepare("INSERT INTO users (id, email, display_name, role, password_hash, password_salt, status) VALUES (?, ?, ?, ?, ?, ?, 'disabled')")
+        .bind(id, email, displayName.slice(0, 100), role, await passwordHash(placeholderPassword, salt), salt).run();
+    }
+    const invitation = await issueInvitation(env, id);
+    await audit(env, user, existing ? "organizer_invitation_renewed" : "organizer_invited", "user", id, null, { role });
+    return json({ id, setupUrl: `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`, expiresAt: invitation.expiresAt }, 201);
+  }
+
+  const invitationMatch = url.pathname.match(/^\/portal-api\/organizer\/users\/([^/]+)\/invitation$/);
+  if (invitationMatch && request.method === "POST") {
+    if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Executive Owner permission required." }, 403);
+    const account = await env.DB.prepare("SELECT id, status FROM users WHERE id = ?").bind(invitationMatch[1]).first();
+    if (!account || account.status === "active") return json({ error: "A new invitation is only available for a pending account." }, 400);
+    const invitation = await issueInvitation(env, account.id);
+    await audit(env, user, "organizer_invitation_renewed", "user", account.id);
+    return json({ id: account.id, setupUrl: `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`, expiresAt: invitation.expiresAt });
   }
 
   if (url.pathname === "/portal-api/bootstrap-owner" && request.method === "POST") {

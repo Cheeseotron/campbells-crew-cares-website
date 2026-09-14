@@ -261,7 +261,7 @@
     if (!response.ok) throw new Error("The organizer accounts could not be loaded.");
     const labels = { executive_owner: "Executive Owner", event_admin: "Event Administrator", read_only: "Read-Only Coordinator", checkin_staff: "Check-In Staff" };
     const payload = await response.json();
-    state.users = (payload.users || []).map((record) => ({ name: record.display_name, email: record.email, role: labels[record.role] || record.role, status: record.status === "active" ? "Active" : "Invited" }));
+    state.users = (payload.users || []).map((record) => ({ id: record.id, name: record.display_name, email: record.email, role: labels[record.role] || record.role, status: record.status === "active" ? "Active" : "Invitation pending", invitationExpiresAt: record.invitation_expires_at || "" }));
   }
 
   function esc(value) {
@@ -884,8 +884,12 @@
     return `${heading("Event records", "Reports & history", "Close out an event once, preserve it permanently and compare participation over time.", `<button class="button button--green" type="button" data-demo-action="closeout">Close out current event</button>`)}<div class="metric-grid"><article class="metric-card"><span>Children attendance</span><strong>${latest.childrenAttended}/${latest.childrenRegistered}</strong><small>${Math.round((latest.childrenAttended/latest.childrenRegistered)*100)}% attended</small></article><article class="metric-card"><span>Volunteer attendance</span><strong>${latest.volunteersAttended}/${latest.volunteersRegistered}</strong><small>${latest.volunteerHours} volunteer hours</small></article><article class="metric-card"><span>Total event spending</span><strong>$${latest.totalSpent.toLocaleString()}</strong><small>$${Math.round(latest.totalSpent/latest.childrenAttended)} per attending child</small></article></div><article class="panel"><div class="panel-header"><div><h2>Close-out worksheet</h2><p>Enter final figures after the event. Saving adds a permanent read-only report.</p></div>${statusPill("review", "Draft")}</div><form id="report-form"><div class="form-grid"><div class="field"><label>Children registered<input name="childrenRegistered" type="number" value="100"></label></div><div class="field"><label>Children attended<input name="childrenAttended" type="number" value="92"></label></div><div class="field"><label>Volunteers registered<input name="volunteersRegistered" type="number" value="80"></label></div><div class="field"><label>Volunteers attended<input name="volunteersAttended" type="number" value="74"></label></div><div class="field"><label>Total volunteer hours<input name="volunteerHours" type="number" value="340"></label></div><div class="field"><label>Kids shopping<input name="shopping" type="number" value="13800"></label></div><div class="field"><label>Food<input name="food" type="number" value="700"></label></div><div class="field"><label>Planning & supplies<input name="supplies" type="number" value="900"></label></div><div class="field"><label>Other expenses<input name="other" type="number" value="250"></label></div><div class="field field--span-2"><label>Close-out notes<textarea name="notes" placeholder="Lessons learned, incidents, successes and next-year changes"></textarea></label></div></div><button class="button button--green" type="submit">Save close-out report →</button></form></article><article class="panel"><h2>Event history</h2><div class="report-row"><span><strong>${esc(latest.event)}</strong><small>${esc(latest.status)} · All records retained</small></span><b>${latest.childrenAttended} children · ${latest.volunteerHours} hours · $${latest.totalSpent.toLocaleString()}</b><button class="button button--small button--ghost" type="button" data-demo-action="view-report">View report</button></div></article>`;
   }
 
+  function organizerUserRows() {
+    return state.users.map((user) => `<div class="user-row"><span><strong>${esc(user.name)}</strong><small>${esc(user.email)}</small></span><b>${esc(user.role)}</b>${statusPill(user.status === "Active" ? "approved" : "submitted", user.status)}${user.status === "Active" ? "" : `<button class="button button--small button--light" type="button" data-renew-invitation="${esc(user.id)}">New setup link</button>`}</div>`).join("") || `<p>No organizer accounts found.</p>`;
+  }
+
   function organizerSettings() {
-    return `${heading("Workspace administration", "Settings", "Manage people, permissions, and security defaults.", `<button class="button button--green" type="button" data-add-user>+ Add user</button>`)}<article class="panel"><div class="panel-header"><div><h2>Users & permissions</h2><p>Fewer than ten trusted people will have organizer access.</p></div></div><div class="permission-legend"><span><b>Executive Owner</b> Everything</span><span><b>Event Administrator</b> All event operations</span><span><b>Read-Only Coordinator</b> View without editing</span><span><b>Check-In Staff</b> Check-in only; other panels locked</span></div><div class="user-list">${state.users.map((user) => `<div class="user-row"><span><strong>${esc(user.name)}</strong><small>${esc(user.email)}</small></span><b>${esc(user.role)}</b>${statusPill(user.status === "Active" ? "approved" : "submitted", user.status)}<button class="dots-button" type="button" data-demo-action="user-menu" aria-label="User options">•••</button></div>`).join("")}</div></article><article class="panel"><div class="panel-header"><div><h2>Security & retention</h2><p>Current planning decisions</p></div></div><div class="detail-grid"><div class="detail-item"><span>Organizer login</span><strong>Google Workspace planned</strong></div><div class="detail-item"><span>Event history</span><strong>Retain all years</strong></div><div class="detail-item"><span>Audit log</span><strong>Decisions, edits, emails and exports</strong></div><div class="detail-item"><span>Search visibility</span><strong>No indexing</strong></div></div></article>`;
+    return `${heading("Workspace administration", "Settings", "Manage people, permissions, and security defaults.", `<button class="button button--green" type="button" data-add-user>+ Add user</button>`)}<article class="panel"><div class="panel-header"><div><h2>Users & permissions</h2><p>Fewer than ten trusted people will have organizer access.</p></div></div><div class="permission-legend"><span><b>Executive Owner</b> Everything</span><span><b>Event Administrator</b> All event operations</span><span><b>Read-Only Coordinator</b> View without editing</span><span><b>Check-In Staff</b> Check-in only; other panels locked</span></div><div class="user-list">${organizerUserRows()}</div></article><article class="panel"><div class="panel-header"><div><h2>Security & retention</h2><p>Current planning decisions</p></div></div><div class="detail-grid"><div class="detail-item"><span>Organizer login</span><strong>Google Workspace planned</strong></div><div class="detail-item"><span>Event history</span><strong>Retain all years</strong></div><div class="detail-item"><span>Audit log</span><strong>Decisions, edits, emails and exports</strong></div><div class="detail-item"><span>Search visibility</span><strong>No indexing</strong></div></div></article>`;
   }
 
   function organizerSettingsV5() {
@@ -1093,6 +1097,13 @@
     });
     const addUser = document.querySelector("[data-add-user]");
     if (addUser) addUser.addEventListener("click", openAddUser);
+    document.querySelectorAll("[data-renew-invitation]").forEach((button) => button.addEventListener("click", async () => {
+      try {
+        const response = await fetch(`/portal-api/organizer/users/${encodeURIComponent(button.dataset.renewInvitation)}/invitation`, { method: "POST" });
+        const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "A new setup link could not be created.");
+        showInvitationLink(payload); await loadLiveUsers(); renderOrganizer("settings");
+      } catch (error) { toast(error.message || "A new setup link could not be created."); }
+    }));
     const finishEvent = document.querySelector("[data-finish-event]");
     if (finishEvent) finishEvent.addEventListener("click", openFinishEvent);
     document.querySelectorAll("[data-create-event]").forEach((button) => button.addEventListener("click", openCreateEvent));
@@ -1263,11 +1274,16 @@
       try {
         const response = await fetch("/portal-api/organizer/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ displayName: data.get("name"), email: data.get("email"), role: data.get("role") }) });
         const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The invitation could not be created.");
-        dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Invitation created</p><h2 id="dialog-title">Share this link privately</h2><p>This one-time account-setup link expires in seven days. Your new organizer will choose their own password.</p><div class="field"><label for="setup-link">Account setup link</label><input id="setup-link" value="${esc(payload.setupUrl)}" readonly></div><button class="button button--green" type="button" data-copy-setup-link>Copy link</button></div>`;
-        dialogContent.querySelector("[data-copy-setup-link]").addEventListener("click", async () => { await navigator.clipboard.writeText(payload.setupUrl); toast("Invitation link copied."); });
+        showInvitationLink(payload);
         await loadLiveUsers();
       } catch (error) { toast(error.message || "The invitation could not be created."); submit.disabled = false; submit.textContent = "Create invitation link →"; }
     });
+  }
+
+  function showInvitationLink(payload) {
+    dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Invitation created</p><h2 id="dialog-title">Share this link privately</h2><p>This one-time account-setup link expires in seven days. Your new organizer will choose their own password.</p><div class="field"><label for="setup-link">Account setup link</label><input id="setup-link" value="${esc(payload.setupUrl)}" readonly></div><button class="button button--green" type="button" data-copy-setup-link>Copy link</button></div>`;
+    appDialog.showModal(); document.body.classList.add("dialog-open");
+    dialogContent.querySelector("[data-copy-setup-link]").addEventListener("click", async () => { await navigator.clipboard.writeText(payload.setupUrl); toast("Invitation link copied."); });
   }
 
   function openApplication(id) {
