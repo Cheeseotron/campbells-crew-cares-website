@@ -322,9 +322,11 @@
     }
 
     const volunteerEvents = activeEvents().filter((event) => event.volunteerEnabled && event.volunteerStatus !== "closed");
-    if (volunteerEvents.some((event) => event.id === publicVolunteerEventId)) state.activeEventId = publicVolunteerEventId;
-    if (volunteerEvents.length > 1 && !volunteerEvents.some((event) => event.id === publicVolunteerEventId)) { renderPublicEventChooser("volunteer", volunteerEvents); return; }
-    const event = state.event;
+    const selectedEvent = volunteerEvents.find((event) => event.id === publicVolunteerEventId) || (volunteerEvents.length === 1 ? volunteerEvents[0] : null);
+    if (volunteerEvents.length > 1 && !selectedEvent) { renderPublicEventChooser("volunteer", volunteerEvents); return; }
+    if (!selectedEvent) { main.innerHTML = `<div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><div class="content-card"><h1>Volunteer registration is currently closed.</h1><p>Please check back when Campbell's Crew opens another opportunity.</p></div></div>`; return; }
+    state.activeEventId = selectedEvent.id;
+    const event = selectedEvent;
     if (!event.volunteerEnabled) { main.innerHTML = `<div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><div class="content-card"><h1>Volunteer signups are not part of this event.</h1><p>Please return to see other Campbell's Crew opportunities.</p></div></div>`; return; }
     const roles = event.roles.filter((role) => role.enabled);
     const role = roles.find((item) => item.id === selectedVolunteerRole) || roles[0];
@@ -387,13 +389,18 @@
     }
 
     const recipientEvents = activeEvents().filter((event) => event.recipientEnabled && event.recipientStatus !== "closed");
-    if (recipientEvents.some((event) => event.id === publicRecipientEventId)) state.activeEventId = publicRecipientEventId;
-    if (recipientEvents.length > 1 && !recipientEvents.some((event) => event.id === publicRecipientEventId)) { renderPublicEventChooser("recipient", recipientEvents); return; }
-    if (!state.event.recipientEnabled) {
+    const selectedEvent = recipientEvents.find((event) => event.id === publicRecipientEventId) || (recipientEvents.length === 1 ? recipientEvents[0] : null);
+    if (recipientEvents.length > 1 && !selectedEvent) { renderPublicEventChooser("recipient", recipientEvents); return; }
+    if (!selectedEvent) {
+      main.innerHTML = `<section class="page-hero page-hero--ink"><div class="page-hero__grid"><div><p class="eyebrow eyebrow--light">Recipient application</p><h1>Applications are <span>closed.</span></h1></div><p>Campbell's Crew will reopen applications when a qualifying event is ready.</p></div></section><div class="page-content"><a class="back-link" href="#home">← Back to signup home</a></div>`;
+      return;
+    }
+    state.activeEventId = selectedEvent.id;
+    if (!selectedEvent.recipientEnabled) {
       main.innerHTML = `<div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><div class="content-card"><h1>Recipient applications are not part of this event.</h1><p>This event is volunteer-only. Please return to see available assistance opportunities.</p></div></div>`;
       return;
     }
-    if (state.event.recipientStatus === "closed") {
+    if (selectedEvent.recipientStatus === "closed") {
       main.innerHTML = `<section class="page-hero page-hero--ink"><div class="page-hero__grid"><div><p class="eyebrow eyebrow--light">Recipient application</p><h1>Applications are <span>closed.</span></h1></div><p>Campbell's Crew can reopen this event from the organizer workspace when it is ready to accept applications.</p></div></section><div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><div class="content-card"><h2>${esc(state.event.title)}</h2><p>New recipient applications are not being accepted right now.</p></div></div>`;
       return;
     }
