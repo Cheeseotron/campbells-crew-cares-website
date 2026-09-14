@@ -94,8 +94,10 @@ async function servePortalAsset(request, env, url) {
 }
 
 async function activeEvents(env) {
-  const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date, settings_json FROM events WHERE status = 'open' ORDER BY event_date ASC").all();
-  return results.map((event) => ({ ...event, settings: JSON.parse(event.settings_json) }));
+  // Keep event configuration, access codes, capacity notes, and contact details
+  // on the server. The public form needs only this small display-safe subset.
+  const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date FROM events WHERE status = 'open' ORDER BY event_date ASC").all();
+  return results;
 }
 
 async function audit(env, actor, action, targetType, targetId, eventId = null, metadata = {}) {
@@ -106,6 +108,45 @@ async function audit(env, actor, action, targetType, targetId, eventId = null, m
 async function api(request, env, url, user) {
   if (url.pathname === "/portal-api/health") return json({ ready: true, mode: env.PORTAL_MODE || "closed", emailDelivery: "not_configured" });
   if (url.pathname === "/portal-api/public/events" && request.method === "GET") return json({ events: await activeEvents(env), mode: env.PORTAL_MODE || "closed" });
+
+  if (url.pathname === "/portal-api/public/volunteer-signups" && request.method === "POST") {
+    if ((env.PORTAL_MODE || "closed") !== "open") return json({ error: "Volunteer signups are not open right now." }, 403);
+    const input = await request.json();
+    const event = await env.DB.prepare("SELECT id, settings_json FROM events WHERE id = ? AND status = 'open'").bind(input.eventId).first();
+    if (!event || !input.name || !input.email || !input.role) return json({ error: "Please select an open event and complete your name, email, and role." }, 400);
+    const email = String(input.email).trim().toLowerCase();
+    let profile = await env.DB.prepare("SELECT id FROM volunteer_profiles WHERE email = ?").bind(email).first();
+    if (!profile) {
+      profile = { id: randomId("volunteer") };
+      await env.DB.prepare("INSERT INTO volunteer_profiles (id, name, email, phone, alert_opt_in) VALUES (?, ?, ?, ?, ?)")
+        .bind(profile.id, String(input.name).slice(0, 120), email, String(input.phone || "").slice(0, 30), input.alertOptIn ? 1 : 0).run();
+    }
+    const signupId = randomId("signup");
+    try {
+      await env.DB.prepare("INSERT INTO volunteer_signups (id, event_id, volunteer_id, role) VALUES (?, ?, ?, ?)")
+        .bind(signupId, event.id, profile.id, String(input.role).slice(0, 100)).run();
+    } catch { return json({ error: "You are already signed up for this event." }, 409); }
+    await audit(env, null, "volunteer_signed_up", "volunteer_signup", signupId, event.id);
+    return json({ id: signupId, message: "You are registered. We will email event details before the event." }, 201);
+  }
+
+  if (url.pathname === "/portal-api/public/applications" && request.method === "POST") {
+    if ((env.PORTAL_MODE || "closed") !== "open") return json({ error: "Recipient applications are not open right now." }, 403);
+    const input = await request.json();
+    const event = await env.DB.prepare("SELECT id, event_type FROM events WHERE id = ? AND status = 'open'").bind(input.eventId).first();
+    if (!event || event.event_type !== "shopping") return json({ error: "That recipient application is not available." }, 400);
+    if (!input.guardianName || !input.email || !input.phone || !Array.isArray(input.children) || !input.children.length) return json({ error: "Please complete the guardian information and add at least one child." }, 400);
+    const householdId = randomId("household");
+    await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(householdId, event.id, String(input.guardianName).slice(0, 120), String(input.email).trim().toLowerCase(), String(input.phone).slice(0, 30), JSON.stringify(input.address || {}), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000) })).run();
+    for (const child of input.children.slice(0, 12)) {
+      if (!child.firstName || !child.lastName) continue;
+      await env.DB.prepare("INSERT INTO recipient_children (id, household_id, first_name, last_name, birth_date, details_json) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(randomId("child"), householdId, String(child.firstName).slice(0, 80), String(child.lastName).slice(0, 80), child.birthDate || null, JSON.stringify(child.details || {})).run();
+    }
+    await audit(env, null, "recipient_application_submitted", "recipient_household", householdId, event.id);
+    return json({ id: householdId, message: "Your application has been received for review." }, 201);
+  }
   if (url.pathname === "/portal-api/me" && request.method === "GET") return user ? json({ user }) : json({ user: null }, 401);
 
   if (url.pathname === "/portal-api/events" && request.method === "GET") {
