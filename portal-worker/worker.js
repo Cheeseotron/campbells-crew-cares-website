@@ -82,7 +82,10 @@ function constantTimeEqual(left, right) {
 
 async function passwordHash(password, salt) {
   const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: 310000 }, material, 256);
+  // Cloudflare's free Worker CPU allowance is deliberately short. Ten thousand
+  // iterations keeps an interactive sign-in below that cap; login throttling is
+  // handled separately at the edge rather than allowing a Worker exception.
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: 10000 }, material, 256);
   return base64Url(new Uint8Array(bits));
 }
 
@@ -90,6 +93,14 @@ function loginPage(message = "", status = 200) {
   const alert = message ? `<p role="alert" class="error">${escapeHtml(message)}</p>` : "";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Organizer sign in | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--forest:#176b39;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--ink);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,580px);padding:clamp(30px,6vw,58px);background:#fff;border-top:7px solid var(--green);box-shadow:0 24px 70px rgba(0,0,0,.32)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:var(--forest)}h1{margin:12px 0 14px;font-family:"Arial Black",Arial,sans-serif;font-size:52px;line-height:1;letter-spacing:-.045em;text-transform:uppercase;white-space:nowrap}p{color:var(--gray);line-height:1.55}label{display:block;margin:20px 0 7px}input{width:100%;height:52px;padding:12px;border:1px solid #bdc6c0;border-radius:0;background:var(--mist);color:var(--ink);font:400 17px/26px Arial,sans-serif;appearance:none;-webkit-appearance:none}input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-text-fill-color:var(--ink);-webkit-box-shadow:0 0 0 1000px var(--mist) inset;box-shadow:0 0 0 1000px var(--mist) inset;transition:background-color 9999s ease-out 0s}button{width:100%;min-height:52px;margin-top:22px;border:1px solid var(--green);background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}@media(max-width:560px){h1{font-size:41px;white-space:normal}}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Organizer sign in</h1><p>Use the organizer account created for you. Public volunteer and recipient forms stay separate from this private workspace.</p>${alert}<form method="post" action="/login"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" required autofocus><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><button>Sign in →</button></form></main></body></html>`;
   return new Response(html, { status, headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
+}
+
+// Keep the initial closed-testing experience entirely server-rendered. This is
+// a reliable, no-JavaScript fallback while the fuller interactive workspace is
+// connected to its live data screens.
+function portalStatusPage(title, detail, action = "") {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${escapeHtml(title)} | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--forest:#176b39;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--mist);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,680px);padding:clamp(30px,6vw,58px);background:#fff;border-left:7px solid var(--green);box-shadow:0 18px 55px rgba(17,24,33,.12)}.eyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--forest)}h1{margin:12px 0 14px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(34px,7vw,52px);line-height:1;letter-spacing:-.045em;text-transform:uppercase}p{max-width:57ch;color:var(--gray);line-height:1.55}.action{display:inline-block;margin-top:12px;padding:14px 18px;background:var(--green);color:var(--ink);font-size:11px;font-weight:800;letter-spacing:.12em;text-decoration:none;text-transform:uppercase}</style></head><body><main><div class="eyebrow">Campbell's Crew Cares</div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(detail)}</p>${action}</main></body></html>`;
+  return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
 
 async function servePortalAsset(request, env, url) {
@@ -227,7 +238,12 @@ export default {
     if (url.pathname === "/login") return user ? Response.redirect(`${url.origin}/organizer`, 303) : loginPage();
     if (url.pathname === "/organizer" || url.pathname.startsWith("/organizer/")) {
       if (!user) return Response.redirect(`${url.origin}/login`, 303);
+      if ((env.PORTAL_MODE || "closed") !== "open") return portalStatusPage("You’re signed in", `Your ${user.role.replace(/_/g, " ")} session is active. The private workspace is in its closed testing phase while the live dashboard screens are connected.`);
       return servePortalAsset(request, env, url);
+    }
+    if ((url.pathname === "/volunteer" || url.pathname === "/apply") && (env.PORTAL_MODE || "closed") !== "open") {
+      const isVolunteer = url.pathname === "/volunteer";
+      return portalStatusPage(isVolunteer ? "Volunteer opportunities" : "Recipient applications", isVolunteer ? "There are no public volunteer opportunities open right now. Please check back when the next event is announced." : "Recipient applications are not open right now. Please check back when the next event is announced.");
     }
     return servePortalAsset(request, env, url);
   }

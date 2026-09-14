@@ -15,7 +15,7 @@ will intercept only these routes when deployed:
   audit history, and email jobs.
 - Private R2 boundary for child photos and packet templates. Browser code never
   receives a public storage URL for those files.
-- Password hashing with PBKDF2 (310,000 iterations), signed HttpOnly sessions,
+- Password hashing with PBKDF2 (10,000 Worker-safe iterations), signed HttpOnly sessions,
   login throttling, and server-side role checks.
 - Closed-by-default public status. Email is represented as a draft/queue only;
   the Worker does not send email until the Cloudflare Email Service is enabled.
