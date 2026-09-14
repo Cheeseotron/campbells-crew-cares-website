@@ -127,6 +127,7 @@ async function serveOrganizerPrototype(request, env, url) {
   if (assetUrl.pathname === "/index.html") {
     const html = (await asset.text())
       .replace("<html lang=\"en\">", "<html lang=\"en\" data-server-auth=\"true\">")
+      .replace("</head>", "<style>.app-header,.prototype-notice,.app-footer{display:none!important}</style></head>")
       // Keep CSP's base-uri protection intact; route the prototype's local
       // files explicitly instead of injecting a <base> element.
       .replace('href="styles.css"', 'href="/organizer/styles.css"')
@@ -140,6 +141,7 @@ async function serveOrganizerPrototype(request, env, url) {
     const script = (await asset.text())
       .replaceAll("../assets/", "/assets/")
       .replace('const SERVER_AUTH = document.documentElement.dataset.serverAuth === "true";', 'const SERVER_AUTH = document.documentElement.dataset.serverAuth === "true" || window.location.pathname.startsWith("/organizer");')
+      .replace('if (!window.location.hash) window.location.hash = "home";', 'if (!window.location.hash) window.location.hash = "organizer/dashboard";')
       .replace('window.location.assign("/test-site/logout")', 'window.location.assign("/logout")');
     headers.set("Content-Type", "text/javascript; charset=utf-8");
     return new Response(script, { status: asset.status, headers });
