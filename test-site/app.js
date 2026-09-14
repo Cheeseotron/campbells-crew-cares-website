@@ -15,6 +15,23 @@
   const appDialog = document.querySelector("#app-dialog");
   const dialogContent = document.querySelector("#dialog-content");
 
+  function formatPhoneNumber(value) {
+    const digits = String(value || "").replace(/\D/g, "").slice(0, 10);
+    if (digits.length < 4) return digits;
+    if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  function formatPhoneField(field) {
+    if (!(field instanceof HTMLInputElement) || field.type !== "tel") return;
+    field.inputMode = "tel";
+    if (!field.placeholder) field.placeholder = "(555) 555-5555";
+    field.value = formatPhoneNumber(field.value);
+  }
+
+  document.addEventListener("input", (event) => formatPhoneField(event.target));
+  document.addEventListener("focusin", (event) => formatPhoneField(event.target));
+
   const volunteerRoles = [
     { id: "shopper", title: "Shopper", description: "Shop one-on-one with a child for approved essentials.", shift: "6:00 AM – 10:00 AM", capacity: 65, enabled: true },
     { id: "cart-checker", title: "Cart Checker", description: "Review carts against the event shopping guide.", shift: "7:00 AM – 10:00 AM", capacity: 8, enabled: true },
