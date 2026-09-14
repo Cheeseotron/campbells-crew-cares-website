@@ -282,7 +282,9 @@ async function api(request, env, url, user) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const isPortal = PORTAL_PATHS.has(url.pathname) || url.pathname.startsWith("/organizer/") || url.pathname.startsWith("/portal-assets/") || url.pathname.startsWith("/portal-api/");
+    // Logout is a protected portal action too. It must reach this Worker so it
+    // can expire the HttpOnly session cookie before redirecting to sign-in.
+    const isPortal = PORTAL_PATHS.has(url.pathname) || url.pathname === "/logout" || url.pathname.startsWith("/organizer/") || url.pathname.startsWith("/portal-assets/") || url.pathname.startsWith("/portal-api/");
     if (!isPortal) return new Response("Not found", { status: 404 });
     if (!env.DB || !env.ASSETS) return json({ error: "Portal deployment is not configured." }, 503);
     const user = await readSession(request, env);
