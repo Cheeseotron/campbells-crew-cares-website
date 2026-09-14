@@ -194,6 +194,36 @@ async function publicVolunteerEvents(env) {
   return results.map((event) => ({ ...event, settings: eventSettings(event) })).filter((event) => ["open", "code"].includes(event.settings.volunteerStatus));
 }
 
+async function publicRecipientEvents(env) {
+  const { results } = await env.DB.prepare("SELECT id, title, event_date, settings_json FROM events WHERE status = 'open' AND event_type = 'shopping' ORDER BY event_date ASC").all();
+  return results.map((event) => ({ ...event, settings: eventSettings(event) })).filter((event) => ["open", "code"].includes(event.settings.recipientStatus));
+}
+
+async function recipientAccessCookie(eventId, secret) {
+  return `${eventId}.${base64Url(await hmac(secret, `recipient:${eventId}`))}`;
+}
+
+async function hasRecipientAccess(request, eventId, secret) {
+  const name = `ccc_recipient_access_${eventId}=`;
+  const cookie = (request.headers.get("Cookie") || "").split(";").map((entry) => entry.trim()).find((entry) => entry.startsWith(name));
+  if (!cookie) return false;
+  return constantTimeEqual(cookie.slice(name.length), await recipientAccessCookie(eventId, secret));
+}
+
+function recipientCodePage(event, error = "") {
+  const alert = error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : "";
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Recipient application access | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--mist:#eef3ef;--gray:#617068}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--mist);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,620px);padding:clamp(30px,6vw,54px);background:#fff;border-left:7px solid var(--green);box-shadow:0 18px 55px rgba(17,24,33,.12)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:#176b39}h1{margin:12px 0;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(34px,7vw,52px);line-height:1;letter-spacing:-.045em;text-transform:uppercase}p{color:var(--gray);line-height:1.55}label{display:block;margin:22px 0 7px}input{width:100%;min-height:52px;padding:12px;border:1px solid #bdc6c0;background:#fff;font:16px Arial,sans-serif}button{width:100%;min-height:52px;margin-top:20px;border:0;background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Application access</h1><p>Enter the referral code supplied by Campbell's Crew to apply for <strong>${escapeHtml(event.title)}</strong>.</p>${alert}<form method="post" action="/apply"><input type="hidden" name="action" value="unlock"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><label for="access-code">Referral code</label><input id="access-code" name="accessCode" autocomplete="one-time-code" required autofocus><button>Continue →</button></form></main></body></html>`;
+  return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
+}
+
+function recipientApplicationPage(events, query, message = "", error = "") {
+  if (!events.length) return portalStatusPage("Recipient applications", "There are no recipient applications open right now. Please check back when the next event is announced.");
+  const event = events.find((item) => item.id === query.get("event")) || events[0];
+  const notice = error ? `<p class="notice error" role="alert">${escapeHtml(error)}</p>` : message ? `<p class="notice success">${escapeHtml(message)}</p>` : "";
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Recipient application | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--forest:#176b39;--mist:#eef3ef;--line:#d2d9d4;--gray:#617068}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--mist);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100% - 40px,760px);margin:52px auto 70px;background:#fff;border:1px solid var(--line);box-shadow:0 20px 50px rgba(17,24,33,.11);padding:clamp(28px,5vw,54px)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:var(--forest)}h1{margin:12px 0;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(34px,6vw,52px);line-height:.95;letter-spacing:-.045em;text-transform:uppercase}p{color:var(--gray);line-height:1.55}.event{margin:26px 0;padding:18px 20px;background:var(--mist);border-left:5px solid var(--green)}.event strong,.event span{display:block}.event span{margin-top:5px;color:var(--gray)}label{display:block;margin:20px 0 7px}input,textarea{width:100%;min-height:52px;margin-top:7px;padding:12px;border:1px solid var(--line);font:16px Arial,sans-serif}textarea{min-height:110px;resize:vertical}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.grid label{margin-bottom:0}button{min-height:52px;margin-top:26px;padding:0 22px;border:0;background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.notice{padding:13px;font-weight:700}.error{background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d}.success{background:#e9f7ea;border-left:4px solid var(--forest);color:#155b31}@media(max-width:620px){main{width:min(100% - 26px,760px);margin-top:28px}.grid{grid-template-columns:1fr}}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Apply for help</h1><p>Applications are reviewed by Campbell's Crew. Submitting an application does not guarantee acceptance.</p>${notice}<div class="event"><strong>${escapeHtml(event.title)}</strong><span>${escapeHtml(event.event_date || event.settings.date || "Date to be announced")}</span></div><form method="post" action="/apply"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><label>Responsible party name<input name="guardianName" autocomplete="name" required></label><div class="grid"><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Phone<input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 555-5555" required></label></div><div class="grid"><label>Child's first name<input name="firstName" required></label><label>Child's last name<input name="lastName" required></label></div><label>Notes or accommodations <small>(optional)</small><textarea name="notes"></textarea></label><button>Submit application →</button></form></main></body></html>`;
+  return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
+}
+
 function volunteerCodePage(event, error = "") {
   const alert = error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : "";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Volunteer access | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--mist:#eef3ef;--gray:#617068}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--mist);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,620px);padding:clamp(30px,6vw,54px);background:#fff;border-left:7px solid var(--green);box-shadow:0 18px 55px rgba(17,24,33,.12)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:#176b39}h1{margin:12px 0;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(34px,7vw,52px);line-height:1;letter-spacing:-.045em;text-transform:uppercase}p{color:var(--gray);line-height:1.55}label{display:block;margin:22px 0 7px}input{width:100%;min-height:52px;padding:12px;border:1px solid #bdc6c0;background:#fff;font:16px Arial,sans-serif}button{width:100%;min-height:52px;margin-top:20px;border:0;background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Volunteer access</h1><p>Enter the invitation code supplied by Campbell's Crew to view and sign up for <strong>${escapeHtml(event.title)}</strong>.</p>${alert}<form method="post" action="/volunteer"><input type="hidden" name="action" value="unlock"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><label for="access-code">Invitation code</label><input id="access-code" name="accessCode" autocomplete="one-time-code" required autofocus><button>Continue →</button></form></main></body></html>`;
@@ -256,6 +286,33 @@ async function registerVolunteer(env, input, codeGranted = false) {
   return { id: signupId, event };
 }
 
+async function registerRecipient(env, input, codeGranted = false) {
+  const event = await env.DB.prepare("SELECT id, title, event_type, settings_json FROM events WHERE id = ? AND status = 'open'").bind(input.eventId).first();
+  const settings = event ? eventSettings(event) : null;
+  const status = settings?.recipientStatus;
+  const codeMatches = status === "code" && String(input.accessCode || "").trim() === String(settings.recipientCode || "").trim();
+  if (!event || event.event_type !== "shopping" || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches)) return { error: "That recipient application is not available." };
+  if (!input.guardianName || !input.email || !input.phone || !Array.isArray(input.children) || !input.children.length) return { error: "Please complete the responsible party information and add at least one child." };
+  const householdId = randomId("household");
+  await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(householdId, event.id, String(input.guardianName).slice(0, 120), String(input.email).trim().toLowerCase(), String(input.phone).slice(0, 30), JSON.stringify(input.address || {}), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000) })).run();
+  for (const child of input.children.slice(0, 12)) {
+    if (!child.firstName || !child.lastName) continue;
+    const childId = randomId("child");
+    const photo = photoFromDataUrl(child.photoDataUrl);
+    let photoKey = null;
+    if (photo) {
+      photoKey = `children/${householdId}/${childId}.jpg`;
+      await env.PRIVATE_UPLOADS.put(photoKey, photo.bytes, { httpMetadata: { contentType: photo.contentType }, customMetadata: { householdId, childId } });
+    }
+    await env.DB.prepare("INSERT INTO recipient_children (id, household_id, first_name, last_name, birth_date, details_json) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(childId, householdId, String(child.firstName).slice(0, 80), String(child.lastName).slice(0, 80), child.birthDate || null, JSON.stringify(child.details || {})).run();
+    if (photoKey) await env.DB.prepare("UPDATE recipient_children SET photo_key = ? WHERE id = ?").bind(photoKey, childId).run();
+  }
+  await audit(env, null, "recipient_application_submitted", "recipient_household", householdId, event.id);
+  return { id: householdId, event };
+}
+
 async function audit(env, actor, action, targetType, targetId, eventId = null, metadata = {}) {
   await env.DB.prepare("INSERT INTO audit_log (id, actor_user_id, event_id, action, target_type, target_id, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .bind(randomId("audit"), actor?.id || null, eventId, action, targetType, targetId, JSON.stringify(metadata)).run();
@@ -273,29 +330,10 @@ async function api(request, env, url, user) {
   }
 
   if (url.pathname === "/portal-api/public/applications" && request.method === "POST") {
-    if ((env.PORTAL_MODE || "closed") !== "open") return json({ error: "Recipient applications are not open right now." }, 403);
     const input = await request.json();
-    const event = await env.DB.prepare("SELECT id, event_type FROM events WHERE id = ? AND status = 'open'").bind(input.eventId).first();
-    if (!event || event.event_type !== "shopping") return json({ error: "That recipient application is not available." }, 400);
-    if (!input.guardianName || !input.email || !input.phone || !Array.isArray(input.children) || !input.children.length) return json({ error: "Please complete the guardian information and add at least one child." }, 400);
-    const householdId = randomId("household");
-    await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(householdId, event.id, String(input.guardianName).slice(0, 120), String(input.email).trim().toLowerCase(), String(input.phone).slice(0, 30), JSON.stringify(input.address || {}), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000) })).run();
-    for (const child of input.children.slice(0, 12)) {
-      if (!child.firstName || !child.lastName) continue;
-      const childId = randomId("child");
-      const photo = photoFromDataUrl(child.photoDataUrl);
-      let photoKey = null;
-      if (photo) {
-        photoKey = `children/${householdId}/${childId}.jpg`;
-        await env.PRIVATE_UPLOADS.put(photoKey, photo.bytes, { httpMetadata: { contentType: photo.contentType }, customMetadata: { householdId, childId } });
-      }
-      await env.DB.prepare("INSERT INTO recipient_children (id, household_id, first_name, last_name, birth_date, details_json) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(childId, householdId, String(child.firstName).slice(0, 80), String(child.lastName).slice(0, 80), child.birthDate || null, JSON.stringify(child.details || {})).run();
-      if (photoKey) await env.DB.prepare("UPDATE recipient_children SET photo_key = ? WHERE id = ?").bind(photoKey, childId).run();
-    }
-    await audit(env, null, "recipient_application_submitted", "recipient_household", householdId, event.id);
-    return json({ id: householdId, message: "Your application has been received for review." }, 201);
+    const result = await registerRecipient(env, input);
+    if (result.error) return json({ error: result.error }, 400);
+    return json({ id: result.id, message: "Your application has been received for review." }, 201);
   }
   if (url.pathname === "/portal-api/me" && request.method === "GET") return user ? json({ user }) : json({ user: null }, 401);
 
@@ -480,7 +518,27 @@ export default {
       if (selected?.settings.volunteerStatus === "code" && !(await hasVolunteerAccess(request, selected.id, env.PORTAL_SESSION_SECRET))) return volunteerCodePage(selected);
       return liveVolunteerSignupPage(events, url.searchParams);
     }
-    if (url.pathname === "/apply" && (env.PORTAL_MODE || "closed") !== "open") return portalStatusPage("Recipient applications", "Recipient applications are not open right now. Please check back when the next event is announced.");
+    if (url.pathname === "/apply") {
+      const events = await publicRecipientEvents(env);
+      if (request.method === "POST") {
+        const form = await request.formData();
+        const input = Object.fromEntries(form);
+        const event = events.find((item) => item.id === input.eventId);
+        if (input.action === "unlock") {
+          if (!event || event.settings.recipientStatus !== "code" || String(input.accessCode || "").trim() !== String(event.settings.recipientCode || "").trim()) return recipientCodePage(event || { id: "", title: "this event" }, "That referral code does not match.");
+          const access = await recipientAccessCookie(event.id, env.PORTAL_SESSION_SECRET);
+          return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: `/apply?event=${encodeURIComponent(event.id)}`, "Set-Cookie": `ccc_recipient_access_${event.id}=${access}; Path=/apply; HttpOnly; Secure; SameSite=Lax; Max-Age=604800` })) });
+        }
+        if (!event) return recipientApplicationPage(events, url.searchParams, "", "That recipient application is not available.");
+        const codeGranted = event.settings.recipientStatus !== "code" || await hasRecipientAccess(request, event.id, env.PORTAL_SESSION_SECRET);
+        if (!codeGranted) return recipientCodePage(event, "Enter the referral code before completing this application.");
+        const result = await registerRecipient(env, { ...input, children: [{ firstName: input.firstName, lastName: input.lastName }] }, codeGranted);
+        return recipientApplicationPage(events, url.searchParams, result.error ? "" : "Your application has been received for review.", result.error || "");
+      }
+      const selected = events.find((item) => item.id === url.searchParams.get("event")) || events[0];
+      if (selected?.settings.recipientStatus === "code" && !(await hasRecipientAccess(request, selected.id, env.PORTAL_SESSION_SECRET))) return recipientCodePage(selected);
+      return recipientApplicationPage(events, url.searchParams);
+    }
     return servePortalAsset(request, env, url);
   }
 };
