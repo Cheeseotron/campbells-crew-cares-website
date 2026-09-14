@@ -113,6 +113,17 @@ async function servePortalAsset(request, env, url) {
   else assetUrl.pathname = route.replace(/^\/portal-assets\/?/, "/");
   const asset = await env.ASSETS.fetch(new Request(assetUrl, request));
   const headers = securityHeaders(new Headers(asset.headers));
+  if (route === "/apply") {
+    const html = (await asset.text())
+      .replace("<html lang=\"en\">", "<html lang=\"en\" data-live-public-recipient=\"true\">")
+      .replace('href="styles.css"', 'href="/portal-assets/styles.css"')
+      .replace('src="xlsx-export.js"', 'src="/portal-assets/xlsx-export.js"')
+      .replace('src="app.js"', 'src="/portal-assets/app.js"')
+      .replaceAll("../assets/", "/assets/")
+      .replace("</head>", "<script>window.CCC_LIVE_PUBLIC_RECIPIENT=true;sessionStorage.setItem('ccc-test-site-unlocked','yes');location.hash='recipient';</script></head>");
+    headers.set("Content-Type", "text/html; charset=utf-8");
+    return new Response(html, { status: asset.status, headers });
+  }
   return new Response(asset.body, { status: asset.status, headers });
 }
 
@@ -152,8 +163,11 @@ async function serveOrganizerPrototype(request, env, url) {
 async function activeEvents(env) {
   // Keep event configuration, access codes, capacity notes, and contact details
   // on the server. The public form needs only this small display-safe subset.
-  const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date FROM events WHERE status = 'open' ORDER BY event_date ASC").all();
-  return results;
+  const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date, settings_json FROM events WHERE status = 'open' ORDER BY event_date ASC").all();
+  return results.map((event) => {
+    const settings = eventSettings(event);
+    return { id: event.id, title: event.title, event_type: event.event_type, event_date: event.event_date, settings: { date: settings.date, time: settings.time, location: settings.location, volunteerStatus: settings.volunteerStatus, recipientStatus: settings.recipientStatus, volunteerEnabled: settings.volunteerEnabled, recipientEnabled: settings.recipientEnabled, questions: settings.questions || {} } };
+  });
 }
 
 async function volunteerAccessCookie(eventId, secret) {
@@ -318,7 +332,7 @@ async function registerRecipient(env, input, codeGranted = false) {
   if (!input.guardianName || !input.email || !input.phone || !Array.isArray(input.children) || !input.children.length) return { error: "Please complete the responsible party information and add at least one child." };
   const householdId = randomId("household");
   await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .bind(householdId, event.id, String(input.guardianName).slice(0, 120), String(input.email).trim().toLowerCase(), String(input.phone).slice(0, 30), JSON.stringify(input.address || {}), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000) })).run();
+    .bind(householdId, event.id, String(input.guardianName).slice(0, 120), String(input.email).trim().toLowerCase(), String(input.phone).slice(0, 30), JSON.stringify(input.address || {}), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000), ...(input.application && typeof input.application === "object" ? input.application : {}) })).run();
   for (const child of input.children.slice(0, 12)) {
     if (!child.firstName || !child.lastName) continue;
     const childId = randomId("child");
@@ -558,7 +572,7 @@ export default {
       }
       const selected = events.find((item) => item.id === url.searchParams.get("event")) || events[0];
       if (selected?.settings.recipientStatus === "code" && !(await hasRecipientAccess(request, selected.id, env.PORTAL_SESSION_SECRET))) return recipientCodePage(selected);
-      return recipientApplicationPage(events, url.searchParams);
+      return servePortalAsset(request, env, url);
     }
     return servePortalAsset(request, env, url);
   }

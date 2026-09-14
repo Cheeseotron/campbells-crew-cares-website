@@ -3,6 +3,7 @@
 
   const TEST_PIN = "2017";
   const SERVER_AUTH = document.documentElement.dataset.serverAuth === "true";
+  const LIVE_PUBLIC_RECIPIENT = window.CCC_LIVE_PUBLIC_RECIPIENT === true;
   const SESSION_KEY = "ccc-test-site-unlocked";
   const STATE_KEY = "ccc-signup-prototype-state-v7";
   const main = document.querySelector("#main");
@@ -188,8 +189,8 @@
   function activeEvents() { return state.events.filter((event) => !event.closed); }
   function activeEventOptions() { return activeEvents().map((event) => `<option value="${esc(event.id)}" ${event.id === state.activeEventId ? "selected" : ""}>${esc(event.title)}</option>`).join(""); }
 
-  let state = prepareEventCollection(SERVER_AUTH ? createLiveState() : loadState());
-  if (!SERVER_AUTH) {
+  let state = prepareEventCollection((SERVER_AUTH || LIVE_PUBLIC_RECIPIENT) ? createLiveState() : loadState());
+  if (!SERVER_AUTH && !LIVE_PUBLIC_RECIPIENT) {
     if (state.volunteers.length < 15 || state.applications.length < 15) expandDemoData(state);
     state.volunteers.forEach((volunteer,index) => { if (volunteer.currentEvent === undefined) volunteer.currentEvent = index < 5 ? state.event.title : ""; });
     state.applications.forEach((household) => household.children.forEach((child) => { if (!child.decision) child.decision = household.status === "approved" ? "approved" : household.status === "info" ? "info" : "review"; }));
@@ -249,6 +250,17 @@
       return { ...settings, id: record.id, title: record.title, date: record.event_date || settings.date || "", type: record.event_type === "food_bag" ? "food-bag" : "shopping", closed: record.status === "closed", volunteerStatus: settings.volunteerStatus || (record.status === "open" ? "open" : "closed"), recipientStatus: settings.recipientStatus || "closed", roles: Array.isArray(settings.roles) ? settings.roles : [], questions: settings.questions || {}, budgetItems: Array.isArray(settings.budgetItems) ? settings.budgetItems : [], bagItems: Array.isArray(settings.bagItems) ? settings.bagItems : [], activity: undefined };
     });
     state = prepareEventCollection({ ...createLiveState(), events, activeEventId: events.find((event) => !event.closed)?.id || events[0]?.id || "" });
+  }
+
+  async function loadLiveRecipientEvents() {
+    const response = await fetch("/portal-api/public/events", { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("Recipient events could not be loaded.");
+    const payload = await response.json();
+    const events = (payload.events || []).filter((record) => record.event_type === "shopping" && ["open", "code"].includes(record.settings?.recipientStatus)).map((record) => ({
+      id: record.id, title: record.title, date: record.event_date || record.settings?.date || "", time: record.settings?.time || "", location: record.settings?.location || "", type: "shopping", closed: false,
+      volunteerEnabled: false, recipientEnabled: true, volunteerStatus: "closed", recipientStatus: record.settings?.recipientStatus || "closed", recipientCode: "", questions: record.settings?.questions || {}, roles: [], bagItems: [], budgetItems: [], activity: undefined
+    }));
+    state = prepareEventCollection({ ...createLiveState(), events, activeEventId: events[0]?.id || "" });
   }
 
   async function loadLiveVolunteers() {
@@ -658,7 +670,7 @@
     return [...new Set(flags)];
   }
 
-  function submitRecipient(event) {
+  async function submitRecipient(event) {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
@@ -672,6 +684,21 @@
       return;
     }
     const flags = findApplicationFlags(recipientDraft);
+    if (LIVE_PUBLIC_RECIPIENT) {
+      try {
+        const response = await fetch("/portal-api/public/applications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+          eventId: state.event.id, guardianName: recipientDraft.guardian, email: recipientDraft.email, phone: recipientDraft.phone,
+          address: { address: recipientDraft.address, city: recipientDraft.city, zip: recipientDraft.zip }, notes: recipientDraft.notes,
+          application: { referral: recipientDraft.referral, preferredContact: recipientDraft.preferredContact, emergencyName: recipientDraft.emergencyName, emergencyPhone: recipientDraft.emergencyPhone, emergencyRelation: recipientDraft.emergencyRelation, agreementSignature: recipientDraft.agreementSignature, finalSignature: recipientDraft.finalSignature, acknowledgments: recipientDraft.acknowledgments },
+          children: recipientDraft.children.map((child) => ({ firstName: child.firstName, lastName: child.lastName, birthDate: child.birthdate, details: { gender: child.gender, shirt: child.shirt, pants: child.pants, shoes: child.shoes, socks: child.socks, underwear: child.underwear, coat: child.coat, preferences: child.preferences, accommodations: child.accommodations } }))
+        }) });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Your application could not be submitted.");
+        recipientConfirmation = { id: payload.id, guardian: recipientDraft.guardian, eventName: state.event.title };
+        renderRecipient();
+      } catch (error) { toast(error.message || "Your application could not be submitted."); }
+      return;
+    }
     const record = {
       id: makeId("CCC", state.applications), guardian: recipientDraft.guardian, email: recipientDraft.email, phone: recipientDraft.phone, address: recipientDraft.address, city: recipientDraft.city, zip: recipientDraft.zip, referral: recipientDraft.referral, emergencyName: recipientDraft.emergencyName, emergencyPhone: recipientDraft.emergencyPhone, emergencyRelation: recipientDraft.emergencyRelation, signedBy: recipientDraft.finalSignature, submitted: "Just now", status: flags.length ? "review" : "submitted", flags, checkedIn: false, archived: false, eventName: state.event.title,
       children: recipientDraft.children.map((child, index) => ({ ...child, id: `child-${Date.now()}-${index}`, decision: "review", attendance: "expected", attendanceNote: "", age: child.birthdate ? Math.max(0, new Date().getFullYear() - Number(child.birthdate.slice(0, 4))) : "" }))
@@ -1452,6 +1479,18 @@
   window.addEventListener("afterprint", clearPrintState);
 
   async function boot() {
+    if (LIVE_PUBLIC_RECIPIENT) {
+      try {
+        await loadLiveRecipientEvents();
+      } catch (error) {
+        main.innerHTML = `<section class="page-content"><article class="content-card"><h1>Applications are unavailable</h1><p>Please try again shortly.</p></article></section>`;
+        lockScreen.hidden = true;
+        appShell.hidden = false;
+        return;
+      }
+      setUnlocked(true);
+      return;
+    }
     if (SERVER_AUTH) {
       try {
         await loadLiveEvents();
