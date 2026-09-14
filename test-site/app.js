@@ -230,7 +230,7 @@
 
   function databaseStatus(event) {
     if (event.closed) return "closed";
-    return event.volunteerStatus === "open" || event.recipientStatus === "open" ? "open" : "draft";
+    return ["open", "code"].includes(event.volunteerStatus) || ["open", "code"].includes(event.recipientStatus) ? "open" : "draft";
   }
 
   async function saveLiveEvent(event) {

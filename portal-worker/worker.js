@@ -156,6 +156,16 @@ async function activeEvents(env) {
   return results;
 }
 
+async function volunteerAccessCookie(eventId, secret) {
+  return `${eventId}.${base64Url(await hmac(secret, eventId))}`;
+}
+
+async function hasVolunteerAccess(request, eventId, secret) {
+  const cookie = (request.headers.get("Cookie") || "").split(";").map((entry) => entry.trim()).find((entry) => entry.startsWith(`ccc_volunteer_access_${eventId}=`));
+  if (!cookie) return false;
+  return constantTimeEqual(cookie.slice(`ccc_volunteer_access_${eventId}=`.length), await volunteerAccessCookie(eventId, secret));
+}
+
 async function tokenHash(token) {
   return base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))));
 }
@@ -181,7 +191,13 @@ function eventSettings(event) {
 
 async function publicVolunteerEvents(env) {
   const { results } = await env.DB.prepare("SELECT id, title, event_date, settings_json FROM events WHERE status = 'open' AND event_type IN ('shopping', 'food_bag') ORDER BY event_date ASC").all();
-  return results.map((event) => ({ ...event, settings: eventSettings(event) })).filter((event) => event.settings.volunteerStatus === "open");
+  return results.map((event) => ({ ...event, settings: eventSettings(event) })).filter((event) => ["open", "code"].includes(event.settings.volunteerStatus));
+}
+
+function volunteerCodePage(event, error = "") {
+  const alert = error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : "";
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Volunteer access | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--mist:#eef3ef;--gray:#617068}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--mist);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,620px);padding:clamp(30px,6vw,54px);background:#fff;border-left:7px solid var(--green);box-shadow:0 18px 55px rgba(17,24,33,.12)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:#176b39}h1{margin:12px 0;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(34px,7vw,52px);line-height:1;letter-spacing:-.045em;text-transform:uppercase}p{color:var(--gray);line-height:1.55}label{display:block;margin:22px 0 7px}input{width:100%;min-height:52px;padding:12px;border:1px solid #bdc6c0;background:#fff;font:16px Arial,sans-serif}button{width:100%;min-height:52px;margin-top:20px;border:0;background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Volunteer access</h1><p>Enter the invitation code supplied by Campbell's Crew to view and sign up for <strong>${escapeHtml(event.title)}</strong>.</p>${alert}<form method="post" action="/volunteer"><input type="hidden" name="action" value="unlock"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><label for="access-code">Invitation code</label><input id="access-code" name="accessCode" autocomplete="one-time-code" required autofocus><button>Continue →</button></form></main></body></html>`;
+  return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
 
 function volunteerSignupPage(events, message = "", error = "") {
@@ -216,11 +232,13 @@ function liveVolunteerSignupPage(events, query, message = "", error = "") {
   return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
 
-async function registerVolunteer(env, input) {
+async function registerVolunteer(env, input, codeGranted = false) {
   const event = await env.DB.prepare("SELECT id, title, settings_json FROM events WHERE id = ? AND status = 'open'").bind(input.eventId).first();
   const settings = event ? eventSettings(event) : null;
   const roles = Array.isArray(settings?.roles) ? settings.roles.filter((role) => role.enabled).map((role) => role.title) : [];
-  if (!event || settings?.volunteerStatus !== "open" || !roles.includes(String(input.role || ""))) return { error: "That volunteer opportunity is not available." };
+  const status = settings?.volunteerStatus;
+  const codeMatches = status === "code" && String(input.accessCode || "").trim() === String(settings.volunteerCode || "").trim();
+  if (!event || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches) || !roles.includes(String(input.role || ""))) return { error: "That volunteer opportunity is not available." };
   if (!input.name || !input.email || !input.phone || !input.role) return { error: "Please complete your name, email, phone number, and volunteer role." };
   const email = String(input.email).trim().toLowerCase();
   let profile = await env.DB.prepare("SELECT id FROM volunteer_profiles WHERE email = ?").bind(email).first();
@@ -444,11 +462,22 @@ export default {
       if (request.method === "POST") {
         const form = await request.formData();
         const input = Object.fromEntries(form);
+        const event = events.find((item) => item.id === input.eventId);
+        if (input.action === "unlock") {
+          if (!event || event.settings.volunteerStatus !== "code" || String(input.accessCode || "").trim() !== String(event.settings.volunteerCode || "").trim()) return volunteerCodePage(event || { id: "", title: "this event" }, "That invitation code does not match.");
+          const access = await volunteerAccessCookie(event.id, env.PORTAL_SESSION_SECRET);
+          return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: `/volunteer?event=${encodeURIComponent(event.id)}`, "Set-Cookie": `ccc_volunteer_access_${event.id}=${access}; Path=/volunteer; HttpOnly; Secure; SameSite=Lax; Max-Age=604800` })) });
+        }
+        if (!event) return liveVolunteerSignupPage(events, url.searchParams, "", "That volunteer opportunity is not available.");
+        const codeGranted = event.settings.volunteerStatus !== "code" || await hasVolunteerAccess(request, event.id, env.PORTAL_SESSION_SECRET);
+        if (!codeGranted) return volunteerCodePage(event, "Enter the invitation code before completing this signup.");
         input.name = `${String(input.firstName || "").trim()} ${String(input.lastName || "").trim()}`.trim();
         if (input.agreement !== "on") return liveVolunteerSignupPage(events, url.searchParams, "", "Please agree to the event and child-safety instructions before continuing.");
-        const result = await registerVolunteer(env, input);
+        const result = await registerVolunteer(env, input, codeGranted);
         return liveVolunteerSignupPage(events, url.searchParams, result.error ? "" : "You are registered. Campbell's Crew will send event details before the event.", result.error || "");
       }
+      const selected = events.find((item) => item.id === url.searchParams.get("event")) || events[0];
+      if (selected?.settings.volunteerStatus === "code" && !(await hasVolunteerAccess(request, selected.id, env.PORTAL_SESSION_SECRET))) return volunteerCodePage(selected);
       return liveVolunteerSignupPage(events, url.searchParams);
     }
     if (url.pathname === "/apply" && (env.PORTAL_MODE || "closed") !== "open") return portalStatusPage("Recipient applications", "Recipient applications are not open right now. Please check back when the next event is announced.");
