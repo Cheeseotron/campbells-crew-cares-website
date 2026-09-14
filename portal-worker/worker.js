@@ -230,6 +230,18 @@ async function api(request, env, url, user) {
     return json({ id }, 201);
   }
 
+  if (url.pathname === "/portal-api/organizer/volunteers" && request.method === "GET") {
+    if (!user) return json({ error: "Sign in required." }, 401);
+    const { results } = await env.DB.prepare("SELECT s.id, s.event_id, s.role, s.status, s.created_at, v.name, v.email, v.phone, e.title AS event_title FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id JOIN events e ON e.id = s.event_id ORDER BY s.created_at DESC").all();
+    return json({ volunteers: results });
+  }
+
+  if (url.pathname === "/portal-api/organizer/recipients" && request.method === "GET") {
+    if (!user) return json({ error: "Sign in required." }, 401);
+    const { results } = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, h.phone, h.status, h.created_at, e.title AS event_title, COUNT(c.id) AS child_count FROM recipient_households h JOIN events e ON e.id = h.event_id LEFT JOIN recipient_children c ON c.household_id = h.id GROUP BY h.id ORDER BY h.created_at DESC").all();
+    return json({ recipients: results });
+  }
+
   if (url.pathname === "/portal-api/bootstrap-owner" && request.method === "POST") {
     // Disabled by default. Initial account creation happens only with a deployment secret,
     // never from a public browser form or hard-coded credential.
@@ -272,7 +284,7 @@ export default {
     if (url.pathname === "/login") return user ? Response.redirect(`${url.origin}/organizer#organizer/dashboard`, 303) : loginPage();
     if (url.pathname === "/organizer" || url.pathname.startsWith("/organizer/")) {
       if (!user) return Response.redirect(`${url.origin}/login`, 303);
-      return serveOrganizerPrototype(request, env, url);
+      return servePortalAsset(request, env, url);
     }
     if ((url.pathname === "/volunteer" || url.pathname === "/apply") && (env.PORTAL_MODE || "closed") !== "open") {
       const isVolunteer = url.pathname === "/volunteer";
