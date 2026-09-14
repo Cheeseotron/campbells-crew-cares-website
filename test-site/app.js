@@ -134,6 +134,12 @@
     }
   }
 
+  // Live organizer sessions begin empty and are hydrated from the Worker. They
+  // must never inherit a browser's old sample records.
+  function createLiveState() {
+    return { events: [], activeEventId: "", volunteers: [], applications: [], users: [], reports: [], activity: [], publicStats: { families: 0, children: 0, volunteers: 0, years: 0 } };
+  }
+
   function expandDemoData(target) {
     const extraVolunteers = [
       ["Alyssa Grant","Shopper","Attended"],["Benjamin Ortiz","Cart Checker","Attended"],["Chloe Williams","Checkout Assistant","Attended"],["Derek Johnson","Floater","No-show"],["Emily Nguyen","Shopper","Attended"],["Franklin Reed","Greeter / Sign-In","Attended"],["Grace Kim","Photographer","Attended"],["Henry Davis","Shopper","Excused absence"],["Isabella Torres","Floater","Attended"],["Jack Wilson","Shopper","Attended"],["Keira Thompson","Checkout Assistant","No-show"],["Liam Martinez","Cart Checker","Attended"],["Natalie Scott","Shopper","Attended"]
@@ -165,11 +171,13 @@
   function activeEvents() { return state.events.filter((event) => !event.closed); }
   function activeEventOptions() { return activeEvents().map((event) => `<option value="${esc(event.id)}" ${event.id === state.activeEventId ? "selected" : ""}>${esc(event.title)}</option>`).join(""); }
 
-  let state = prepareEventCollection(loadState());
-  if (state.volunteers.length < 15 || state.applications.length < 15) expandDemoData(state);
-  state.volunteers.forEach((volunteer,index) => { if (volunteer.currentEvent === undefined) volunteer.currentEvent = index < 5 ? state.event.title : ""; });
-  state.applications.forEach((household) => household.children.forEach((child) => { if (!child.decision) child.decision = household.status === "approved" ? "approved" : household.status === "info" ? "info" : "review"; }));
-  state.applications.forEach((household) => { if (household.archived === undefined) household.archived = false; if (!household.eventName) household.eventName = state.event.title; household.children.forEach((child) => { const parts=String(child.name||"").trim().split(/\s+/); if(!child.firstName) child.firstName=parts[0]||""; if(!child.lastName) child.lastName=parts.slice(1).join(" ") || household.guardian.trim().split(/\s+/).slice(-1)[0]; child.name=`${child.firstName} ${child.lastName}`.trim(); }); });
+  let state = prepareEventCollection(SERVER_AUTH ? createLiveState() : loadState());
+  if (!SERVER_AUTH) {
+    if (state.volunteers.length < 15 || state.applications.length < 15) expandDemoData(state);
+    state.volunteers.forEach((volunteer,index) => { if (volunteer.currentEvent === undefined) volunteer.currentEvent = index < 5 ? state.event.title : ""; });
+    state.applications.forEach((household) => household.children.forEach((child) => { if (!child.decision) child.decision = household.status === "approved" ? "approved" : household.status === "info" ? "info" : "review"; }));
+    state.applications.forEach((household) => { if (household.archived === undefined) household.archived = false; if (!household.eventName) household.eventName = state.event.title; household.children.forEach((child) => { const parts=String(child.name||"").trim().split(/\s+/); if(!child.firstName) child.firstName=parts[0]||""; if(!child.lastName) child.lastName=parts.slice(1).join(" ") || household.guardian.trim().split(/\s+/).slice(-1)[0]; child.name=`${child.firstName} ${child.lastName}`.trim(); }); });
+  }
   let selectedVolunteerRole = "shopper";
   let volunteerStep = 0;
   let volunteerConfirmation = null;
@@ -200,7 +208,30 @@
   }
 
   function saveState() {
-    localStorage.setItem(STATE_KEY, JSON.stringify(state));
+    if (!SERVER_AUTH) localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  }
+
+  function databaseStatus(event) {
+    if (event.closed) return "closed";
+    return event.volunteerStatus === "open" || event.recipientStatus === "open" ? "open" : "draft";
+  }
+
+  async function saveLiveEvent(event) {
+    if (!SERVER_AUTH || !event?.id) return;
+    const response = await fetch(`/portal-api/events/${encodeURIComponent(event.id)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: event.title, eventDate: event.date || null, status: databaseStatus(event), settings: event }) });
+    if (!response.ok) throw new Error("The event could not be saved.");
+  }
+
+  async function loadLiveEvents() {
+    if (!SERVER_AUTH) return;
+    const response = await fetch("/portal-api/events", { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("The live event records could not be loaded.");
+    const payload = await response.json();
+    const events = (payload.events || []).map((record) => {
+      const settings = record.settings && typeof record.settings === "object" ? record.settings : {};
+      return { ...settings, id: record.id, title: record.title, date: record.event_date || settings.date || "", type: record.event_type === "food_bag" ? "food-bag" : "shopping", closed: record.status === "closed", volunteerStatus: settings.volunteerStatus || (record.status === "open" ? "open" : "closed"), recipientStatus: settings.recipientStatus || "closed", roles: Array.isArray(settings.roles) ? settings.roles : [], questions: settings.questions || {}, budgetItems: Array.isArray(settings.budgetItems) ? settings.budgetItems : [], bagItems: Array.isArray(settings.bagItems) ? settings.bagItems : [], activity: undefined };
+    });
+    state = prepareEventCollection({ ...createLiveState(), events, activeEventId: events.find((event) => !event.closed)?.id || events[0]?.id || "" });
   }
 
   function esc(value) {
@@ -833,6 +864,7 @@
   }
 
   function organizerDashboardV8() {
+    if (!state.event) return `${heading("Organizer overview", "No event scheduled", "Create an event when you are ready. Nothing is publicly open until you choose to open that event.", `<button class="button button--green" type="button" data-create-event>Create event</button>`)}<article class="panel no-active-event"><p class="eyebrow">Start here</p><h2>Create your first event</h2><p>Choose either a Kids Shopping Event or a Food Bag Event. Its settings will be saved to the private Campbell's Crew workspace.</p><button class="button button--green" type="button" data-create-event>Create event</button></article>`;
     const children = state.applications.filter((item)=>!item.archived && item.eventName === state.event.title).reduce((sum,item)=>sum+item.children.length,0);
     const volunteers = state.volunteers.filter((item)=>item.currentEvent === state.event.title).length;
     const isFoodBag = state.event.type === "food-bag";
@@ -844,6 +876,9 @@
   }
 
   function organizerEventsV8() {
+    if (!state.event) {
+      return `${heading("Event management", "No active event", "Create an event to begin configuring volunteers, recipients, and event details.", `<button class="button button--green" type="button" data-create-event>Create event</button>`)}<article class="panel no-active-event"><p class="eyebrow">Ready when you are</p><h2>Create an event</h2><p>Your event will begin as a private draft. Public volunteer and recipient pages remain closed until you deliberately open them.</p><button class="button button--green" type="button" data-create-event>Create event</button></article>`;
+    }
     const eventClosed = state.event.closed === true || (state.event.closed === undefined && state.event.volunteerStatus === "closed" && state.event.recipientStatus === "closed");
     if (eventClosed) {
       return `${heading("Event management", "No active event", "The finished event is safely stored in Reports & History and is no longer editable.", `<button class="button button--green" type="button" data-create-event>Create New Event</button>`)}<article class="panel no-active-event"><p class="eyebrow">Ready for what’s next</p><h2>Create your next event</h2><p>Start a fresh event workspace with new dates, signup settings, volunteer roles, budgets, applications, and check-in lists. Closed events remain read-only in historical records.</p><button class="button button--green" type="button" data-create-event>Create New Event</button></article>`;
@@ -899,7 +934,7 @@
   function bindOrganizer(subroute) {
     if (subroute === "events") {
       const eventForm = document.querySelector("#event-form");
-      if (eventForm) eventForm.addEventListener("submit", (event) => {
+      if (eventForm) eventForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         if (!event.currentTarget.reportValidity()) return;
         const openSections = [...document.querySelectorAll(".settings-section")].map((section) => section.open);
@@ -923,8 +958,14 @@
           item.amount = Number(data.get(`budget-amount-${item.id}`) || 0);
         });
         state.activity.unshift({ text: "Event settings were updated by Organizer.", time: "Just now" });
+        try {
+          await saveLiveEvent(state.event);
+        } catch (error) {
+          toast(error.message || "The event could not be saved.");
+          return;
+        }
         saveState();
-        toast("Event changes saved across the prototype.");
+        toast("Event changes saved.");
         renderOrganizer("events");
         document.querySelectorAll(".settings-section").forEach((section, index) => { section.open = openSections[index]; });
       });
@@ -1151,7 +1192,7 @@
   function openCreateEvent() {
     dialogContent.innerHTML = `<form class="dialog-body" id="create-event-form"><p class="eyebrow">New event workspace</p><h2 id="dialog-title">Create a new event</h2><p>Choose the event type first. Its management tools are set up specifically for that kind of event.</p><div class="form-grid"><div class="field field--span-2"><label>Event type<select name="eventType" required><option value="shopping">Kids Shopping Event</option><option value="food-bag">Food Bag Event</option></select></label><small>Shopping events include recipient applications and clothing packets. Food Bag Events use a bag plan and order totals instead.</small></div><div class="field field--span-2"><label>Event name<input name="title" placeholder="2027 Winter Clothing for Kids" required></label></div><div class="field"><label>Date<input name="date" type="date" required></label></div><div class="field"><label>Time<input name="time" placeholder="6:00 AM – 10:00 AM" required></label></div><div class="field field--span-2"><label>Location name<input name="location" placeholder="Queen Creek Walmart · Garden Center" required></label></div><div class="field field--span-2"><label>Street address<input name="address" placeholder="21055 E Rittenhouse Rd, Queen Creek, AZ"></label></div><label class="question-toggle"><input type="checkbox" name="volunteerEnabled" checked><span class="switch-control" aria-hidden="true"></span><span><strong>Volunteer signup</strong><small>Use roles, capacity, confirmations, and check-in.</small></span></label><label class="question-toggle" id="recipient-create-option"><input type="checkbox" name="recipientEnabled" checked><span class="switch-control" aria-hidden="true"></span><span><strong>Recipient applications</strong><small>For Kids Shopping Events only.</small></span></label></div><button class="button button--green button--wide" type="submit">Create Event Draft</button></form>`;
     appDialog.showModal(); document.body.classList.add("dialog-open");
-    dialogContent.querySelector("#create-event-form").addEventListener("submit", (event) => {
+    dialogContent.querySelector("#create-event-form").addEventListener("submit", async (event) => {
       event.preventDefault(); if (!event.currentTarget.reportValidity()) return;
       const data = new FormData(event.currentTarget); const fresh = createDefaultState().event; const dateValue = String(data.get("date") || "");
       fresh.title = String(data.get("title") || "").trim();
@@ -1167,6 +1208,16 @@
         { id: "floater", title: "Floater", description: "Go wherever the packing team needs an extra hand.", shift: fresh.time, capacity: 10, enabled: true }
       ];
       fresh.volunteerStatus = "closed"; fresh.recipientStatus = "closed"; fresh.closed = false;
+      if (SERVER_AUTH) {
+        try {
+          const response = await fetch("/portal-api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: fresh.title, eventType: fresh.type === "food-bag" ? "food_bag" : "shopping", eventDate: fresh.date || null, status: "draft", settings: fresh }) });
+          if (!response.ok) throw new Error("The event could not be created.");
+          fresh.id = (await response.json()).id;
+        } catch (error) {
+          toast(error.message || "The event could not be created.");
+          return;
+        }
+      }
       state.events.push(fresh); state.activeEventId = fresh.id; publicVolunteerEventId = ""; publicRecipientEventId = ""; sessionStorage.removeItem("ccc-public-volunteer-event"); sessionStorage.removeItem("ccc-public-recipient-event"); state.activity.unshift({ text:`${fresh.title} was created as a new event draft.`, time:"Just now" }); saveState(); closeDialog(); toast("New event draft created. Signups remain closed until you open them."); renderOrganizer("events");
     });
     const typeSelect = dialogContent.querySelector('[name="eventType"]'); const recipientOption = dialogContent.querySelector("#recipient-create-option");
@@ -1326,5 +1377,19 @@
   window.addEventListener("hashchange", renderRoute);
   window.addEventListener("afterprint", clearPrintState);
 
-  setUnlocked(SERVER_AUTH || sessionStorage.getItem(SESSION_KEY) === "yes");
+  async function boot() {
+    if (SERVER_AUTH) {
+      try {
+        await loadLiveEvents();
+      } catch (error) {
+        main.innerHTML = `<section class="page-content"><article class="content-card"><h1>Organizer records could not load</h1><p>Please refresh the page. No changes were made.</p></article></section>`;
+        lockScreen.hidden = true;
+        appShell.hidden = false;
+        return;
+      }
+    }
+    setUnlocked(SERVER_AUTH || sessionStorage.getItem(SESSION_KEY) === "yes");
+  }
+
+  void boot();
 })();
