@@ -186,7 +186,9 @@
   let applicationView = "current";
   let publicVolunteerEventId = sessionStorage.getItem("ccc-public-volunteer-event") || "";
   let publicRecipientEventId = sessionStorage.getItem("ccc-public-recipient-event") || "";
-  let portalUser = sessionStorage.getItem("ccc-portal-user") || "";
+  // The live organizer route has already been authenticated by the Worker.
+  // It must never fall through to the old in-browser demonstration login.
+  let portalUser = SERVER_AUTH ? "Executive Owner" : (sessionStorage.getItem("ccc-portal-user") || "");
   let previewRole = sessionStorage.getItem("ccc-preview-role") || "";
 
   function createRecipientDraft() {
@@ -656,6 +658,11 @@
   }
 
   function renderOrganizerLogin() {
+    if (SERVER_AUTH) {
+      portalUser = "Executive Owner";
+      renderOrganizer("dashboard");
+      return;
+    }
     main.innerHTML = `<section class="portal-login"><div class="portal-login__intro"><p class="eyebrow">Organizer portal</p><h1>Welcome,<br>crew.</h1><p>Sign in with a demonstration account to preview its access. The finished system will use Campbell's Crew Google Workspace accounts.</p></div><form class="portal-login__card" id="portal-login-form"><h2>Organizer sign in</h2><div class="field"><label>Email address<input name="email" type="email" value="Campbell@Campbellscrew.com" required></label></div><div class="field"><label>Demonstration PIN<input name="pin" type="password" inputmode="numeric" maxlength="4" value="2017" required></label></div><button class="button button--green button--wide" type="submit">Sign in →</button><div class="demo-accounts"><span>Quick demonstration accounts</span><button type="button" data-login-role="Executive Owner">Executive Owner</button><button type="button" data-login-role="Event Administrator">Event Admin</button><button type="button" data-login-role="Read-Only Coordinator">Read-Only Coordinator</button><button type="button" data-login-role="Check-In Staff">Check-In Staff</button></div></form></section>`;
     const login = (role) => { portalUser = role; previewRole = ""; sessionStorage.setItem("ccc-portal-user", role); sessionStorage.removeItem("ccc-preview-role"); window.location.hash = role === "Check-In Staff" ? "organizer/checkin" : "organizer/dashboard"; renderRoute(); };
     document.querySelector("#portal-login-form").addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); if (String(data.get("pin")) !== TEST_PIN) { toast("That demonstration PIN is incorrect."); return; } login("Executive Owner"); });
