@@ -95,6 +95,8 @@ function loginPage(message = "", status = 200) {
 async function servePortalAsset(request, env, url) {
   const assetUrl = new URL(request.url);
   const route = url.pathname;
+  // HTML routing is disabled in Wrangler because these routes intentionally
+  // share a single app shell rather than their canonical file locations.
   if (PORTAL_PATHS.has(route) || route.startsWith("/organizer/")) assetUrl.pathname = "/index.html";
   else assetUrl.pathname = route.replace(/^\/portal-assets\/?/, "/");
   const asset = await env.ASSETS.fetch(new Request(assetUrl, request));
