@@ -1144,6 +1144,23 @@
     });
     const addUser = document.querySelector("[data-add-user]");
     if (addUser) addUser.addEventListener("click", openAddUser);
+    if (SERVER_AUTH && subroute === "settings") {
+      document.querySelectorAll(".user-row").forEach((row, index) => {
+        const account = state.users[index];
+        if (!account || account.status !== "Active" || account.role === "Executive Owner") return;
+        const button = document.createElement("button");
+        button.type = "button"; button.className = "button button--small button--light"; button.textContent = "Password reset link";
+        button.addEventListener("click", async () => {
+          if (!window.confirm(`Create a new password-reset link for ${account.email}?`)) return;
+          try {
+            const response = await fetch(`/portal-api/organizer/users/${encodeURIComponent(account.id)}/password-reset`, { method: "POST" });
+            const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The reset link could not be created.");
+            showPasswordResetLink(payload, account.email);
+          } catch (error) { toast(error.message || "The reset link could not be created."); }
+        });
+        row.appendChild(button);
+      });
+    }
     document.querySelectorAll("[data-renew-invitation]").forEach((button) => button.addEventListener("click", async () => {
       try {
         const response = await fetch(`/portal-api/organizer/users/${encodeURIComponent(button.dataset.renewInvitation)}/invitation`, { method: "POST" });
@@ -1355,6 +1372,12 @@
     dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Invitation created</p><h2 id="dialog-title">Share this link privately</h2><p>This one-time account-setup link expires in seven days. Your new organizer will choose their own password.</p><div class="field"><label for="setup-link">Account setup link</label><input id="setup-link" value="${esc(payload.setupUrl)}" readonly></div><button class="button button--green" type="button" data-copy-setup-link>Copy link</button></div>`;
     appDialog.showModal(); document.body.classList.add("dialog-open");
     dialogContent.querySelector("[data-copy-setup-link]").addEventListener("click", async () => { await navigator.clipboard.writeText(payload.setupUrl); toast("Invitation link copied."); });
+  }
+
+  function showPasswordResetLink(payload, email) {
+    dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Password reset</p><h2 id="dialog-title">Share this link privately</h2><p>This one-time password-reset link is for <strong>${esc(email)}</strong> and expires in seven days.</p><div class="field"><label for="reset-link">Password-reset link</label><input id="reset-link" value="${esc(payload.setupUrl)}" readonly></div><button class="button button--green" type="button" data-copy-reset-link>Copy link</button></div>`;
+    appDialog.showModal(); document.body.classList.add("dialog-open");
+    dialogContent.querySelector("[data-copy-reset-link]").addEventListener("click", async () => { await navigator.clipboard.writeText(payload.setupUrl); toast("Password-reset link copied."); });
   }
 
   function openApplication(id) {

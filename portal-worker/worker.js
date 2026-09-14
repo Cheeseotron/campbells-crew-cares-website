@@ -491,6 +491,15 @@ async function api(request, env, url, user) {
     await audit(env, user, "organizer_invitation_cancelled", "user", target.id);
     return json({ id: target.id });
   }
+  const resetMatch = url.pathname.match(/^\/portal-api\/organizer\/users\/([^/]+)\/password-reset$/);
+  if (resetMatch && request.method === "POST") {
+    if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Executive Owner permission required." }, 403);
+    const account = await env.DB.prepare("SELECT id, email, status FROM users WHERE id = ?").bind(resetMatch[1]).first();
+    if (!account || account.status !== "active") return json({ error: "A password-reset link is available only for an active organizer account." }, 400);
+    const invitation = await issueInvitation(env, account.id);
+    await audit(env, user, "organizer_password_reset_issued", "user", account.id);
+    return json({ id: account.id, setupUrl: `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`, expiresAt: invitation.expiresAt });
+  }
 
   if (url.pathname === "/portal-api/bootstrap-owner" && request.method === "POST") {
     // Disabled by default. Initial account creation happens only with a deployment secret,
