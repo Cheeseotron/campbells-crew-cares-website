@@ -255,6 +255,12 @@ async function api(request, env, url, user) {
     return json({ recipients: results });
   }
 
+  if (url.pathname === "/portal-api/organizer/reports" && request.method === "GET") {
+    if (!user) return json({ error: "Sign in required." }, 401);
+    const { results } = await env.DB.prepare("SELECT e.id, e.title, e.event_type, e.event_date, e.status, COUNT(DISTINCT s.id) AS volunteer_count, COUNT(DISTINCT h.id) AS household_count, COUNT(DISTINCT c.id) AS child_count FROM events e LEFT JOIN volunteer_signups s ON s.event_id = e.id LEFT JOIN recipient_households h ON h.event_id = e.id LEFT JOIN recipient_children c ON c.household_id = h.id GROUP BY e.id ORDER BY e.event_date DESC").all();
+    return json({ reports: results });
+  }
+
   if (url.pathname === "/portal-api/bootstrap-owner" && request.method === "POST") {
     // Disabled by default. Initial account creation happens only with a deployment secret,
     // never from a public browser form or hard-coded credential.
