@@ -294,7 +294,7 @@ async function api(request, env, url, user) {
 
   if (url.pathname === "/portal-api/organizer/volunteers" && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
-    const { results } = await env.DB.prepare("SELECT s.id, s.event_id, s.role, s.status, s.created_at, v.name, v.email, v.phone, e.title AS event_title FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id JOIN events e ON e.id = s.event_id ORDER BY s.created_at DESC").all();
+    const { results } = await env.DB.prepare("SELECT s.id, s.event_id, s.role, s.status, s.notes, s.created_at, v.name, v.email, v.phone, e.title AS event_title FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id JOIN events e ON e.id = s.event_id ORDER BY s.created_at DESC").all();
     return json({ volunteers: results });
   }
 

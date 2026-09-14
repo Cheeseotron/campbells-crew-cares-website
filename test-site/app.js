@@ -234,6 +234,27 @@
     state = prepareEventCollection({ ...createLiveState(), events, activeEventId: events.find((event) => !event.closed)?.id || events[0]?.id || "" });
   }
 
+  async function loadLiveVolunteers() {
+    if (!SERVER_AUTH) return;
+    const response = await fetch("/portal-api/organizer/volunteers", { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("The live volunteer records could not be loaded.");
+    const payload = await response.json();
+    state.volunteers = (payload.volunteers || []).map((record) => ({
+      id: record.id,
+      name: record.name,
+      email: record.email,
+      phone: record.phone,
+      role: record.role,
+      currentEvent: record.event_title || "",
+      eventId: record.event_id,
+      status: record.status || "confirmed",
+      notes: record.notes || "",
+      checkedIn: record.status === "checked_in",
+      checkedAt: "",
+      history: []
+    }));
+  }
+
   function esc(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -1391,6 +1412,7 @@
     if (SERVER_AUTH) {
       try {
         await loadLiveEvents();
+        await loadLiveVolunteers();
       } catch (error) {
         main.innerHTML = `<section class="page-content"><article class="content-card"><h1>Organizer records could not load</h1><p>Please refresh the page. No changes were made.</p></article></section>`;
         lockScreen.hidden = true;
