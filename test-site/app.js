@@ -275,6 +275,7 @@
   async function loadLiveUsers() {
     if (!SERVER_AUTH) return;
     const response = await fetch("/portal-api/organizer/users", { headers: { Accept: "application/json" } });
+    if (response.status === 403) { state.users = []; return; }
     if (!response.ok) throw new Error("The organizer accounts could not be loaded.");
     const labels = { executive_owner: "Executive Owner", event_admin: "Event Administrator", read_only: "Read-Only Coordinator", checkin_staff: "Check-In Staff" };
     const payload = await response.json();

@@ -196,9 +196,10 @@ async function issueInvitation(env, userId) {
   return { token, expiresAt };
 }
 
-function accountSetupPage(token, message = "", status = 200) {
+function accountSetupPage(token, email = "", message = "", status = 200) {
   const alert = message ? `<p role="alert" class="error">${escapeHtml(message)}</p>` : "";
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Set up organizer account | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--ink);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,580px);padding:clamp(30px,6vw,58px);background:#fff;border-top:7px solid var(--green);box-shadow:0 24px 70px rgba(0,0,0,.32)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:#176b39}h1{margin:12px 0 14px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(36px,7vw,52px);line-height:1;letter-spacing:-.045em;text-transform:uppercase}p{color:var(--gray);line-height:1.55}label{display:block;margin:20px 0 7px}input{width:100%;height:52px;padding:12px;border:1px solid #bdc6c0;background:var(--mist);color:var(--ink);font:400 17px/26px Arial,sans-serif}button{width:100%;min-height:52px;margin-top:22px;border:1px solid var(--green);background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Set your password</h1><p>Create a password for your private organizer account. This one-time link expires in seven days.</p>${alert}<form method="post" action="/setup"><input type="hidden" name="token" value="${escapeHtml(token)}"><label for="password">New password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required autofocus><label for="confirm">Confirm password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="10" required><button>Activate organizer account →</button></form></main></body></html>`;
+  const identity = email ? `<p><strong>Organizer sign-in email</strong><br>${escapeHtml(email)}</p>` : "";
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Set up organizer account | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--ink);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,580px);padding:clamp(30px,6vw,58px);background:#fff;border-top:7px solid var(--green);box-shadow:0 24px 70px rgba(0,0,0,.32)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:#176b39}h1{margin:12px 0 14px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(36px,7vw,52px);line-height:1;letter-spacing:-.045em;text-transform:uppercase}p{color:var(--gray);line-height:1.55}label{display:block;margin:20px 0 7px}input{width:100%;height:52px;padding:12px;border:1px solid #bdc6c0;background:var(--mist);color:var(--ink);font:400 17px/26px Arial,sans-serif}button{width:100%;min-height:52px;margin-top:22px;border:1px solid var(--green);background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Set your password</h1><p>Create a password for your private organizer account. This one-time link expires in seven days.</p>${identity}${alert}<form method="post" action="/setup"><input type="hidden" name="token" value="${escapeHtml(token)}"><label for="password">New password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required autofocus><label for="confirm">Confirm password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="10" required><button>Activate organizer account →</button></form></main></body></html>`;
   return new Response(html, { status, headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
 
@@ -480,15 +481,15 @@ export default {
       const setupForm = request.method === "POST" ? await request.formData() : null;
       const token = setupForm ? String(setupForm.get("token") || "") : String(url.searchParams.get("token") || "");
       if (!token) return portalStatusPage("Invitation link needed", "Use the account-setup link supplied by a Campbell's Crew Executive Owner.");
+      const invitation = await env.DB.prepare("SELECT id, user_id, expires_at, used_at FROM user_invitations WHERE token_hash = ?").bind(await tokenHash(token)).first();
+      if (!invitation || invitation.used_at || Date.parse(invitation.expires_at) < Date.now()) return portalStatusPage("Invitation expired", "Ask a Campbell's Crew Executive Owner to create a new account invitation.");
+      const account = await env.DB.prepare("SELECT id, email, display_name, role FROM users WHERE id = ?").bind(invitation.user_id).first();
+      if (!account) return portalStatusPage("Invitation unavailable", "Ask a Campbell's Crew Executive Owner to create a new account invitation.");
       if (request.method === "POST") {
         const password = String(setupForm.get("password") || "");
         const confirm = String(setupForm.get("confirm") || "");
-        if (password.length < 10) return accountSetupPage(token, "Use a password of at least 10 characters.", 400);
-        if (password !== confirm) return accountSetupPage(token, "The password confirmation does not match.", 400);
-        const invitation = await env.DB.prepare("SELECT id, user_id, expires_at, used_at FROM user_invitations WHERE token_hash = ?").bind(await tokenHash(token)).first();
-        if (!invitation || invitation.used_at || Date.parse(invitation.expires_at) < Date.now()) return portalStatusPage("Invitation expired", "Ask a Campbell's Crew Executive Owner to create a new account invitation.");
-        const account = await env.DB.prepare("SELECT id, email, display_name, role FROM users WHERE id = ?").bind(invitation.user_id).first();
-        if (!account) return portalStatusPage("Invitation unavailable", "Ask a Campbell's Crew Executive Owner to create a new account invitation.");
+        if (password.length < 10) return accountSetupPage(token, account.email, "Use a password of at least 10 characters.", 400);
+        if (password !== confirm) return accountSetupPage(token, account.email, "The password confirmation does not match.", 400);
         const salt = base64Url(crypto.getRandomValues(new Uint8Array(18)));
         await env.DB.batch([
           env.DB.prepare("UPDATE users SET password_hash = ?, password_salt = ?, status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(await passwordHash(password, salt), salt, account.id),
@@ -498,9 +499,7 @@ export default {
         const session = await makeSession({ id: account.id, role: account.role }, env.PORTAL_SESSION_SECRET);
         return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: "/organizer#organizer/dashboard", "Set-Cookie": `${COOKIE_NAME}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_SECONDS}` })) });
       }
-      const invitation = await env.DB.prepare("SELECT id, expires_at, used_at FROM user_invitations WHERE token_hash = ?").bind(await tokenHash(token)).first();
-      if (!invitation || invitation.used_at || Date.parse(invitation.expires_at) < Date.now()) return portalStatusPage("Invitation expired", "Ask a Campbell's Crew Executive Owner to create a new account invitation.");
-      return accountSetupPage(token);
+      return accountSetupPage(token, account.email);
     }
     if (url.pathname === "/login" && request.method === "POST") {
       const clientKey = request.headers.get("CF-Connecting-IP") || "unknown";
