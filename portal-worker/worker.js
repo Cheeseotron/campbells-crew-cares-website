@@ -1,5 +1,6 @@
 const COOKIE_NAME = "ccc_portal_session";
 const SESSION_SECONDS = 60 * 60 * 8;
+const REMEMBER_SESSION_SECONDS = 60 * 60 * 24 * 30;
 const PORTAL_PATHS = new Set(["/volunteer", "/apply", "/login", "/organizer"]);
 const OWNER_ROLES = new Set(["executive_owner"]);
 const EDITOR_ROLES = new Set(["executive_owner", "event_admin"]);
@@ -52,8 +53,8 @@ async function hmac(secret, value) {
   return new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)));
 }
 
-async function makeSession(user, secret) {
-  const payload = base64Url(new TextEncoder().encode(JSON.stringify({ id: user.id, role: user.role, expires: Math.floor(Date.now() / 1000) + SESSION_SECONDS })));
+async function makeSession(user, secret, lifetime = SESSION_SECONDS) {
+  const payload = base64Url(new TextEncoder().encode(JSON.stringify({ id: user.id, role: user.role, expires: Math.floor(Date.now() / 1000) + lifetime })));
   return `${payload}.${base64Url(await hmac(secret, payload))}`;
 }
 
@@ -91,7 +92,7 @@ async function passwordHash(password, salt) {
 
 function loginPage(message = "", status = 200) {
   const alert = message ? `<p role="alert" class="error">${escapeHtml(message)}</p>` : "";
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Organizer sign in | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--forest:#176b39;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--ink);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,580px);padding:clamp(30px,6vw,58px);background:#fff;border-top:7px solid var(--green);box-shadow:0 24px 70px rgba(0,0,0,.32)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:var(--forest)}h1{margin:12px 0 14px;font-family:"Arial Black",Arial,sans-serif;font-size:52px;line-height:1;letter-spacing:-.045em;text-transform:uppercase;white-space:nowrap}p{color:var(--gray);line-height:1.55}label{display:block;margin:20px 0 7px}input{width:100%;height:52px;padding:12px;border:1px solid #bdc6c0;border-radius:0;background:var(--mist);color:var(--ink);font:400 17px/26px Arial,sans-serif;appearance:none;-webkit-appearance:none}input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-text-fill-color:var(--ink);-webkit-box-shadow:0 0 0 1000px var(--mist) inset;box-shadow:0 0 0 1000px var(--mist) inset;transition:background-color 9999s ease-out 0s}button{width:100%;min-height:52px;margin-top:22px;border:1px solid var(--green);background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}@media(max-width:560px){h1{font-size:41px;white-space:normal}}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Organizer sign in</h1><p>Use the organizer account created for you. Public volunteer and recipient forms stay separate from this private workspace.</p>${alert}<form method="post" action="/login"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" required autofocus><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><button>Sign in →</button></form></main></body></html>`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Organizer sign in | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--forest:#176b39;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--ink);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,580px);padding:clamp(30px,6vw,58px);background:#fff;border-top:7px solid var(--green);box-shadow:0 24px 70px rgba(0,0,0,.32)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:var(--forest)}h1{margin:12px 0 14px;font-family:"Arial Black",Arial,sans-serif;font-size:52px;line-height:1;letter-spacing:-.045em;text-transform:uppercase;white-space:nowrap}p{color:var(--gray);line-height:1.55}label{display:block;margin:20px 0 7px}input{width:100%;height:52px;padding:12px;border:1px solid #bdc6c0;border-radius:0;background:var(--mist);color:var(--ink);font:400 17px/26px Arial,sans-serif;appearance:none;-webkit-appearance:none}input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-text-fill-color:var(--ink);-webkit-box-shadow:0 0 0 1000px var(--mist) inset;box-shadow:0 0 0 1000px var(--mist) inset;transition:background-color 9999s ease-out 0s}.remember{display:flex;align-items:center;gap:9px;margin:18px 0 0;color:var(--ink);font-size:13px;font-weight:700;letter-spacing:0;text-transform:none;cursor:pointer}.remember input{width:18px;height:18px;padding:0;accent-color:var(--forest)}button{width:100%;min-height:52px;margin-top:22px;border:1px solid var(--green);background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}@media(max-width:560px){h1{font-size:41px;white-space:normal}}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Organizer sign in</h1><p>Use the organizer account created for you. Public volunteer and recipient forms stay separate from this private workspace.</p>${alert}<form method="post" action="/login"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" required autofocus><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><label class="remember"><input name="remember" type="checkbox"> Stay signed in on this device</label><button>Sign in →</button></form></main></body></html>`;
   return new Response(html, { status, headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
 
@@ -294,12 +295,12 @@ export default {
     if (url.pathname === "/login" && request.method === "POST") {
       const clientKey = request.headers.get("CF-Connecting-IP") || "unknown";
       if (env.LOGIN_RATE_LIMITER && !(await env.LOGIN_RATE_LIMITER.limit({ key: clientKey })).success) return loginPage("Too many attempts. Please wait one minute and try again.", 429);
-      const form = await request.formData(); const email = String(form.get("email") || "").trim(); const password = String(form.get("password") || "");
+      const form = await request.formData(); const email = String(form.get("email") || "").trim(); const password = String(form.get("password") || ""); const lifetime = form.get("remember") === "on" ? REMEMBER_SESSION_SECONDS : SESSION_SECONDS;
       const account = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
       if (!account || account.status !== "active" || !constantTimeEqual(await passwordHash(password, account.password_salt), account.password_hash)) return loginPage("That email and password do not match.", 401);
-      const session = await makeSession(account, env.PORTAL_SESSION_SECRET);
+      const session = await makeSession(account, env.PORTAL_SESSION_SECRET, lifetime);
       await audit(env, account, "login", "user", account.id);
-      return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: "/organizer#organizer/dashboard", "Set-Cookie": `${COOKIE_NAME}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_SECONDS}` })) });
+      return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: "/organizer#organizer/dashboard", "Set-Cookie": `${COOKIE_NAME}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${lifetime}` })) });
     }
     if (url.pathname === "/login") return user ? Response.redirect(`${url.origin}/organizer#organizer/dashboard`, 303) : loginPage();
     if (url.pathname === "/organizer" || url.pathname.startsWith("/organizer/")) {
