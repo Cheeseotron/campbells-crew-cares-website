@@ -404,7 +404,12 @@ h1, h2, h3, p { margin-top: 0; }
 .permission-legend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
 .permission-legend span { padding: 12px; color: var(--gray); background: var(--mist-2); font-size: 10px; }
 .permission-legend b { display: block; margin-bottom: 5px; color: var(--ink); }
-.user-row { grid-template-columns: 1fr auto auto auto; }
+.user-row { display: flex; flex-wrap: wrap; grid-template-columns: none; gap: 10px; }
+.user-row > span { margin-right: auto; min-width: 240px; }
+.user-row select { width: auto; min-width: 165px; min-height: 38px; padding: 7px 28px 7px 10px; }
+.user-row .button { width: auto; min-height: 38px; margin: 0; padding: 0 12px; white-space: nowrap; }
+.user-row .button--danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+.user-row .button--danger:hover { background: var(--danger); color: #fff; }
 .inline-note { margin-top: 16px; padding: 14px; background: #fff7df; border-left: 4px solid #d39b21; font-size: 12px; }
 .danger-zone { display: flex; align-items: center; justify-content: space-between; gap: 18px; border-color: #e9b9b6; }
 .sort-bar { display: flex; margin: 0 0 14px; overflow-x: auto; align-items: stretch; background: var(--white); border: 1px solid var(--line); }
