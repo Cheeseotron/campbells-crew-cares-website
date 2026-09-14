@@ -230,6 +230,19 @@ async function api(request, env, url, user) {
     return json({ id }, 201);
   }
 
+  const eventMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)$/);
+  if (eventMatch && request.method === "PUT") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
+    const input = await request.json();
+    const existing = await env.DB.prepare("SELECT id FROM events WHERE id = ?").bind(eventMatch[1]).first();
+    if (!existing) return json({ error: "Event not found." }, 404);
+    const status = ["draft", "open", "closed"].includes(input.status) ? input.status : "draft";
+    await env.DB.prepare("UPDATE events SET title = ?, event_date = ?, status = ?, settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .bind(String(input.title || "Untitled event").slice(0, 160), input.eventDate || null, status, JSON.stringify(input.settings || {}), eventMatch[1]).run();
+    await audit(env, user, "event_updated", "event", eventMatch[1], eventMatch[1]);
+    return json({ id: eventMatch[1] });
+  }
+
   if (url.pathname === "/portal-api/organizer/volunteers" && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
     const { results } = await env.DB.prepare("SELECT s.id, s.event_id, s.role, s.status, s.created_at, v.name, v.email, v.phone, e.title AS event_title FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id JOIN events e ON e.id = s.event_id ORDER BY s.created_at DESC").all();
