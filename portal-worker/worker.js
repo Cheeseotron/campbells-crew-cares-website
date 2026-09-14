@@ -267,9 +267,9 @@ export default {
       if (!account || account.status !== "active" || !constantTimeEqual(await passwordHash(password, account.password_salt), account.password_hash)) return loginPage("That email and password do not match.", 401);
       const session = await makeSession(account, env.PORTAL_SESSION_SECRET);
       await audit(env, account, "login", "user", account.id);
-      return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: "/organizer", "Set-Cookie": `${COOKIE_NAME}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_SECONDS}` })) });
+      return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: "/organizer#organizer/dashboard", "Set-Cookie": `${COOKIE_NAME}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_SECONDS}` })) });
     }
-    if (url.pathname === "/login") return user ? Response.redirect(`${url.origin}/organizer`, 303) : loginPage();
+    if (url.pathname === "/login") return user ? Response.redirect(`${url.origin}/organizer#organizer/dashboard`, 303) : loginPage();
     if (url.pathname === "/organizer" || url.pathname.startsWith("/organizer/")) {
       if (!user) return Response.redirect(`${url.origin}/login`, 303);
       return serveOrganizerPrototype(request, env, url);
