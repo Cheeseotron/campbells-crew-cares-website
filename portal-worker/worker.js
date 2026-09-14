@@ -1,7 +1,8 @@
 const COOKIE_NAME = "ccc_portal_session";
 const SESSION_SECONDS = 60 * 60 * 8;
 const REMEMBER_SESSION_SECONDS = 60 * 60 * 24 * 30;
-const PORTAL_PATHS = new Set(["/volunteer", "/apply", "/login", "/setup", "/organizer"]);
+const PORTAL_PATHS = new Set(["/volunteer", "/apply", "/login", "/setup", "/organizer", "/forgot-password", "/google-email/connect", "/google-email/callback"]);
+const EMAIL_SENDER = "Submission@campbellscrew.com";
 const OWNER_ROLES = new Set(["executive_owner"]);
 const EDITOR_ROLES = new Set(["executive_owner", "event_admin"]);
 
@@ -91,7 +92,7 @@ async function passwordHash(password, salt) {
 }
 
 function loginPage(message = "", status = 200) {
-  const alert = message ? `<p role="alert" class="error">${escapeHtml(message)}</p>` : "";
+  const alert = `${message ? `<p role="alert" class="error">${escapeHtml(message)}</p>` : ""}<p><a style="color:#176b39;font-weight:700" href="/forgot-password">Forgot password?</a></p>`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Organizer sign in | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--forest:#176b39;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--ink);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,580px);padding:clamp(30px,6vw,58px);background:#fff;border-top:7px solid var(--green);box-shadow:0 24px 70px rgba(0,0,0,.32)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:var(--forest)}h1{margin:12px 0 14px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(38px,7vw,52px);line-height:1;letter-spacing:-.045em;text-transform:uppercase}p{color:var(--gray);line-height:1.55}label{display:block;margin:20px 0 7px}input{width:100%;height:52px;padding:12px;border:1px solid #bdc6c0;border-radius:0;background:var(--mist);color:var(--ink);font:400 17px/26px Arial,sans-serif;appearance:none;-webkit-appearance:none}input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-text-fill-color:var(--ink);-webkit-box-shadow:0 0 0 1000px var(--mist) inset;box-shadow:0 0 0 1000px var(--mist) inset;transition:background-color 9999s ease-out 0s}.remember{display:flex;align-items:center;gap:9px;margin:18px 0 0;color:var(--ink);font-size:13px;font-weight:700;letter-spacing:0;text-transform:none;cursor:pointer}.remember input{width:18px;height:18px;padding:0;accent-color:var(--forest)}button{width:100%;min-height:52px;margin-top:22px;border:1px solid var(--green);background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Organizer sign in</h1><p>Use the organizer account created for you. Public volunteer and recipient forms stay separate from this private workspace.</p>${alert}<form method="post" action="/login"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" required autofocus><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><label class="remember"><input name="remember" type="checkbox"> Stay signed in on this device</label><button>Sign in →</button></form></main></body></html>`;
   return new Response(html, { status, headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
@@ -125,6 +126,50 @@ async function servePortalAsset(request, env, url) {
     return new Response(html, { status: asset.status, headers });
   }
   return new Response(asset.body, { status: asset.status, headers });
+}
+
+async function readSignedUserToken(token, env) {
+  const [payload, signature, extra] = String(token || "").split(".");
+  if (!payload || !signature || extra) return null;
+  try {
+    if (!constantTimeEqual(signature, base64Url(await hmac(env.PORTAL_SESSION_SECRET, payload)))) return null;
+    const session = JSON.parse(new TextDecoder().decode(decodeBase64Url(payload)));
+    if (!session.id || session.expires <= Math.floor(Date.now() / 1000)) return null;
+    const account = await env.DB.prepare("SELECT id, email, role, status FROM users WHERE id = ?").bind(session.id).first();
+    return account?.status === "active" ? account : null;
+  } catch { return null; }
+}
+
+async function emailTokenKey(env) {
+  const source = `${env.PORTAL_SESSION_SECRET}:${env.GOOGLE_OAUTH_CLIENT_SECRET}`;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source));
+  return crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+async function encryptEmailToken(token, env) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const bytes = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await emailTokenKey(env), new TextEncoder().encode(token));
+  return `${base64Url(iv)}.${base64Url(new Uint8Array(bytes))}`;
+}
+
+async function decryptEmailToken(value, env) {
+  const [ivValue, cipherValue] = String(value || "").split(".");
+  if (!ivValue || !cipherValue) throw new Error("Email connection is unavailable.");
+  const bytes = await crypto.subtle.decrypt({ name: "AES-GCM", iv: decodeBase64Url(ivValue) }, await emailTokenKey(env), decodeBase64Url(cipherValue));
+  return new TextDecoder().decode(bytes);
+}
+
+async function sendPasswordResetEmail(env, recipient, resetUrl) {
+  const credential = await env.DB.prepare("SELECT encrypted_refresh_token FROM email_oauth_credentials WHERE id = 1").first();
+  if (!credential || !env.GOOGLE_OAUTH_CLIENT_ID || !env.GOOGLE_OAUTH_CLIENT_SECRET) throw new Error("Email delivery has not been connected yet.");
+  const refreshToken = await decryptEmailToken(credential.encrypted_refresh_token, env);
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_OAUTH_CLIENT_ID, client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET, refresh_token: refreshToken, grant_type: "refresh_token" }) });
+  const token = await tokenResponse.json();
+  if (!tokenResponse.ok || !token.access_token) throw new Error("Google email authorization needs to be reconnected.");
+  const subject = "Reset your Campbell's Crew organizer password";
+  const message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${recipient}\r\nSubject: ${subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nA password reset was requested for your Campbell's Crew organizer account.\r\n\r\nSet a new password using this secure link:\r\n${resetUrl}\r\n\r\nThis link expires in seven days. If you did not request this, you can ignore this email.`;
+  const sent = await fetch(`https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(EMAIL_SENDER)}/messages/send`, { method: "POST", headers: { Authorization: `Bearer ${token.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw: base64Url(new TextEncoder().encode(message)) }) });
+  if (!sent.ok) throw new Error("Google could not send the password-reset email.");
 }
 
 // The complete organizer experience is the established test-site interface.
@@ -215,6 +260,12 @@ function accountSetupPage(token, email = "", message = "", status = 200) {
   const identity = email ? `<p><strong>Organizer sign-in email</strong><br>${escapeHtml(email)}</p>` : "";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Set up organizer account | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--ink);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,580px);padding:clamp(30px,6vw,58px);background:#fff;border-top:7px solid var(--green);box-shadow:0 24px 70px rgba(0,0,0,.32)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:#176b39}h1{margin:12px 0 14px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(36px,7vw,52px);line-height:1;letter-spacing:-.045em;text-transform:uppercase}p{color:var(--gray);line-height:1.55}label{display:block;margin:20px 0 7px}input{width:100%;height:52px;padding:12px;border:1px solid #bdc6c0;background:var(--mist);color:var(--ink);font:400 17px/26px Arial,sans-serif}button{width:100%;min-height:52px;margin-top:22px;border:1px solid var(--green);background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Set your password</h1><p>Create a password for your private organizer account. This one-time link expires in seven days.</p>${identity}${alert}<form method="post" action="/setup"><input type="hidden" name="token" value="${escapeHtml(token)}"><label for="password">New password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required autofocus><label for="confirm">Confirm password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="10" required><button>Activate organizer account →</button></form></main></body></html>`;
   return new Response(html, { status, headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
+}
+
+function forgotPasswordPage(message = "") {
+  const notice = message ? `<p class="notice">${escapeHtml(message)}</p>` : "";
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reset password | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--ink);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,580px);padding:clamp(30px,6vw,58px);background:#fff;border-top:7px solid var(--green)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:#176b39}h1{margin:12px 0;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(36px,7vw,52px);line-height:1;text-transform:uppercase}p{color:var(--gray);line-height:1.55}label{display:block;margin:20px 0 7px}input{width:100%;height:52px;padding:12px;border:1px solid #bdc6c0;background:var(--mist);font:16px Arial,sans-serif}button{width:100%;min-height:52px;margin-top:22px;border:0;background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.notice{padding:12px;background:#e9f7ea;border-left:4px solid #176b39;color:#155b31;font-weight:700}.back{display:inline-block;margin-top:20px;color:#176b39;font-weight:700}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Reset password</h1><p>Enter your organizer email address. If it matches an active account, we will send a reset link.</p>${notice}<form method="post" action="/forgot-password"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required autofocus><button>Send reset link →</button></form><a class="back" href="/login">← Back to sign in</a></main></body></html>`;
+  return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
 
 function eventSettings(event) {
@@ -497,6 +548,7 @@ async function api(request, env, url, user) {
     const account = await env.DB.prepare("SELECT id, email, status FROM users WHERE id = ?").bind(resetMatch[1]).first();
     if (!account || account.status !== "active") return json({ error: "A password-reset link is available only for an active organizer account." }, 400);
     const invitation = await issueInvitation(env, account.id);
+    await sendPasswordResetEmail(env, account.email, `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`);
     await audit(env, user, "organizer_password_reset_issued", "user", account.id);
     return json({ id: account.id, setupUrl: `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`, expiresAt: invitation.expiresAt });
   }
@@ -532,6 +584,40 @@ export default {
 
     if (url.pathname.startsWith("/portal-api/")) return api(request, env, url, user);
     if (url.pathname === "/logout") return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: "/login", "Set-Cookie": `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0` })) });
+    if (url.pathname === "/forgot-password") {
+      if (request.method !== "POST") return forgotPasswordPage();
+      const form = await request.formData();
+      const email = String(form.get("email") || "").trim().toLowerCase();
+      const account = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND status = 'active'").bind(email).first();
+      if (account) {
+        try {
+          const invitation = await issueInvitation(env, account.id);
+          await sendPasswordResetEmail(env, email, `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`);
+          await audit(env, null, "organizer_password_reset_requested", "user", account.id);
+        } catch (error) { console.error("Password reset delivery failed", error); }
+      }
+      return forgotPasswordPage("If an active organizer account uses that address, a reset link has been sent.");
+    }
+    if (url.pathname === "/google-email/connect") {
+      if (!user || !OWNER_ROLES.has(user.role)) return Response.redirect(`${url.origin}/login`, 303);
+      if (!env.GOOGLE_OAUTH_CLIENT_ID || !env.GOOGLE_OAUTH_CLIENT_SECRET) return portalStatusPage("Email connection unavailable", "Add the Google OAuth client ID and secret in Cloudflare before connecting email delivery.");
+      const state = await makeSession(user, env.PORTAL_SESSION_SECRET, 600);
+      const authorization = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+      authorization.search = new URLSearchParams({ client_id: env.GOOGLE_OAUTH_CLIENT_ID, redirect_uri: `${url.origin}/google-email/callback`, response_type: "code", scope: "https://www.googleapis.com/auth/gmail.send", access_type: "offline", prompt: "consent", login_hint: EMAIL_SENDER, state }).toString();
+      return Response.redirect(authorization.toString(), 302);
+    }
+    if (url.pathname === "/google-email/callback") {
+      const owner = await readSignedUserToken(url.searchParams.get("state"), env);
+      const code = url.searchParams.get("code");
+      if (!owner || !OWNER_ROLES.has(owner.role) || !code) return portalStatusPage("Email connection could not be completed", "Return to Settings and try connecting the Submission mailbox again.");
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_OAUTH_CLIENT_ID, client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET, redirect_uri: `${url.origin}/google-email/callback`, grant_type: "authorization_code" }) });
+      const token = await tokenResponse.json();
+      if (!tokenResponse.ok || !token.refresh_token) return portalStatusPage("Email connection could not be completed", "Google did not return a reusable authorization. Return to Settings and try again.");
+      const encrypted = await encryptEmailToken(token.refresh_token, env);
+      await env.DB.prepare("INSERT INTO email_oauth_credentials (id, encrypted_refresh_token, sender_email, updated_at) VALUES (1, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET encrypted_refresh_token = excluded.encrypted_refresh_token, sender_email = excluded.sender_email, updated_at = CURRENT_TIMESTAMP").bind(encrypted, EMAIL_SENDER).run();
+      await audit(env, owner, "google_email_connected", "email_sender", EMAIL_SENDER);
+      return portalStatusPage("Email delivery connected", `Password-reset emails will now be sent from ${EMAIL_SENDER}.`, `<a class="action" href="/organizer#organizer/settings">Return to Settings →</a>`);
+    }
     if (url.pathname === "/setup") {
       const setupForm = request.method === "POST" ? await request.formData() : null;
       const token = setupForm ? String(setupForm.get("token") || "") : String(url.searchParams.get("token") || "");

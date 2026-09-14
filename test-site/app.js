@@ -1145,6 +1145,12 @@
     const addUser = document.querySelector("[data-add-user]");
     if (addUser) addUser.addEventListener("click", openAddUser);
     if (SERVER_AUTH && subroute === "settings") {
+      const securityPanel = document.querySelector(".detail-grid");
+      if (securityPanel) {
+        const connect = document.createElement("a");
+        connect.className = "button button--light"; connect.href = "/google-email/connect"; connect.textContent = "Connect Submission email";
+        securityPanel.after(connect);
+      }
       document.querySelectorAll(".user-row").forEach((row, index) => {
         const account = state.users[index];
         if (!account || account.status !== "Active" || account.role === "Executive Owner") return;
