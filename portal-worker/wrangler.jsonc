@@ -12,6 +12,20 @@
   "vars": {
     "PORTAL_MODE": "closed"
   },
+  "routes": [
+    { "pattern": "campbellscrew.com/volunteer", "zone_name": "campbellscrew.com" },
+    { "pattern": "campbellscrew.com/apply", "zone_name": "campbellscrew.com" },
+    { "pattern": "campbellscrew.com/login", "zone_name": "campbellscrew.com" },
+    { "pattern": "campbellscrew.com/logout", "zone_name": "campbellscrew.com" },
+    { "pattern": "campbellscrew.com/organizer*", "zone_name": "campbellscrew.com" },
+    { "pattern": "campbellscrew.com/portal-api*", "zone_name": "campbellscrew.com" },
+    { "pattern": "www.campbellscrew.com/volunteer", "zone_name": "campbellscrew.com" },
+    { "pattern": "www.campbellscrew.com/apply", "zone_name": "campbellscrew.com" },
+    { "pattern": "www.campbellscrew.com/login", "zone_name": "campbellscrew.com" },
+    { "pattern": "www.campbellscrew.com/logout", "zone_name": "campbellscrew.com" },
+    { "pattern": "www.campbellscrew.com/organizer*", "zone_name": "campbellscrew.com" },
+    { "pattern": "www.campbellscrew.com/portal-api*", "zone_name": "campbellscrew.com" }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
