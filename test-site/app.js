@@ -876,7 +876,7 @@
   }
 
   function organizerSettings() {
-    return `${heading("Workspace administration", "Settings", "Manage people, permissions, security defaults and demonstration data.", `<button class="button button--green" type="button" data-add-user>+ Add user</button>`)}<article class="panel"><div class="panel-header"><div><h2>Users & permissions</h2><p>Fewer than ten trusted people will have organizer access.</p></div></div><div class="permission-legend"><span><b>Executive Owner</b> Everything</span><span><b>Event Administrator</b> All event operations</span><span><b>Read-Only Coordinator</b> View without editing</span><span><b>Check-In Staff</b> Check-in only; other panels locked</span></div><div class="user-list">${state.users.map((user) => `<div class="user-row"><span><strong>${esc(user.name)}</strong><small>${esc(user.email)}</small></span><b>${esc(user.role)}</b>${statusPill(user.status === "Active" ? "approved" : "submitted", user.status)}<button class="dots-button" type="button" data-demo-action="user-menu" aria-label="User options">•••</button></div>`).join("")}</div><div class="inline-note"><strong>Check-In Staff elevation PIN:</strong> 2017 in this prototype. Production should require an administrator login before sensitive panels unlock.</div></article><article class="panel"><div class="panel-header"><div><h2>Security & retention</h2><p>Current planning decisions</p></div></div><div class="detail-grid"><div class="detail-item"><span>Organizer login</span><strong>Google Workspace planned</strong></div><div class="detail-item"><span>Event history</span><strong>Retain all years</strong></div><div class="detail-item"><span>Audit log</span><strong>Decisions, edits, emails and exports</strong></div><div class="detail-item"><span>Search visibility</span><strong>No indexing</strong></div></div></article><article class="panel danger-zone"><div><h2>Danger zone</h2><p>Restore the original fictional event, volunteers and applications.</p></div><button class="button button--danger" type="button" data-reset-demo>Reset demonstration data</button></article>`;
+    return `${heading("Workspace administration", "Settings", "Manage people, permissions, and security defaults.", `<button class="button button--green" type="button" data-add-user>+ Add user</button>`)}<article class="panel"><div class="panel-header"><div><h2>Users & permissions</h2><p>Fewer than ten trusted people will have organizer access.</p></div></div><div class="permission-legend"><span><b>Executive Owner</b> Everything</span><span><b>Event Administrator</b> All event operations</span><span><b>Read-Only Coordinator</b> View without editing</span><span><b>Check-In Staff</b> Check-in only; other panels locked</span></div><div class="user-list">${state.users.map((user) => `<div class="user-row"><span><strong>${esc(user.name)}</strong><small>${esc(user.email)}</small></span><b>${esc(user.role)}</b>${statusPill(user.status === "Active" ? "approved" : "submitted", user.status)}<button class="dots-button" type="button" data-demo-action="user-menu" aria-label="User options">•••</button></div>`).join("")}</div><div class="inline-note"><strong>Check-In Staff elevation PIN:</strong> 2017 in this prototype. Production should require an administrator login before sensitive panels unlock.</div></article><article class="panel"><div class="panel-header"><div><h2>Security & retention</h2><p>Current planning decisions</p></div></div><div class="detail-grid"><div class="detail-item"><span>Organizer login</span><strong>Google Workspace planned</strong></div><div class="detail-item"><span>Event history</span><strong>Retain all years</strong></div><div class="detail-item"><span>Audit log</span><strong>Decisions, edits, emails and exports</strong></div><div class="detail-item"><span>Search visibility</span><strong>No indexing</strong></div></div></article>`;
   }
 
   function organizerSettingsV5() {
@@ -1115,17 +1115,6 @@
     document.querySelectorAll("[data-export]").forEach((button) => {
       button.textContent = "Download Excel workbook";
       button.addEventListener("click", () => exportWorkbook(button.dataset.export));
-    });
-    const reset = document.querySelector("[data-reset-demo]");
-    if (reset) reset.addEventListener("click", () => {
-      if (!window.confirm("Reset every fictional signup and organizer change in this prototype?")) return;
-      state = prepareEventCollection(createDefaultState());
-      expandDemoData(state);
-      state.volunteers.forEach((volunteer,index)=>{if(volunteer.currentEvent===undefined)volunteer.currentEvent=index<5?state.event.title:"";});
-      state.applications.forEach((household)=>{if(household.archived===undefined)household.archived=false;if(!household.eventName)household.eventName=state.event.title;household.children.forEach((child)=>{const parts=String(child.name||"").trim().split(/\s+/);child.firstName=child.firstName||parts[0]||"";child.lastName=child.lastName||parts.slice(1).join(" ")||household.guardian.trim().split(/\s+/).slice(-1)[0];child.name=`${child.firstName} ${child.lastName}`.trim();if(!child.decision)child.decision=household.status==="approved"?"approved":household.status==="info"?"info":"review";});});
-      saveState();
-      toast("Demonstration data restored.");
-      renderOrganizer("settings");
     });
   }
 
