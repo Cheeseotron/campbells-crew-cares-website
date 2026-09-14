@@ -303,7 +303,7 @@ export default {
     if (url.pathname === "/login") return user ? Response.redirect(`${url.origin}/organizer#organizer/dashboard`, 303) : loginPage();
     if (url.pathname === "/organizer" || url.pathname.startsWith("/organizer/")) {
       if (!user) return Response.redirect(`${url.origin}/login`, 303);
-      return servePortalAsset(request, env, url);
+      return serveOrganizerPrototype(request, env, url);
     }
     if ((url.pathname === "/volunteer" || url.pathname === "/apply") && (env.PORTAL_MODE || "closed") !== "open") {
       const isVolunteer = url.pathname === "/volunteer";

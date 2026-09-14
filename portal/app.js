@@ -1,7 +1,61 @@
-const app=document.querySelector('#app');
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-async function api(url,options){const r=await fetch(url,options);const d=await r.json();if(!r.ok)throw Error(d.error||'Please try again.');return d}
-function shell(body){return `<header><b>Campbell's Crew Cares</b><a href="/logout">Sign out</a></header><div class="shell"><aside><p>PRIVATE WORKSPACE</p><button data-view="home">Overview</button><button data-view="events">Event management</button><button data-view="volunteers">Volunteer directory</button><button data-view="recipients">Recipients</button><button data-view="food-bags">Food bag plans</button><button data-view="reports">Reports & history</button><button disabled>Settings & users</button></aside><section>${body}</section></div>`}
-function bind(){document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>render(b.dataset.view))}
-async function render(view='home'){try{if(view==='food-bags'){const {events}=await api('/portal-api/events'),bags=events.filter(e=>e.event_type==='food_bag');app.innerHTML=shell(`<p class="eyebrow">EVENT OPERATIONS</p><h1>Food bag plans</h1>${bags.map(e=>`<form data-bag="${e.id}"><h2>${esc(e.title)}</h2><label>Goal number of bags<input name="goal" type="number" min="1" value="${esc(e.settings?.bagGoal||0)}"></label><label>Items — one per line, with quantity first (example: 1 Granola bar)<textarea name="items">${esc((e.settings?.bagItems||[]).map(i=>i.quantity+' '+i.label).join('\n'))}</textarea></label><button>Save packing plan →</button><output></output></form>`).join('')||'<div class="empty"><h2>No food bag event yet.</h2><p>Create a Food Bag Event in Event Management to start a real packing plan.</p></div>'}`);bind();document.querySelectorAll('[data-bag]').forEach(f=>f.onsubmit=async x=>{x.preventDefault();const e=bags.find(v=>v.id===f.dataset.bag),items=f.items.value.split('\n').map(v=>v.trim()).filter(Boolean).map(v=>{const m=v.match(/^(\d+)\s+(.+)$/);return {quantity:m?Number(m[1]):1,label:m?m[2]:v}});try{await api('/portal-api/events/'+e.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:e.title,eventDate:e.event_date,status:e.status,settings:{...e.settings,bagGoal:Number(f.goal.value||0),bagItems:items}})});f.querySelector('output').textContent='Saved.'}catch(err){f.querySelector('output').textContent=err.message}});return}if(view==='volunteers'||view==='recipients'){const key=view==='volunteers'?'volunteers':'recipients',data=await api('/portal-api/organizer/'+key),rows=data[key];app.innerHTML=shell(`<p class="eyebrow">LIVE RECORDS</p><h1>${view==='volunteers'?'Volunteer directory':'Recipients'}</h1><div class="records">${rows.map(x=>`<article><b>${esc(view==='volunteers'?x.name:x.guardian_name)}</b><small>${esc(x.event_title)} · ${esc(view==='volunteers'?x.role:x.child_count+' children')}</small></article>`).join('')||'<div class="empty"><h2>No real records yet.</h2><p>Records will appear here after an event receives signups or applications.</p></div>'}</div>`);bind();return}const {events}=await api('/portal-api/events');if(view==='events'){app.innerHTML=shell(`<p class="eyebrow">EVENT OPERATIONS</p><h1>Event management</h1><p>Create real events here. Drafts remain private until you open them.</p><div class="records">${events.map(e=>`<article><b>${esc(e.title)}</b><small>${esc(e.event_type==='food_bag'?'Food Bag Event':'Kids Shopping Event')} · ${esc(e.status)}</small></article>`).join('')||'<p>No events yet.</p>'}</div><form id="create"><h2>Create event</h2><label>Event name<input required name="title"></label><label>Event type<select name="eventType"><option value="shopping">Kids Shopping Event</option><option value="food_bag">Food Bag Event</option></select></label><label>Date<input name="eventDate" type="date"></label><button>Create draft event →</button><output></output></form>`);bind();document.querySelector('#create').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;try{const x=Object.fromEntries(new FormData(f));await api('/portal-api/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...x,status:'draft',settings:{}})});render('events')}catch(err){f.querySelector('output').textContent=err.message}};return}app.innerHTML=shell(`<p class="eyebrow">ORGANIZER OVERVIEW</p><h1>Upcoming events</h1>${events.length?`<div class="records">${events.filter(e=>e.status!=='closed').map(e=>`<article><b>${esc(e.title)}</b><small>${esc(e.event_date||'Date not set')} · ${esc(e.status)}</small></article>`).join('')||'<p>No active events.</p>'}</div>`:`<div class="empty"><h2>Your real workspace is ready.</h2><p>There is no sample data here. Create your first event to begin.</p><button data-view="events">Create event →</button></div>`}`);bind()}catch(e){app.innerHTML=`<h1>Could not load workspace</h1><p>${esc(e.message)}</p>`}}
-render();
+const app = document.querySelector("#app");
+const path = location.pathname;
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
+
+async function compressPhoto(file) {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error("Please choose a JPG, PNG, or WebP photo.");
+  if (file.size > 8 * 1024 * 1024) throw new Error("Please choose a photo smaller than 8 MB.");
+  const source = await createImageBitmap(file);
+  const scale = Math.min(1, 1200 / Math.max(source.width, source.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(source.width * scale));
+  canvas.height = Math.max(1, Math.round(source.height * scale));
+  canvas.getContext("2d").drawImage(source, 0, 0, canvas.width, canvas.height);
+  source.close();
+  return new Promise((resolve) => canvas.toBlob((blob) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  }, "image/jpeg", 0.78));
+}
+
+async function load() {
+  const response = await fetch("/portal-api/public/events");
+  const data = await response.json();
+  if (path.startsWith("/organizer")) {
+    app.innerHTML = `<div class="eyebrow">Campbell's Crew Cares</div><h1>You're signed in</h1><p>Your Executive Owner session is active. The live organizer workspace is being connected to the new database now.</p><p class="closed">Public signup remains closed until you open an event from the finished workspace.</p>`;
+    return;
+  }
+  const kind = path === "/apply" ? "recipient application" : "volunteer opportunity";
+  if (data.mode !== "open" || !data.events.length) {
+    app.innerHTML = `<div class="eyebrow">Campbell's Crew Cares</div><h1>${kind} updates</h1><p>There are no open ${kind}s right now. Please check back soon.</p><p class="closed">This page is ready for the next event, but registration is currently closed.</p>`;
+    return;
+  }
+  const events = data.events.filter((event) => path !== "/apply" || event.event_type === "shopping");
+  if (!events.length) {
+    app.innerHTML = `<div class="eyebrow">Campbell's Crew Cares</div><h1>Applications are closed</h1><p>There are no open shopping events accepting recipient applications right now.</p>`;
+    return;
+  }
+  const choices = events.map((event) => `<option value="${escapeHtml(event.id)}">${escapeHtml(event.title)}${event.event_date ? ` — ${escapeHtml(event.event_date)}` : ""}</option>`).join("");
+  if (path === "/apply") {
+    app.innerHTML = `<div class="eyebrow">Campbell's Crew Cares</div><h1>Apply for help</h1><p>Applications are reviewed by the Campbell's Crew team. Submitting does not guarantee acceptance.</p><div id="notice"></div><form class="form" id="application"><label>Event<select name="eventId">${choices}</select></label><label>Responsible party name<input required name="guardianName" autocomplete="name"></label><label>Email<input required name="email" type="email" autocomplete="email"></label><label>Phone<input required name="phone" type="tel" autocomplete="tel"></label><label>Child's first name<input required name="firstName"></label><label>Child's last name<input required name="lastName"></label><label>Child photo <input name="childPhoto" type="file" accept="image/jpeg,image/png,image/webp"><span class="helper">Optional. It is resized and compressed before private storage; it is never published publicly.</span></label><label>Notes or accommodations<textarea name="notes"></textarea></label><button>Submit application →</button></form>`;
+  } else {
+    app.innerHTML = `<div class="eyebrow">Campbell's Crew Cares</div><h1>Volunteer</h1><p>Choose an open event, then tell us how you would like to help.</p><div id="notice"></div><form class="form" id="volunteer"><label>Event<select name="eventId">${choices}</select></label><label>Your name<input required name="name" autocomplete="name"></label><label>Email<input required name="email" type="email" autocomplete="email"></label><label>Phone<input name="phone" type="tel" autocomplete="tel"></label><label>Volunteer role<input required name="role" placeholder="For example, Shopper"></label><label class="helper"><input name="alertOptIn" type="checkbox"> I would like future volunteer-event alerts.</label><button>Register to volunteer →</button></form>`;
+  }
+  const form = document.querySelector("form");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(form));
+    const photoDataUrl = path === "/apply" && form.childPhoto.files[0] ? await compressPhoto(form.childPhoto.files[0]) : "";
+    const body = path === "/apply" ? { ...values, children: [{ firstName: values.firstName, lastName: values.lastName, photoDataUrl }] } : { ...values, alertOptIn: form.alertOptIn.checked };
+    delete body.childPhoto;
+    const result = await fetch(path === "/apply" ? "/portal-api/public/applications" : "/portal-api/public/volunteer-signups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const reply = await result.json();
+    const notice = document.querySelector("#notice");
+    notice.className = `notice${result.ok ? " success" : ""}`;
+    notice.textContent = reply.message || reply.error || "Please try again.";
+    if (result.ok) form.reset();
+  });
+}
+
+load().catch(() => { app.innerHTML = "<div class=\"eyebrow\">Campbell's Crew Cares</div><h1>Please try again</h1><p>We could not load this page just now.</p>"; });
