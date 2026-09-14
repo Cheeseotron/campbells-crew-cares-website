@@ -1,7 +1,7 @@
 const COOKIE_NAME = "ccc_portal_session";
 const SESSION_SECONDS = 60 * 60 * 8;
 const REMEMBER_SESSION_SECONDS = 60 * 60 * 24 * 30;
-const PORTAL_PATHS = new Set(["/volunteer", "/apply", "/login", "/organizer"]);
+const PORTAL_PATHS = new Set(["/volunteer", "/apply", "/login", "/setup", "/organizer"]);
 const OWNER_ROLES = new Set(["executive_owner"]);
 const EDITOR_ROLES = new Set(["executive_owner", "event_admin"]);
 
@@ -154,6 +154,16 @@ async function activeEvents(env) {
   // on the server. The public form needs only this small display-safe subset.
   const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date FROM events WHERE status = 'open' ORDER BY event_date ASC").all();
   return results;
+}
+
+async function tokenHash(token) {
+  return base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))));
+}
+
+function accountSetupPage(token, message = "", status = 200) {
+  const alert = message ? `<p role="alert" class="error">${escapeHtml(message)}</p>` : "";
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Set up organizer account | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--mist:#edf3ed;--gray:#66716c}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:28px;background:var(--ink);font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100%,580px);padding:clamp(30px,6vw,58px);background:#fff;border-top:7px solid var(--green);box-shadow:0 24px 70px rgba(0,0,0,.32)}.eyebrow,label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.eyebrow{color:#176b39}h1{margin:12px 0 14px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(36px,7vw,52px);line-height:1;letter-spacing:-.045em;text-transform:uppercase}p{color:var(--gray);line-height:1.55}label{display:block;margin:20px 0 7px}input{width:100%;height:52px;padding:12px;border:1px solid #bdc6c0;background:var(--mist);color:var(--ink);font:400 17px/26px Arial,sans-serif}button{width:100%;min-height:52px;margin-top:22px;border:1px solid var(--green);background:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}.error{padding:12px;background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d;font-weight:700}</style></head><body><main><p class="eyebrow">Campbell's Crew Cares</p><h1>Set your password</h1><p>Create a password for your private organizer account. This one-time link expires in seven days.</p>${alert}<form method="post" action="/setup"><input type="hidden" name="token" value="${escapeHtml(token)}"><label for="password">New password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required autofocus><label for="confirm">Confirm password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="10" required><button>Activate organizer account →</button></form></main></body></html>`;
+  return new Response(html, { status, headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
 
 function eventSettings(event) {
@@ -310,6 +320,35 @@ async function api(request, env, url, user) {
     return json({ reports: results });
   }
 
+  if (url.pathname === "/portal-api/organizer/users" && request.method === "GET") {
+    if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Executive Owner permission required." }, 403);
+    const { results } = await env.DB.prepare("SELECT id, email, display_name, role, status, created_at FROM users ORDER BY created_at ASC").all();
+    return json({ users: results });
+  }
+
+  if (url.pathname === "/portal-api/organizer/users" && request.method === "POST") {
+    if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Executive Owner permission required." }, 403);
+    const input = await request.json();
+    const email = String(input.email || "").trim().toLowerCase();
+    const displayName = String(input.displayName || "").trim();
+    const role = String(input.role || "");
+    if (!/^\S+@\S+\.\S+$/.test(email) || !displayName || !["event_admin", "read_only", "checkin_staff"].includes(role)) return json({ error: "Enter a name, a valid email address, and a permission level." }, 400);
+    const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
+    if (existing) return json({ error: "An organizer account already uses that email address." }, 409);
+    const id = randomId("user");
+    const salt = base64Url(crypto.getRandomValues(new Uint8Array(18)));
+    const placeholderPassword = base64Url(crypto.getRandomValues(new Uint8Array(24)));
+    await env.DB.prepare("INSERT INTO users (id, email, display_name, role, password_hash, password_salt, status) VALUES (?, ?, ?, ?, ?, ?, 'disabled')")
+      .bind(id, email, displayName.slice(0, 100), role, await passwordHash(placeholderPassword, salt), salt).run();
+    const invitationId = randomId("invite");
+    const token = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    await env.DB.prepare("INSERT INTO user_invitations (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)")
+      .bind(invitationId, id, await tokenHash(token), expiresAt).run();
+    await audit(env, user, "organizer_invited", "user", id, null, { role });
+    return json({ id, setupUrl: `${url.origin}/setup?token=${encodeURIComponent(token)}`, expiresAt }, 201);
+  }
+
   if (url.pathname === "/portal-api/bootstrap-owner" && request.method === "POST") {
     // Disabled by default. Initial account creation happens only with a deployment secret,
     // never from a public browser form or hard-coded credential.
@@ -341,6 +380,32 @@ export default {
 
     if (url.pathname.startsWith("/portal-api/")) return api(request, env, url, user);
     if (url.pathname === "/logout") return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: "/login", "Set-Cookie": `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0` })) });
+    if (url.pathname === "/setup") {
+      const setupForm = request.method === "POST" ? await request.formData() : null;
+      const token = setupForm ? String(setupForm.get("token") || "") : String(url.searchParams.get("token") || "");
+      if (!token) return portalStatusPage("Invitation link needed", "Use the account-setup link supplied by a Campbell's Crew Executive Owner.");
+      if (request.method === "POST") {
+        const password = String(setupForm.get("password") || "");
+        const confirm = String(setupForm.get("confirm") || "");
+        if (password.length < 10) return accountSetupPage(token, "Use a password of at least 10 characters.", 400);
+        if (password !== confirm) return accountSetupPage(token, "The password confirmation does not match.", 400);
+        const invitation = await env.DB.prepare("SELECT id, user_id, expires_at, used_at FROM user_invitations WHERE token_hash = ?").bind(await tokenHash(token)).first();
+        if (!invitation || invitation.used_at || Date.parse(invitation.expires_at) < Date.now()) return portalStatusPage("Invitation expired", "Ask a Campbell's Crew Executive Owner to create a new account invitation.");
+        const account = await env.DB.prepare("SELECT id, email, display_name, role FROM users WHERE id = ?").bind(invitation.user_id).first();
+        if (!account) return portalStatusPage("Invitation unavailable", "Ask a Campbell's Crew Executive Owner to create a new account invitation.");
+        const salt = base64Url(crypto.getRandomValues(new Uint8Array(18)));
+        await env.DB.batch([
+          env.DB.prepare("UPDATE users SET password_hash = ?, password_salt = ?, status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(await passwordHash(password, salt), salt, account.id),
+          env.DB.prepare("UPDATE user_invitations SET used_at = CURRENT_TIMESTAMP WHERE id = ?").bind(invitation.id)
+        ]);
+        await audit(env, account, "organizer_account_activated", "user", account.id);
+        const session = await makeSession({ id: account.id, role: account.role }, env.PORTAL_SESSION_SECRET);
+        return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: "/organizer#organizer/dashboard", "Set-Cookie": `${COOKIE_NAME}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_SECONDS}` })) });
+      }
+      const invitation = await env.DB.prepare("SELECT id, expires_at, used_at FROM user_invitations WHERE token_hash = ?").bind(await tokenHash(token)).first();
+      if (!invitation || invitation.used_at || Date.parse(invitation.expires_at) < Date.now()) return portalStatusPage("Invitation expired", "Ask a Campbell's Crew Executive Owner to create a new account invitation.");
+      return accountSetupPage(token);
+    }
     if (url.pathname === "/login" && request.method === "POST") {
       const clientKey = request.headers.get("CF-Connecting-IP") || "unknown";
       if (env.LOGIN_RATE_LIMITER && !(await env.LOGIN_RATE_LIMITER.limit({ key: clientKey })).success) return loginPage("Too many attempts. Please wait one minute and try again.", 429);

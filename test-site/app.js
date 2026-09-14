@@ -255,6 +255,15 @@
     }));
   }
 
+  async function loadLiveUsers() {
+    if (!SERVER_AUTH) return;
+    const response = await fetch("/portal-api/organizer/users", { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("The organizer accounts could not be loaded.");
+    const labels = { executive_owner: "Executive Owner", event_admin: "Event Administrator", read_only: "Read-Only Coordinator", checkin_staff: "Check-In Staff" };
+    const payload = await response.json();
+    state.users = (payload.users || []).map((record) => ({ name: record.display_name, email: record.email, role: labels[record.role] || record.role, status: record.status === "active" ? "Active" : "Invited" }));
+  }
+
   function esc(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -1245,9 +1254,20 @@
   }
 
   function openAddUser() {
-    dialogContent.innerHTML = `<form class="dialog-body" id="add-user-form"><p class="eyebrow">Workspace access</p><h2 id="dialog-title">Add a user</h2><div class="form-grid"><div class="field"><label>Name<input name="name" required></label></div><div class="field"><label>Email<input name="email" type="email" required></label></div><div class="field field--span-2"><label>Permission level<select name="role"><option>Event Administrator</option><option>Read-Only Coordinator</option><option>Check-In Staff</option><option>Executive Owner</option></select></label></div></div><p class="inline-note">Production invitations will use their Campbell's Crew Google account. No shared password will be emailed.</p><button class="button button--green" type="submit">Add user →</button></form>`;
+    dialogContent.innerHTML = `<form class="dialog-body" id="add-user-form"><p class="eyebrow">Workspace access</p><h2 id="dialog-title">Add a user</h2><p>Create an invitation link for this person. They choose their own password when they open it.</p><div class="form-grid"><div class="field"><label>Name<input name="name" required></label></div><div class="field"><label>Email<input name="email" type="email" required></label></div><div class="field field--span-2"><label>Permission level<select name="role"><option value="event_admin">Event Administrator</option><option value="read_only">Read-Only Coordinator</option><option value="checkin_staff">Check-In Staff</option></select></label></div></div><button class="button button--green" type="submit">Create invitation link →</button></form>`;
     appDialog.showModal(); document.body.classList.add("dialog-open");
-    dialogContent.querySelector("#add-user-form").addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); state.users.push({ id: `user-${Date.now()}`, name: String(data.get("name")), email: String(data.get("email")), role: String(data.get("role")), status: "Invited" }); saveState(); closeDialog(); toast("User added to the demonstration workspace."); renderOrganizer("settings"); });
+    dialogContent.querySelector("#add-user-form").addEventListener("submit", async (event) => {
+      event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
+      if (!SERVER_AUTH) { toast("User invitations are available in the live organizer portal."); return; }
+      const submit = form.querySelector("button[type=submit]"); submit.disabled = true; submit.textContent = "Creating invitation…";
+      try {
+        const response = await fetch("/portal-api/organizer/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ displayName: data.get("name"), email: data.get("email"), role: data.get("role") }) });
+        const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The invitation could not be created.");
+        dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Invitation created</p><h2 id="dialog-title">Share this link privately</h2><p>This one-time account-setup link expires in seven days. Your new organizer will choose their own password.</p><div class="field"><label for="setup-link">Account setup link</label><input id="setup-link" value="${esc(payload.setupUrl)}" readonly></div><button class="button button--green" type="button" data-copy-setup-link>Copy link</button></div>`;
+        dialogContent.querySelector("[data-copy-setup-link]").addEventListener("click", async () => { await navigator.clipboard.writeText(payload.setupUrl); toast("Invitation link copied."); });
+        await loadLiveUsers();
+      } catch (error) { toast(error.message || "The invitation could not be created."); submit.disabled = false; submit.textContent = "Create invitation link →"; }
+    });
   }
 
   function openApplication(id) {
@@ -1402,6 +1422,7 @@
       try {
         await loadLiveEvents();
         await loadLiveVolunteers();
+        await loadLiveUsers();
       } catch (error) {
         main.innerHTML = `<section class="page-content"><article class="content-card"><h1>Organizer records could not load</h1><p>Please refresh the page. No changes were made.</p></article></section>`;
         lockScreen.hidden = true;
