@@ -211,8 +211,8 @@ async function registerVolunteer(env, input) {
   }
   const signupId = randomId("signup");
   try {
-    await env.DB.prepare("INSERT INTO volunteer_signups (id, event_id, volunteer_id, role) VALUES (?, ?, ?, ?)")
-      .bind(signupId, event.id, profile.id, String(input.role).slice(0, 100)).run();
+    await env.DB.prepare("INSERT INTO volunteer_signups (id, event_id, volunteer_id, role, notes) VALUES (?, ?, ?, ?, ?)")
+      .bind(signupId, event.id, profile.id, String(input.role).slice(0, 100), String(input.notes || "").slice(0, 2000)).run();
   } catch { return { error: "That email is already registered for this event." }; }
   await audit(env, null, "volunteer_signed_up", "volunteer_signup", signupId, event.id);
   return { id: signupId, event };
@@ -231,7 +231,7 @@ async function api(request, env, url, user) {
     const input = await request.json();
     const result = await registerVolunteer(env, input);
     if (result.error) return json({ error: result.error }, 400);
-    return json({ id: result.id, message: "You are registered. We will email event details before the event." }, 201);
+    return json({ id: result.id, message: "You are registered. Campbell's Crew will send event details before the event." }, 201);
   }
 
   if (url.pathname === "/portal-api/public/applications" && request.method === "POST") {
@@ -363,7 +363,7 @@ export default {
         input.name = `${String(input.firstName || "").trim()} ${String(input.lastName || "").trim()}`.trim();
         if (input.agreement !== "on") return liveVolunteerSignupPage(events, url.searchParams, "", "Please agree to the event and child-safety instructions before continuing.");
         const result = await registerVolunteer(env, input);
-        return liveVolunteerSignupPage(events, url.searchParams, result.error ? "" : "You are registered. We will email event details before the event.", result.error || "");
+        return liveVolunteerSignupPage(events, url.searchParams, result.error ? "" : "You are registered. Campbell's Crew will send event details before the event.", result.error || "");
       }
       return liveVolunteerSignupPage(events, url.searchParams);
     }
