@@ -460,6 +460,38 @@ async function api(request, env, url, user) {
     return json({ id: account.id, setupUrl: `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`, expiresAt: invitation.expiresAt });
   }
 
+  const userMatch = url.pathname.match(/^\/portal-api\/organizer\/users\/([^/]+)$/);
+  if (userMatch && request.method === "PATCH") {
+    if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Executive Owner permission required." }, 403);
+    if (userMatch[1] === user.id) return json({ error: "You cannot change your own permission level here." }, 400);
+    const input = await request.json();
+    const role = String(input.role || "");
+    if (!["event_admin", "read_only", "checkin_staff"].includes(role)) return json({ error: "Choose a valid organizer permission level." }, 400);
+    const target = await env.DB.prepare("SELECT id, role FROM users WHERE id = ?").bind(userMatch[1]).first();
+    if (!target || target.role === "executive_owner") return json({ error: "Executive Owner accounts cannot be changed here." }, 400);
+    await env.DB.prepare("UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(role, target.id).run();
+    await audit(env, user, "organizer_permission_changed", "user", target.id, null, { role });
+    return json({ id: target.id, role });
+  }
+  if (userMatch && request.method === "DELETE") {
+    if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Executive Owner permission required." }, 403);
+    if (userMatch[1] === user.id) return json({ error: "You cannot delete your own account." }, 400);
+    const target = await env.DB.prepare("SELECT id, role FROM users WHERE id = ?").bind(userMatch[1]).first();
+    if (!target || target.role === "executive_owner") return json({ error: "Executive Owner accounts cannot be deleted here." }, 400);
+    await env.DB.batch([env.DB.prepare("DELETE FROM user_invitations WHERE user_id = ?").bind(target.id), env.DB.prepare("DELETE FROM users WHERE id = ?").bind(target.id)]);
+    await audit(env, user, "organizer_account_deleted", "user", target.id);
+    return json({ id: target.id });
+  }
+  if (invitationMatch && request.method === "DELETE") {
+    if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Executive Owner permission required." }, 403);
+    if (invitationMatch[1] === user.id) return json({ error: "You cannot cancel your own account invitation." }, 400);
+    const target = await env.DB.prepare("SELECT id, status FROM users WHERE id = ?").bind(invitationMatch[1]).first();
+    if (!target || target.status === "active") return json({ error: "Only pending invitations can be cancelled." }, 400);
+    await env.DB.prepare("DELETE FROM user_invitations WHERE user_id = ? AND used_at IS NULL").bind(target.id).run();
+    await audit(env, user, "organizer_invitation_cancelled", "user", target.id);
+    return json({ id: target.id });
+  }
+
   if (url.pathname === "/portal-api/bootstrap-owner" && request.method === "POST") {
     // Disabled by default. Initial account creation happens only with a deployment secret,
     // never from a public browser form or hard-coded credential.

@@ -291,7 +291,7 @@
     if (!response.ok) throw new Error("The organizer accounts could not be loaded.");
     const labels = { executive_owner: "Executive Owner", event_admin: "Event Administrator", read_only: "Read-Only Coordinator", checkin_staff: "Check-In Staff" };
     const payload = await response.json();
-    state.users = (payload.users || []).map((record) => ({ id: record.id, name: record.display_name, email: record.email, role: labels[record.role] || record.role, status: record.status === "active" ? "Active" : "Invitation pending", invitationExpiresAt: record.invitation_expires_at || "" }));
+    state.users = (payload.users || []).map((record) => ({ id: record.id, name: record.display_name, email: record.email, role: labels[record.role] || record.role, status: record.status === "active" ? "Active" : record.invitation_expires_at ? "Invitation pending" : "Invitation cancelled", invitationExpiresAt: record.invitation_expires_at || "" }));
   }
 
   function esc(value) {
@@ -930,7 +930,9 @@
   }
 
   function organizerUserRows() {
-    return state.users.map((user) => `<div class="user-row"><span><strong>${esc(user.name)}</strong><small>${esc(user.email)}</small></span><b>${esc(user.role)}</b>${statusPill(user.status === "Active" ? "approved" : "submitted", user.status)}${user.status === "Active" ? "" : `<button class="button button--small button--light" type="button" data-renew-invitation="${esc(user.id)}">New setup link</button>`}</div>`).join("") || `<p>No organizer accounts found.</p>`;
+    const roles = [["event_admin", "Event Administrator"], ["read_only", "Read-Only Coordinator"], ["checkin_staff", "Check-In Staff"]];
+    const roleKey = { "Event Administrator": "event_admin", "Read-Only Coordinator": "read_only", "Check-In Staff": "checkin_staff" };
+    return state.users.map((user) => `<div class="user-row"><span><strong>${esc(user.name)}</strong><small>${esc(user.email)}</small></span>${roleKey[user.role] ? `<label class="screen-reader-only" for="role-${esc(user.id)}">Permission for ${esc(user.name)}</label><select id="role-${esc(user.id)}" data-user-role="${esc(user.id)}">${roles.map(([value, label]) => `<option value="${value}" ${roleKey[user.role] === value ? "selected" : ""}>${label}</option>`).join("")}</select><button class="button button--small button--light" type="button" data-save-user-role="${esc(user.id)}">Save role</button>` : `<b>${esc(user.role)}</b>`}${statusPill(user.status === "Active" ? "approved" : "submitted", user.status)}${user.status === "Active" ? "" : `<button class="button button--small button--light" type="button" data-renew-invitation="${esc(user.id)}">New setup link</button><button class="button button--small button--light" type="button" data-cancel-invitation="${esc(user.id)}">Cancel invite</button>`}${roleKey[user.role] ? `<button class="button button--small button--danger" type="button" data-delete-user="${esc(user.id)}">Delete user</button>` : ""}</div>`).join("") || `<p>No organizer accounts found.</p>`;
   }
 
   function organizerSettings() {
@@ -1148,6 +1150,30 @@
         const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "A new setup link could not be created.");
         showInvitationLink(payload); await loadLiveUsers(); renderOrganizer("settings");
       } catch (error) { toast(error.message || "A new setup link could not be created."); }
+    }));
+    document.querySelectorAll("[data-save-user-role]").forEach((button) => button.addEventListener("click", async () => {
+      const select = document.querySelector(`[data-user-role="${button.dataset.saveUserRole}"]`);
+      try {
+        const response = await fetch(`/portal-api/organizer/users/${encodeURIComponent(button.dataset.saveUserRole)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: select.value }) });
+        const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The permission could not be changed.");
+        await loadLiveUsers(); renderOrganizer("settings"); toast("Permission updated.");
+      } catch (error) { toast(error.message || "The permission could not be changed."); }
+    }));
+    document.querySelectorAll("[data-cancel-invitation]").forEach((button) => button.addEventListener("click", async () => {
+      if (!window.confirm("Cancel this invitation? The setup link will stop working.")) return;
+      try {
+        const response = await fetch(`/portal-api/organizer/users/${encodeURIComponent(button.dataset.cancelInvitation)}/invitation`, { method: "DELETE" });
+        const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The invitation could not be cancelled.");
+        await loadLiveUsers(); renderOrganizer("settings"); toast("Invitation cancelled.");
+      } catch (error) { toast(error.message || "The invitation could not be cancelled."); }
+    }));
+    document.querySelectorAll("[data-delete-user]").forEach((button) => button.addEventListener("click", async () => {
+      if (!window.confirm("Delete this organizer account? This cannot be undone.")) return;
+      try {
+        const response = await fetch(`/portal-api/organizer/users/${encodeURIComponent(button.dataset.deleteUser)}`, { method: "DELETE" });
+        const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The account could not be deleted.");
+        await loadLiveUsers(); renderOrganizer("settings"); toast("Organizer account deleted.");
+      } catch (error) { toast(error.message || "The account could not be deleted."); }
     }));
     const finishEvent = document.querySelector("[data-finish-event]");
     if (finishEvent) finishEvent.addEventListener("click", openFinishEvent);
