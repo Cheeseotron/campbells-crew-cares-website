@@ -115,40 +115,6 @@ async function servePortalAsset(request, env, url) {
   return new Response(asset.body, { status: asset.status, headers });
 }
 
-// The complete organizer experience is the established test-site interface.
-// It is served only after the database-backed organizer session above has been
-// verified. Rewriting its local asset links lets it live safely at /organizer.
-async function serveOrganizerPrototype(request, env, url) {
-  const relativePath = url.pathname.replace(/^\/organizer\/?/, "");
-  const assetUrl = new URL(request.url);
-  assetUrl.pathname = relativePath ? `/${relativePath}` : "/index.html";
-  const asset = await env.ASSETS.fetch(new Request(assetUrl, request));
-  const headers = securityHeaders(new Headers(asset.headers));
-  if (assetUrl.pathname === "/index.html") {
-    const html = (await asset.text())
-      .replace("<html lang=\"en\">", "<html lang=\"en\" data-server-auth=\"true\">")
-      .replace("</head>", "<style>.app-header,.prototype-notice,.app-footer{display:none!important}</style></head>")
-      // Keep CSP's base-uri protection intact; route the prototype's local
-      // files explicitly instead of injecting a <base> element.
-      .replace('href="styles.css"', 'href="/organizer/styles.css"')
-      .replace('src="xlsx-export.js"', 'src="/organizer/xlsx-export.js"')
-      .replace('src="app.js"', 'src="/organizer/app.js"')
-      .replaceAll("../assets/", "/assets/");
-    headers.set("Content-Type", "text/html; charset=utf-8");
-    return new Response(html, { status: asset.status, headers });
-  }
-  if (assetUrl.pathname === "/app.js") {
-    const script = (await asset.text())
-      .replaceAll("../assets/", "/assets/")
-      .replace('const SERVER_AUTH = document.documentElement.dataset.serverAuth === "true";', 'const SERVER_AUTH = document.documentElement.dataset.serverAuth === "true" || window.location.pathname.startsWith("/organizer");')
-      .replace('if (!window.location.hash) window.location.hash = "home";', 'if (!window.location.hash) window.location.hash = "organizer/dashboard";')
-      .replace('window.location.assign("/test-site/logout")', 'window.location.assign("/logout")');
-    headers.set("Content-Type", "text/javascript; charset=utf-8");
-    return new Response(script, { status: asset.status, headers });
-  }
-  return new Response(asset.body, { status: asset.status, headers });
-}
-
 async function activeEvents(env) {
   // Keep event configuration, access codes, capacity notes, and contact details
   // on the server. The public form needs only this small display-safe subset.
