@@ -477,8 +477,7 @@
 
   function renderRecipient() {
     if (recipientConfirmation) {
-      main.innerHTML = `<div class="page-content"><div class="confirmation"><div class="confirmation-mark">✓</div><p class="eyebrow">Application received</p><h1>Thank you, ${esc(recipientConfirmation.guardian)}.</h1><p>Your demonstration application has been added to the organizer review queue. Submission does not guarantee acceptance; Campbell's Crew will contact you after review.</p><div class="confirmation-number"><span>Application number</span><strong>${esc(recipientConfirmation.id)}</strong></div>${(recipientConfirmation.flags || []).length ? `<div class="inline-note"><strong>Prototype note:</strong> The duplicate-checking demonstration added ${(recipientConfirmation.flags || []).length} review flag${(recipientConfirmation.flags || []).length === 1 ? "" : "s"}. Flags require human review and do not automatically reject an application.</div>` : ""}<button class="button button--green" type="button" id="new-application">Start another test application <span>→</span></button></div></div>`;
-      document.querySelector("#new-application").addEventListener("click", () => { recipientDraft = createRecipientDraft(); recipientStep = 0; recipientMaxStep = 0; recipientConfirmation = null; renderRecipient(); });
+      main.innerHTML = `<div class="page-content"><div class="confirmation"><div class="confirmation-mark">✓</div><p class="eyebrow">Application received</p><h1>Thank you, ${esc(recipientConfirmation.guardian)}.</h1><p>Your application has been sent to Campbell's Crew for review. Submission does not guarantee acceptance; we will contact you after review.</p><p class="inline-note"><strong>Keep an eye on your email.</strong> We sent a confirmation to the address you provided.</p></div></div>`;
       return;
     }
 
