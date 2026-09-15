@@ -159,17 +159,46 @@ async function decryptEmailToken(value, env) {
   return new TextDecoder().decode(bytes);
 }
 
-async function sendPasswordResetEmail(env, recipient, resetUrl) {
+function emailLine(value) {
+  return String(value || "").replace(/[\r\n]+/g, " ").trim();
+}
+
+async function sendEmail(env, recipient, subject, body) {
   const credential = await env.DB.prepare("SELECT encrypted_refresh_token FROM email_oauth_credentials WHERE id = 1").first();
   if (!credential || !env.GOOGLE_OAUTH_CLIENT_ID || !env.GOOGLE_OAUTH_CLIENT_SECRET) throw new Error("Email delivery has not been connected yet.");
+  const destination = emailLine(recipient).toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(destination)) throw new Error("A valid email address is required for delivery.");
   const refreshToken = await decryptEmailToken(credential.encrypted_refresh_token, env);
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_OAUTH_CLIENT_ID, client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET, refresh_token: refreshToken, grant_type: "refresh_token" }) });
   const token = await tokenResponse.json();
   if (!tokenResponse.ok || !token.access_token) throw new Error("Google email authorization needs to be reconnected.");
-  const subject = "Reset your Campbell's Crew organizer password";
-  const message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${recipient}\r\nSubject: ${subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nA password reset was requested for your Campbell's Crew organizer account.\r\n\r\nSet a new password using this secure link:\r\n${resetUrl}\r\n\r\nThis link expires in seven days. If you did not request this, you can ignore this email.`;
+  const message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\nSubject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${String(body || "").replace(/\r?\n/g, "\r\n")}`;
   const sent = await fetch(`https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(EMAIL_SENDER)}/messages/send`, { method: "POST", headers: { Authorization: `Bearer ${token.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw: base64Url(new TextEncoder().encode(message)) }) });
-  if (!sent.ok) throw new Error("Google could not send the password-reset email.");
+  if (!sent.ok) throw new Error("Google could not send the email.");
+}
+
+function eventEmailDetails(event) {
+  const settings = eventSettings(event) || {};
+  return { date: emailLine(event.event_date || settings.date || "To be announced"), time: emailLine(settings.time || "To be announced"), location: emailLine(settings.location || "To be announced"), address: emailLine(settings.address || "") };
+}
+
+async function sendPasswordResetEmail(env, recipient, resetUrl) {
+  await sendEmail(env, recipient, "Reset your Campbell's Crew organizer password", `A password reset was requested for your Campbell's Crew organizer account.\n\nSet a new password using this secure link:\n${resetUrl}\n\nThis link expires in seven days. If you did not request this, you can ignore this email.`);
+}
+
+async function sendVolunteerConfirmation(env, recipient, name, role, event) {
+  const details = eventEmailDetails(event);
+  await sendEmail(env, recipient, `You're registered: ${emailLine(event.title)}`, `Hi ${emailLine(name)},\n\nThank you for volunteering with Campbell's Crew Cares. You are registered for:\n\n${emailLine(event.title)}\nRole: ${emailLine(role)}\nDate: ${details.date}\nTime: ${details.time}\nLocation: ${details.location}${details.address ? `\nAddress: ${details.address}` : ""}\n\nWe look forward to seeing you there.`);
+}
+
+async function sendRecipientConfirmation(env, recipient, guardianName, event) {
+  const details = eventEmailDetails(event);
+  await sendEmail(env, recipient, `Application received: ${emailLine(event.title)}`, `Hi ${emailLine(guardianName)},\n\nYour Campbell's Crew Cares application for ${emailLine(event.title)} has been received and is now awaiting review.\n\nEvent date: ${details.date}\n\nSubmitting an application does not guarantee approval. We will contact you if we need more information or when there is an update.`);
+}
+
+async function sendOrganizerInvitation(env, recipient, name, role, setupUrl) {
+  const labels = { event_admin: "Event Administrator", read_only: "Read-Only Coordinator", checkin_staff: "Check-In Staff" };
+  await sendEmail(env, recipient, "Set up your Campbell's Crew organizer account", `Hi ${emailLine(name)},\n\nYou have been invited to the Campbell's Crew Cares organizer portal as ${labels[role] || "an organizer"}.\n\nCreate your password using this secure link:\n${setupUrl}\n\nThis link expires in seven days. If you were not expecting this invitation, you can ignore this email.`);
 }
 
 // The complete organizer experience is the established test-site interface.
@@ -414,14 +443,20 @@ async function api(request, env, url, user) {
     const input = await request.json();
     const result = await registerVolunteer(env, input);
     if (result.error) return json({ error: result.error }, 400);
-    return json({ id: result.id, message: "You are registered. Campbell's Crew will send event details before the event." }, 201);
+    let emailSent = true;
+    try { await sendVolunteerConfirmation(env, input.email, input.name, input.role, result.event); await audit(env, null, "volunteer_confirmation_sent", "volunteer_signup", result.id, result.event.id); }
+    catch (error) { console.error("Volunteer confirmation delivery failed", error); emailSent = false; await audit(env, null, "volunteer_confirmation_failed", "volunteer_signup", result.id, result.event.id); }
+    return json({ id: result.id, emailSent, message: emailSent ? "You are registered. A confirmation email is on its way." : "You are registered, but we could not send the confirmation email." }, 201);
   }
 
   if (url.pathname === "/portal-api/public/applications" && request.method === "POST") {
     const input = await request.json();
     const result = await registerRecipient(env, input);
     if (result.error) return json({ error: result.error }, 400);
-    return json({ id: result.id, message: "Your application has been received for review." }, 201);
+    let emailSent = true;
+    try { await sendRecipientConfirmation(env, input.email, input.guardianName, result.event); await audit(env, null, "recipient_receipt_sent", "recipient_household", result.id, result.event.id); }
+    catch (error) { console.error("Recipient application receipt delivery failed", error); emailSent = false; await audit(env, null, "recipient_receipt_failed", "recipient_household", result.id, result.event.id); }
+    return json({ id: result.id, emailSent, message: emailSent ? "Your application has been received for review. A receipt email is on its way." : "Your application has been received for review, but we could not send the receipt email." }, 201);
   }
   if (url.pathname === "/portal-api/me" && request.method === "GET") return user ? json({ user }) : json({ user: null }, 401);
 
@@ -498,17 +533,25 @@ async function api(request, env, url, user) {
     }
     const invitation = await issueInvitation(env, id);
     await audit(env, user, existing ? "organizer_invitation_renewed" : "organizer_invited", "user", id, null, { role });
-    return json({ id, setupUrl: `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`, expiresAt: invitation.expiresAt }, 201);
+    const setupUrl = `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`;
+    let emailSent = true;
+    try { await sendOrganizerInvitation(env, email, displayName, role, setupUrl); await audit(env, user, "organizer_invitation_email_sent", "user", id); }
+    catch (error) { console.error("Organizer invitation delivery failed", error); emailSent = false; await audit(env, user, "organizer_invitation_email_failed", "user", id); }
+    return json({ id, setupUrl, expiresAt: invitation.expiresAt, emailSent }, 201);
   }
 
   const invitationMatch = url.pathname.match(/^\/portal-api\/organizer\/users\/([^/]+)\/invitation$/);
   if (invitationMatch && request.method === "POST") {
     if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Executive Owner permission required." }, 403);
-    const account = await env.DB.prepare("SELECT id, status FROM users WHERE id = ?").bind(invitationMatch[1]).first();
+    const account = await env.DB.prepare("SELECT id, email, display_name, role, status FROM users WHERE id = ?").bind(invitationMatch[1]).first();
     if (!account || account.status === "active") return json({ error: "A new invitation is only available for a pending account." }, 400);
     const invitation = await issueInvitation(env, account.id);
     await audit(env, user, "organizer_invitation_renewed", "user", account.id);
-    return json({ id: account.id, setupUrl: `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`, expiresAt: invitation.expiresAt });
+    const setupUrl = `${url.origin}/setup?token=${encodeURIComponent(invitation.token)}`;
+    let emailSent = true;
+    try { await sendOrganizerInvitation(env, account.email, account.display_name, account.role, setupUrl); await audit(env, user, "organizer_invitation_email_sent", "user", account.id); }
+    catch (error) { console.error("Organizer invitation delivery failed", error); emailSent = false; await audit(env, user, "organizer_invitation_email_failed", "user", account.id); }
+    return json({ id: account.id, setupUrl, expiresAt: invitation.expiresAt, emailSent });
   }
 
   const userMatch = url.pathname.match(/^\/portal-api\/organizer\/users\/([^/]+)$/);
@@ -678,7 +721,16 @@ export default {
         input.name = `${String(input.firstName || "").trim()} ${String(input.lastName || "").trim()}`.trim();
         if (input.agreement !== "on") return liveVolunteerSignupPage(events, url.searchParams, "", "Please agree to the event and child-safety instructions before continuing.");
         const result = await registerVolunteer(env, input, codeGranted);
-        return liveVolunteerSignupPage(events, url.searchParams, result.error ? "" : "You are registered. Campbell's Crew will send event details before the event.", result.error || "");
+        if (result.error) return liveVolunteerSignupPage(events, url.searchParams, "", result.error);
+        try {
+          await sendVolunteerConfirmation(env, input.email, input.name, input.role, result.event);
+          await audit(env, null, "volunteer_confirmation_sent", "volunteer_signup", result.id, result.event.id);
+          return liveVolunteerSignupPage(events, url.searchParams, "You are registered. A confirmation email is on its way.");
+        } catch (error) {
+          console.error("Volunteer confirmation delivery failed", error);
+          await audit(env, null, "volunteer_confirmation_failed", "volunteer_signup", result.id, result.event.id);
+          return liveVolunteerSignupPage(events, url.searchParams, "You are registered, but we could not send the confirmation email.");
+        }
       }
       const selected = events.find((item) => item.id === url.searchParams.get("event")) || events[0];
       if (selected?.settings.volunteerStatus === "code" && !(await hasVolunteerAccessToken(url.searchParams.get("access"), selected.id, env.PORTAL_SESSION_SECRET))) return volunteerCodePage(selected);
@@ -699,7 +751,16 @@ export default {
         const codeGranted = event.settings.recipientStatus !== "code" || await hasRecipientAccess(request, event.id, env.PORTAL_SESSION_SECRET);
         if (!codeGranted) return recipientCodePage(event, "Enter the referral code before completing this application.");
         const result = await registerRecipient(env, { ...input, children: [{ firstName: input.firstName, lastName: input.lastName }] }, codeGranted);
-        return recipientApplicationPage(events, url.searchParams, result.error ? "" : "Your application has been received for review.", result.error || "");
+        if (result.error) return recipientApplicationPage(events, url.searchParams, "", result.error);
+        try {
+          await sendRecipientConfirmation(env, input.email, input.guardianName, result.event);
+          await audit(env, null, "recipient_receipt_sent", "recipient_household", result.id, result.event.id);
+          return recipientApplicationPage(events, url.searchParams, "Your application has been received for review. A receipt email is on its way.");
+        } catch (error) {
+          console.error("Recipient application receipt delivery failed", error);
+          await audit(env, null, "recipient_receipt_failed", "recipient_household", result.id, result.event.id);
+          return recipientApplicationPage(events, url.searchParams, "Your application has been received for review, but we could not send the receipt email.");
+        }
       }
       const selected = events.find((item) => item.id === url.searchParams.get("event")) || events[0];
       if (selected?.settings.recipientStatus === "code" && !(await hasRecipientAccess(request, selected.id, env.PORTAL_SESSION_SECRET))) return recipientCodePage(selected);

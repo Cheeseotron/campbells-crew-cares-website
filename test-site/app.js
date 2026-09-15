@@ -1374,7 +1374,8 @@
   }
 
   function showInvitationLink(payload) {
-    dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Invitation created</p><h2 id="dialog-title">Share this link privately</h2><p>This one-time account-setup link expires in seven days. Your new organizer will choose their own password.</p><div class="field"><label for="setup-link">Account setup link</label><input id="setup-link" value="${esc(payload.setupUrl)}" readonly></div><button class="button button--green" type="button" data-copy-setup-link>Copy link</button></div>`;
+    const delivery = payload.emailSent === false ? "We could not send the invitation email, so please share this setup link privately." : "An invitation email has been sent. This setup link is included as a backup.";
+    dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Invitation created</p><h2 id="dialog-title">Organizer invitation ready</h2><p>${delivery} The one-time account-setup link expires in seven days.</p><div class="field"><label for="setup-link">Account setup link</label><input id="setup-link" value="${esc(payload.setupUrl)}" readonly></div><button class="button button--green" type="button" data-copy-setup-link>Copy link</button></div>`;
     appDialog.showModal(); document.body.classList.add("dialog-open");
     dialogContent.querySelector("[data-copy-setup-link]").addEventListener("click", async () => { await navigator.clipboard.writeText(payload.setupUrl); toast("Invitation link copied."); });
   }
