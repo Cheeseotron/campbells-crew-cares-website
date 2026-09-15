@@ -179,6 +179,13 @@ function childProfilePdf({ child, household, event }) {
   return new TextEncoder().encode(pdf);
 }
 
+function childProfilePrintPage({ child, household, event }) {
+  const details = child.details || {}; const application = household.application || {}; const settings = eventSettings(event); const name = `${child.first_name || ""} ${child.last_name || ""}`.trim();
+  const value = (item) => escapeHtml(item || "Not provided");
+  const size = (label, item) => `<div class="size"><span>${label}</span><strong>${value(item)}</strong></div>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${value(name)} shopping profile</title><style>@page{size:letter;margin:.45in}*{box-sizing:border-box}body{margin:0;color:#111821;background:#fff;font-family:Arial,sans-serif}.sheet{min-height:9.9in;padding:24px;border:1px solid #cbd3ce;border-top:6px solid #35d32f}.eyebrow{margin:0 0 13px;color:#176b39;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{margin:0;font-size:30px;line-height:1.05}h2{margin:30px 0 11px;font-size:16px}.reference{margin:7px 0 26px;color:#617068;font-size:12px;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.box{padding:15px;background:#f3f7f3}.box span,.size span{display:block;margin-bottom:6px;color:#617068;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.box strong{font-size:14px}.sizes{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.size{padding:12px;background:#f3f7f3}.size strong{font-size:14px}.copy{line-height:1.5}.budget{display:flex;margin-top:32px;padding:16px;justify-content:space-between;gap:20px;background:#e8f7e8;border-left:5px solid #176b39;font-weight:700}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><main class="sheet"><p class="eyebrow">Campbell's Crew Cares · Child Shopping Profile</p><h1>${value(name)}</h1><p class="reference">${value(recipientApplicationReference(household.id))} · ${value(event.title)}</p><div class="grid"><div class="box"><span>Responsible party</span><strong>${value(household.guardian_name)}</strong></div><div class="box"><span>Emergency contact</span><strong>${value(application.emergencyName)} · ${value(application.emergencyPhone)}</strong></div></div><h2>Sizes</h2><div class="sizes">${size("Shirt",details.shirt)}${size("Pants",details.pants)}${size("Shoes",details.shoes)}${size("Underwear",details.underwear)}${size("Coat",details.coat)}</div><h2>Preferences & accommodations</h2><p class="copy"><strong>Preferences:</strong> ${value(details.preferences)}</p><p class="copy"><strong>Accommodations:</strong> ${value(details.accommodations)}</p><div class="budget"><span>Shopping budget: $${value(settings.shoppingBudget || "0")}</span><span>Volunteer spending total: $________________</span></div></main><script>addEventListener('load',()=>setTimeout(()=>print(),180))</script></body></html>`;
+}
+
 async function readSignedUserToken(token, env) {
   const [payload, signature, extra] = String(token || "").split(".");
   if (!payload || !signature || extra) return null;
@@ -659,6 +666,21 @@ async function api(request, env, url, user) {
     const pdf = childProfilePdf({ child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, settings_json: JSON.stringify(settings) } });
     const filename = `${String(child.first_name || "child").replace(/[^a-z0-9]+/gi, "-")}-shopping-profile.pdf`;
     return new Response(pdf, { headers: securityHeaders(new Headers({ "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${filename}"` })) });
+  }
+
+  const childProfilePrintMatch = url.pathname.match(/^\/portal-api\/organizer\/children\/([^/]+)\/profile\/print$/);
+  if (childProfilePrintMatch && request.method === "GET") {
+    if (!user) return json({ error: "Sign in required." }, 401);
+    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childProfilePrintMatch[1]).first();
+    if (!child) return json({ error: "That child record was not found." }, 404);
+    let details = {}; let application = {}; let settings = {};
+    try { details = JSON.parse(child.details_json || "{}"); } catch {}
+    try { application = JSON.parse(child.application_json || "{}"); } catch {}
+    try { settings = JSON.parse(child.settings_json || "{}"); } catch {}
+    const html = childProfilePrintPage({ child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, settings_json: JSON.stringify(settings) } });
+    const headers = securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" }));
+    headers.set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
+    return new Response(html, { headers });
   }
 
   const recipientHouseholdMatch = url.pathname.match(/^\/portal-api\/organizer\/recipients\/([^/]+)$/);
