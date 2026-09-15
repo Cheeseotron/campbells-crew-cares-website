@@ -13,6 +13,8 @@
   const pinInput = document.querySelector("#pin");
   const pinError = document.querySelector("#pin-error");
   const lockButton = document.querySelector("#lock-button");
+  const headerEventPicker = document.querySelector("#header-event-picker");
+  const headerActiveEvent = document.querySelector("#header-active-event");
   const appDialog = document.querySelector("#app-dialog");
   const dialogContent = document.querySelector("#dialog-content");
 
@@ -407,12 +409,22 @@
     });
   }
 
+  function syncHeaderActiveEvent() {
+    if (!headerEventPicker || !headerActiveEvent) return;
+    const events = SERVER_AUTH ? activeEvents() : [];
+    headerEventPicker.hidden = events.length === 0;
+    if (!events.length) return;
+    headerActiveEvent.innerHTML = events.map((event) => `<option value="${esc(event.id)}">${esc(event.title)}</option>`).join("");
+    headerActiveEvent.value = state.activeEventId;
+  }
+
   function renderRoute() {
     if (sessionStorage.getItem(SESSION_KEY) !== "yes") return;
     clearPrintState();
     let [route, subroute = "dashboard"] = routeParts();
     if (LIVE_PUBLIC_RECIPIENT) route = "recipient";
     updateNav(route);
+    syncHeaderActiveEvent();
     if (route === "volunteer") renderVolunteer();
     else if (route === "recipient") renderRecipient();
     else if (route === "organizer") renderOrganizer(subroute);
@@ -1584,6 +1596,7 @@
     }
     setUnlocked(false);
   });
+  headerActiveEvent?.addEventListener("change", () => { state.activeEventId = headerActiveEvent.value; saveState(); renderRoute(); });
   document.querySelector("[data-close-dialog]").addEventListener("click", closeDialog);
   appDialog.addEventListener("click", (event) => { if (event.target === appDialog) closeDialog(); });
   window.addEventListener("hashchange", renderRoute);
