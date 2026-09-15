@@ -336,10 +336,17 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .settings-section__body { padding: 6px 22px 24px; border-top: 1px solid var(--line); }
 .settings-section__body h3 { margin-top: 24px; }
 .editor-table { margin: 18px 0; border: 1px solid var(--line); }
+.editor-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .editor-row { display: grid; grid-template-columns: 60px 1.2fr 1fr 90px; gap: 8px; padding: 9px; align-items: center; border-bottom: 1px solid var(--line); }
 .editor-row:last-child { border-bottom: 0; }
 .editor-row--head { color: var(--gray); background: var(--mist-2); font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .editor-row input { min-width: 0; }
+.role-removal-list { display: grid; gap: 9px; margin: 24px 0; }
+.role-removal-option { display: flex; gap: 12px; align-items: center; padding: 13px 14px; border: 1px solid var(--line); background: var(--mist); cursor: pointer; }
+.role-removal-option:hover { border-color: var(--green-dark); }
+.role-removal-option input { width: 18px; height: 18px; accent-color: var(--green-dark); }
+.role-removal-option strong, .role-removal-option small { display: block; }
+.role-removal-option small { margin-top: 3px; color: var(--gray); }
 .switch input { position: absolute; opacity: 0; }
 .switch span { position: relative; display: block; width: 40px; height: 22px; background: #aab2b8; border-radius: 22px; cursor: pointer; }
 .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: .15s; }
