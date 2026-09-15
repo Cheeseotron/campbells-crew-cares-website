@@ -369,8 +369,21 @@ function volunteerSignupPage(events, message = "", error = "") {
   return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
 
+function volunteerEventChooserPage(events) {
+  const cards = events.map((event) => {
+    const roles = (Array.isArray(event.settings.roles) ? event.settings.roles : []).filter((role) => role.enabled && role.title);
+    const counts = event.volunteerSignupCounts || {};
+    const spots = roles.reduce((total, role) => total + Math.max(0, (Number(role.capacity) || 0) - (Number(counts[role.title]) || 0)), 0);
+    const date = event.event_date || event.settings.date || "Date to be announced";
+    return `<article class="event-choice"><p class="eyebrow">Volunteer opportunity</p><h2>${escapeHtml(event.title)}</h2><p><strong>${escapeHtml(date)} · ${escapeHtml(event.settings.time || "Time to be announced")}</strong><br>${escapeHtml(event.settings.location || "Location to be announced")}</p><div class="choice-footer"><span>${spots} ${spots === 1 ? "spot" : "spots"} open</span><a href="/volunteer?event=${encodeURIComponent(event.id)}">Choose this event →</a></div></article>`;
+  }).join("");
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Choose an event | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--forest:#176b39;--mist:#eef3ef;--line:#d2d9d4;--gray:#617068}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#fff;color:var(--ink);font-family:Arial,sans-serif}main{width:min(100% - 40px,900px);margin:52px auto 70px}.back,.eyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.back{display:inline-block;margin:0 0 30px;color:var(--forest);text-decoration:none}.eyebrow{color:var(--forest)}h1{margin:0 0 12px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(36px,6vw,56px);line-height:.95;letter-spacing:-.05em;text-transform:uppercase}.intro{max-width:620px;margin-bottom:30px;color:var(--gray);line-height:1.55}.choices{display:grid;gap:16px}.event-choice{padding:28px;border:1px solid var(--line);border-left:6px solid var(--green);background:#fff;box-shadow:0 14px 36px rgba(17,24,33,.08)}.event-choice h2{margin:8px 0 12px;font-size:25px}.event-choice p:not(.eyebrow){margin:0;color:var(--gray);line-height:1.55}.event-choice p strong{color:var(--ink)}.choice-footer{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-top:22px;font-weight:800}.choice-footer span{color:var(--forest)}.choice-footer a{display:inline-flex;min-height:46px;padding:0 17px;align-items:center;background:var(--green);color:var(--ink);font-size:10px;letter-spacing:.1em;text-decoration:none;text-transform:uppercase}@media(max-width:620px){main{width:min(100% - 26px,900px);margin-top:28px}.event-choice{padding:23px}.choice-footer{align-items:stretch;flex-direction:column}.choice-footer a{justify-content:center}}</style></head><body><main><a class="back" href="/">← Back to Campbell's Crew Cares</a><p class="eyebrow">Volunteer signup</p><h1>Choose an event.</h1><p class="intro">Campbell's Crew has more than one volunteer opportunity open. Select the event you would like to support.</p><div class="choices">${cards}</div></main></body></html>`;
+  return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
+}
+
 function liveVolunteerSignupPage(events, query, message = "", error = "") {
   if (!events.length) return portalStatusPage("Volunteer opportunities", "There are no public volunteer opportunities open right now. Please check back when the next event is announced.");
+  if (events.length > 1 && !query.get("event")) return volunteerEventChooserPage(events);
   const event = events.find((item) => item.id === query.get("event")) || events[0];
   const roles = (Array.isArray(event.settings.roles) ? event.settings.roles : []).filter((role) => role.enabled && role.title);
   const signupCounts = event.volunteerSignupCounts || {};
