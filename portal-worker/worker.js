@@ -145,6 +145,40 @@ async function servePortalAsset(request, env, url) {
   return new Response(asset.body, { status: asset.status, headers });
 }
 
+function pdfSafeText(value) {
+  return String(value || "").normalize("NFKD").replace(/[^\x20-\x7E]/g, "").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)").trim();
+}
+
+function pdfLines(value, width = 72) {
+  const words = pdfSafeText(value).split(/\s+/).filter(Boolean); const lines = []; let line = "";
+  words.forEach((word) => { const next = line ? `${line} ${word}` : word; if (next.length > width && line) { lines.push(line); line = word; } else line = next; });
+  if (line) lines.push(line); return lines.length ? lines : ["Not provided"];
+}
+
+function childProfilePdf({ child, household, event }) {
+  const details = child.details || {}; const application = household.application || {}; const settings = eventSettings(event);
+  const line = (text, x, y, size = 10, font = "F1") => `BT /${font} ${size} Tf ${x} ${y} Td (${pdfSafeText(text)}) Tj ET`;
+  const wrapped = (label, text, x, y) => [line(label, x, y, 9, "F2"), ...pdfLines(text).slice(0, 4).map((part, index) => line(part, x, y - 15 - index * 13, 10))];
+  const name = `${child.first_name || ""} ${child.last_name || ""}`.trim();
+  const content = [
+    "0.09 0.42 0.22 rg", "72 736 468 4 re f", "0.93 0.96 0.93 rg", "54 54 504 684 re f", "0.11 0.15 0.13 RG", "54 54 504 684 re S",
+    line("CAMPBELL'S CREW CARES - CHILD SHOPPING PROFILE", 76, 708, 11, "F2"), line(name, 76, 675, 23, "F2"), line(`${recipientApplicationReference(household.id)} - ${event.title || "Event"}`, 76, 657, 10, "F2"),
+    "0.95 0.97 0.95 rg", "76 585 220 48 re f", "316 585 220 48 re f",
+    line("RESPONSIBLE PARTY", 88, 616, 8, "F2"), line(household.guardian_name, 88, 597, 12, "F2"), line("EMERGENCY CONTACT", 328, 616, 8, "F2"), line(`${application.emergencyName || "Not provided"} - ${application.emergencyPhone || "Not provided"}`, 328, 597, 11, "F2"),
+    line("SIZES", 76, 550, 12, "F2"),
+    ...[["SHIRT", details.shirt],["PANTS", details.pants],["SHOES", details.shoes],["UNDERWEAR", details.underwear],["COAT", details.coat]].flatMap(([label, value], index) => [line(label, 76 + index * 93, 526, 8, "F2"), line(value || "Not provided", 76 + index * 93, 509, 11, "F2")]),
+    ...wrapped("PREFERENCES", details.preferences, 76, 465), ...wrapped("ACCOMMODATIONS", details.accommodations, 76, 395),
+    "0.90 0.97 0.90 rg", "76 116 460 48 re f", "0.09 0.42 0.22 rg", "76 116 5 48 re f", line(`SHOPPING BUDGET: $${settings.shoppingBudget || "0"}`, 94, 139, 12, "F2"), line("VOLUNTEER SPENDING TOTAL: $________________", 302, 139, 10, "F1"),
+    line("Campbell's Crew Cares - volunteer packet", 76, 78, 8, "F1")
+  ].join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>", `<< /Length ${new TextEncoder().encode(content).length} >>\nstream\n${content}\nendstream`
+  ];
+  let pdf = "%PDF-1.4\n"; const offsets = [0]; objects.forEach((object, index) => { offsets.push(new TextEncoder().encode(pdf).length); pdf += `${index + 1} 0 obj\n${object}\nendobj\n`; }); const xref = new TextEncoder().encode(pdf).length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("")}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return new TextEncoder().encode(pdf);
+}
+
 async function readSignedUserToken(token, env) {
   const [payload, signature, extra] = String(token || "").split(".");
   if (!payload || !signature || extra) return null;
@@ -611,6 +645,20 @@ async function api(request, env, url, user) {
     await env.DB.prepare("UPDATE recipient_children SET photo_key = ? WHERE id = ?").bind(photoKey, child.id).run();
     await audit(env, user, "recipient_child_photo_saved", "recipient_child", child.id);
     return json({ photoUrl: `/portal-api/organizer/children/${encodeURIComponent(child.id)}/photo` });
+  }
+
+  const childProfilePdfMatch = url.pathname.match(/^\/portal-api\/organizer\/children\/([^/]+)\/profile\.pdf$/);
+  if (childProfilePdfMatch && request.method === "GET") {
+    if (!user) return json({ error: "Sign in required." }, 401);
+    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childProfilePdfMatch[1]).first();
+    if (!child) return json({ error: "That child record was not found." }, 404);
+    let details = {}; let application = {}; let settings = {};
+    try { details = JSON.parse(child.details_json || "{}"); } catch {}
+    try { application = JSON.parse(child.application_json || "{}"); } catch {}
+    try { settings = JSON.parse(child.settings_json || "{}"); } catch {}
+    const pdf = childProfilePdf({ child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, settings_json: JSON.stringify(settings) } });
+    const filename = `${String(child.first_name || "child").replace(/[^a-z0-9]+/gi, "-")}-shopping-profile.pdf`;
+    return new Response(pdf, { headers: securityHeaders(new Headers({ "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${filename}"` })) });
   }
 
   const recipientHouseholdMatch = url.pathname.match(/^\/portal-api\/organizer\/recipients\/([^/]+)$/);

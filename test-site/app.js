@@ -1217,6 +1217,10 @@
     document.querySelectorAll("[data-print-mode]").forEach((button) => button.addEventListener("click", (event) => {
       event.preventDefault(); event.stopPropagation();
       if (window.location.hash !== "#organizer/packets") return;
+      if (button.dataset.printMode === "child" && button.dataset.printChild) {
+        window.open(`/portal-api/organizer/children/${encodeURIComponent(button.dataset.printChild)}/profile.pdf`, "_blank", "noopener");
+        return;
+      }
       clearPrintState();
       document.body.dataset.printMode = button.dataset.printMode;
       document.body.dataset.printChild = button.dataset.printChild || "all";
