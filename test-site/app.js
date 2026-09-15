@@ -1465,6 +1465,8 @@
       if (item.archived) { toast("Closed-out application records are read-only."); return; }
       const child = item.children.find((record) => record.id === button.dataset.childId); if (!child) return;
       const decision = button.dataset.childDecision;
+      const decisionLabel = formatStatus(decision);
+      if (!window.confirm(`Mark ${child.name} as ${decisionLabel}?${["approved", "declined", "waitlisted"].includes(decision) ? " This will also email the guardian." : ""}`)) return;
       if (SERVER_AUTH) {
         button.disabled = true;
         try {
