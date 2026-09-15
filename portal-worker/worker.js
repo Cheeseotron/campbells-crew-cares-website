@@ -568,6 +568,21 @@ async function api(request, env, url, user) {
     return json({ recipients });
   }
 
+  const recipientHouseholdMatch = url.pathname.match(/^\/portal-api\/organizer\/recipients\/([^/]+)$/);
+  if (recipientHouseholdMatch && request.method === "DELETE") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
+    const household = await env.DB.prepare("SELECT id, event_id, guardian_name FROM recipient_households WHERE id = ?").bind(recipientHouseholdMatch[1]).first();
+    if (!household) return json({ error: "That recipient application was not found." }, 404);
+    const { results: children } = await env.DB.prepare("SELECT photo_key FROM recipient_children WHERE household_id = ?").bind(household.id).all();
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM recipient_children WHERE household_id = ?").bind(household.id),
+      env.DB.prepare("DELETE FROM recipient_households WHERE id = ?").bind(household.id)
+    ]);
+    await Promise.all(children.filter((child) => child.photo_key).map((child) => env.PRIVATE_UPLOADS.delete(child.photo_key)));
+    await audit(env, user, "recipient_application_deleted", "recipient_household", household.id, household.event_id);
+    return json({ id: household.id });
+  }
+
   const recipientDecisionMatch = url.pathname.match(/^\/portal-api\/organizer\/recipients\/([^/]+)\/children\/([^/]+)$/);
   if (recipientDecisionMatch && request.method === "PATCH") {
     if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
