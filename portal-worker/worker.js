@@ -316,7 +316,11 @@ function eventSettings(event) {
 
 async function publicVolunteerEvents(env) {
   const { results } = await env.DB.prepare("SELECT id, title, event_date, settings_json FROM events WHERE status = 'open' AND event_type IN ('shopping', 'food_bag') ORDER BY event_date ASC").all();
-  return results.map((event) => ({ ...event, settings: eventSettings(event) })).filter((event) => ["open", "code"].includes(event.settings.volunteerStatus));
+  const events = results.map((event) => ({ ...event, settings: eventSettings(event) })).filter((event) => ["open", "code"].includes(event.settings.volunteerStatus));
+  return Promise.all(events.map(async (event) => {
+    const { results: signups } = await env.DB.prepare("SELECT role, COUNT(*) AS count FROM volunteer_signups WHERE event_id = ? GROUP BY role").bind(event.id).all();
+    return { ...event, volunteerSignupCounts: Object.fromEntries(signups.map((signup) => [signup.role, Number(signup.count) || 0])) };
+  }));
 }
 
 async function publicRecipientEvents(env) {
@@ -369,7 +373,9 @@ function liveVolunteerSignupPage(events, query, message = "", error = "") {
   if (!events.length) return portalStatusPage("Volunteer opportunities", "There are no public volunteer opportunities open right now. Please check back when the next event is announced.");
   const event = events.find((item) => item.id === query.get("event")) || events[0];
   const roles = (Array.isArray(event.settings.roles) ? event.settings.roles : []).filter((role) => role.enabled && role.title);
-  const totalSpots = roles.reduce((total, role) => total + Math.max(0, Number(role.capacity) || 0), 0);
+  const signupCounts = event.volunteerSignupCounts || {};
+  const spotsOpen = (role) => Math.max(0, (Number(role.capacity) || 0) - (Number(signupCounts[role.title]) || 0));
+  const totalSpots = roles.reduce((total, role) => total + spotsOpen(role), 0);
   const selectedRole = roles.find((role) => role.title === query.get("role")) || roles[0];
   const step = query.get("step") || "home";
   const accessToken = query.get("access") || "";
@@ -379,7 +385,7 @@ function liveVolunteerSignupPage(events, query, message = "", error = "") {
   const date = event.event_date || event.settings.date || "Date to be announced";
   const location = event.settings.location || "Location to be announced";
   const address = event.settings.address || "";
-  const roleCards = roles.map((role) => `<label class="role-card"><input type="radio" name="role" value="${escapeHtml(role.title)}" ${selectedRole?.title === role.title ? "checked" : ""}><span><strong>${escapeHtml(role.title)}</strong><b>${escapeHtml(role.shift || "Shift to be announced")} · ${escapeHtml(role.capacity || 0)} spots</b><small>${escapeHtml(role.description || "Help make this event possible.")}</small></span></label>`).join("");
+  const roleCards = roles.map((role) => `<label class="role-card"><input type="radio" name="role" value="${escapeHtml(role.title)}" ${selectedRole?.title === role.title ? "checked" : ""} ${spotsOpen(role) ? "" : "disabled"}><span><strong>${escapeHtml(role.title)}</strong><b>${escapeHtml(role.shift || "Shift to be announced")} · ${spotsOpen(role)} spots open</b><small>${escapeHtml(role.description || "Help make this event possible.")}</small></span></label>`).join("");
   const home = `<a class="back" href="/">← Back to Campbell's Crew Cares</a>${notice}<article class="event-card"><div class="open-bar"><span>Registration open</span><span>${totalSpots} spots open</span></div><div class="event-body"><div class="date-block"><small>${escapeHtml(date.split(" ")[0] || "Event")}</small><strong>${escapeHtml((date.match(/\b\d{1,2}\b/) || ["--"])[0])}</strong></div><div class="event-copy"><p class="eyebrow">Featured event</p><h1>${escapeHtml(event.title)}</h1><p><b>${escapeHtml(date)} · ${escapeHtml(event.settings.time || "Time to be announced")}</b><br>${escapeHtml(location)}</p><div class="actions"><a class="button dark" href="/volunteer?event=${encodeURIComponent(event.id)}&step=roles${access}">Choose a role →</a><a class="button light" href="/volunteer?event=${encodeURIComponent(event.id)}&details=1${access}">Event details</a></div></div></div></article>`;
   const roleStep = `<article class="step-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}${access}" aria-label="Back">×</a><p class="eyebrow">Step 1 of 2</p><h1>How would you<br>like to help?</h1><form method="get" action="/volunteer"><input type="hidden" name="event" value="${escapeHtml(event.id)}"><input type="hidden" name="step" value="details"><input type="hidden" name="access" value="${escapeHtml(accessToken)}">${roleCards}<button class="button dark" ${roles.length ? "" : "disabled"}>Continue with ${escapeHtml(selectedRole?.title || "selected role")} →</button></form></article>`;
   const detailStep = `<article class="step-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}&step=roles&role=${encodeURIComponent(selectedRole?.title || "")}${access}" aria-label="Back">←</a><p class="eyebrow">Step 2 of 2</p><h1>A few details,<br>and you're in.</h1>${notice}<div class="selected-role"><span>Selected role</span><strong>${escapeHtml(selectedRole?.title || "Volunteer")}</strong><small>${escapeHtml(selectedRole?.shift || "")}</small></div><form method="post" action="/volunteer"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><input type="hidden" name="role" value="${escapeHtml(selectedRole?.title || "")}"><input type="hidden" name="access" value="${escapeHtml(accessToken)}"><div class="grid"><label>First name<input name="firstName" autocomplete="given-name" required></label><label>Last name<input name="lastName" autocomplete="family-name" required></label></div><label>Email address<input name="email" type="email" autocomplete="email" required></label><label>Mobile phone<input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 555-5555" required></label>${event.settings.questions?.shirtSize ? `<label>T-shirt size<select name="shirt" required><option value="">Choose size</option><option>Adult S</option><option>Adult M</option><option>Adult L</option><option>Adult XL</option><option>Adult 2XL</option><option>Adult 3XL</option></select></label>` : ""}${event.settings.questions?.volunteerNotes ? `<label>Special notes <small>(optional)</small><textarea name="notes" placeholder="Anything organizers should know?"></textarea></label>` : ""}<label class="check"><input name="agreement" type="checkbox" required><span>I agree to follow Campbell's Crew Cares event and child-safety instructions. I understand that Campbell's Crew keeps volunteer participation records for future event coordination.</span></label><button class="button dark">Complete signup →</button></form></article>`;
@@ -393,13 +399,16 @@ function liveVolunteerSignupPage(events, query, message = "", error = "") {
 async function registerVolunteer(env, input, codeGranted = false) {
   const event = await env.DB.prepare("SELECT id, title, settings_json FROM events WHERE id = ? AND status = 'open'").bind(input.eventId).first();
   const settings = event ? eventSettings(event) : null;
-  const roles = Array.isArray(settings?.roles) ? settings.roles.filter((role) => role.enabled).map((role) => role.title) : [];
+  const roles = Array.isArray(settings?.roles) ? settings.roles.filter((role) => role.enabled && role.title) : [];
   const status = settings?.volunteerStatus;
   const codeMatches = status === "code" && String(input.accessCode || "").trim() === String(settings.volunteerCode || "").trim();
-  if (!event || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches) || !roles.includes(String(input.role || ""))) return { error: "That volunteer opportunity is not available." };
+  const selectedRole = roles.find((role) => role.title === String(input.role || ""));
+  if (!event || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches) || !selectedRole) return { error: "That volunteer opportunity is not available." };
   if (!input.name || !input.email || !input.phone || !input.role) return { error: "Please complete your name, email, phone number, and volunteer role." };
   if (!isValidEmailAddress(input.email)) return { error: "Enter a complete email address, such as name@example.com." };
   const email = String(input.email).trim().toLowerCase();
+  const currentRoleSignups = await env.DB.prepare("SELECT COUNT(*) AS count FROM volunteer_signups WHERE event_id = ? AND role = ?").bind(event.id, selectedRole.title).first();
+  if ((Number(currentRoleSignups?.count) || 0) >= (Number(selectedRole.capacity) || 0)) return { error: "That volunteer role is now full. Please choose another open role." };
   let profile = await env.DB.prepare("SELECT id FROM volunteer_profiles WHERE email = ?").bind(email).first();
   if (!profile) {
     profile = { id: randomId("volunteer") };
