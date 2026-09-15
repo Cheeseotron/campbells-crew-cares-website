@@ -386,6 +386,9 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .application-row { display: grid; grid-template-columns: 1fr 1.2fr 1fr auto; padding: 17px; align-items: center; gap: 16px; background: var(--white); border: 1px solid var(--line); }
 .application-row strong, .application-row small { display: block; }
 .application-row small { margin-top: 4px; color: var(--gray); }
+.application-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 7px; color: var(--gray); font-size: 11px; line-height: 1.35; }
+.application-meta span { padding-right: 10px; border-right: 1px solid var(--line); }
+.application-meta span:last-child { padding-right: 0; border-right: 0; }
 .application-row > div:last-child { display: grid; justify-items: end; gap: 7px; }
 .child-chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .child-chip-list > span { padding: 8px 10px; background: var(--mist-2); }

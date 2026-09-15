@@ -29,6 +29,10 @@ function isValidEmailAddress(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || "").trim());
 }
 
+function normalizedMatchValue(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 function randomId(prefix) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
@@ -459,9 +463,18 @@ async function registerRecipient(env, input, codeGranted = false) {
   if (!event || event.event_type !== "shopping" || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches)) return { error: "That recipient application is not available." };
   if (!input.guardianName || !input.email || !input.phone || !Array.isArray(input.children) || !input.children.length) return { error: "Please complete the responsible party information and add at least one child." };
   if (!isValidEmailAddress(input.email)) return { error: "Enter a complete email address, such as name@example.com." };
+  const email = String(input.email).trim().toLowerCase();
+  const phone = String(input.phone).trim();
+  const address = input.address && typeof input.address === "object" ? input.address : {};
+  const { results: existingHouseholds } = await env.DB.prepare("SELECT email, phone, address_json FROM recipient_households WHERE event_id = ?").bind(event.id).all();
+  const flags = [];
+  if (existingHouseholds.some((household) => household.email === email)) flags.push("Email used on another application");
+  if (existingHouseholds.some((household) => normalizedMatchValue(household.phone) === normalizedMatchValue(phone))) flags.push("Phone used on another application");
+  const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
+  if (addressKey && existingHouseholds.some((household) => { try { const saved = JSON.parse(household.address_json || "{}"); return normalizedMatchValue(`${saved.address || ""}${saved.zip || ""}`) === addressKey; } catch { return false; } })) flags.push("Household address matches another application");
   const householdId = recipientApplicationReference();
-  await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .bind(householdId, event.id, String(input.guardianName).slice(0, 120), String(input.email).trim().toLowerCase(), String(input.phone).slice(0, 30), JSON.stringify(input.address || {}), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000), ...(input.application && typeof input.application === "object" ? input.application : {}) })).run();
+  await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, flags_json, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(householdId, event.id, String(input.guardianName).slice(0, 120), email, phone.slice(0, 30), JSON.stringify(flags), JSON.stringify(address), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000), ...(input.application && typeof input.application === "object" ? input.application : {}) })).run();
   for (const child of input.children.slice(0, 12)) {
     if (!child.firstName || !child.lastName) continue;
     const childId = randomId("child");
@@ -476,7 +489,7 @@ async function registerRecipient(env, input, codeGranted = false) {
     if (photoKey) await env.DB.prepare("UPDATE recipient_children SET photo_key = ? WHERE id = ?").bind(photoKey, childId).run();
   }
   await audit(env, null, "recipient_application_submitted", "recipient_household", householdId, event.id);
-  return { id: householdId, event };
+  return { id: householdId, event, flags };
 }
 
 async function audit(env, actor, action, targetType, targetId, eventId = null, metadata = {}) {
@@ -557,13 +570,19 @@ async function api(request, env, url, user) {
 
   if (url.pathname === "/portal-api/organizer/recipients" && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
-    const { results } = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, h.phone, h.status, h.created_at, h.address_json, h.application_json, e.title AS event_title FROM recipient_households h JOIN events e ON e.id = h.event_id ORDER BY h.created_at DESC").all();
+    const { results } = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, h.phone, h.status, h.flags_json, h.created_at, h.address_json, h.application_json, e.title AS event_title FROM recipient_households h JOIN events e ON e.id = h.event_id ORDER BY h.created_at DESC").all();
     const recipients = await Promise.all(results.map(async (household) => {
       const { results: children } = await env.DB.prepare("SELECT id, first_name, last_name, birth_date, status, details_json FROM recipient_children WHERE household_id = ? ORDER BY first_name, last_name").bind(household.id).all();
-      let address = {}; let application = {};
+      let address = {}; let application = {}; let flags = [];
       try { address = JSON.parse(household.address_json || "{}"); } catch {}
       try { application = JSON.parse(household.application_json || "{}"); } catch {}
-      return { ...household, reference_code: recipientApplicationReference(household.id), address, application, children: children.map((child) => { let details = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} return { ...child, details }; }) };
+      try { flags = JSON.parse(household.flags_json || "[]"); } catch {}
+      const otherHouseholds = results.filter((other) => other.id !== household.id);
+      if (otherHouseholds.some((other) => other.event_id === household.event_id && other.email === household.email) && !flags.includes("Email used on another application")) flags.push("Email used on another application");
+      if (otherHouseholds.some((other) => other.event_id === household.event_id && normalizedMatchValue(other.phone) === normalizedMatchValue(household.phone)) && !flags.includes("Phone used on another application")) flags.push("Phone used on another application");
+      const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
+      if (addressKey && otherHouseholds.some((other) => { try { const saved = JSON.parse(other.address_json || "{}"); return other.event_id === household.event_id && normalizedMatchValue(`${saved.address || ""}${saved.zip || ""}`) === addressKey; } catch { return false; } }) && !flags.includes("Household address matches another application")) flags.push("Household address matches another application");
+      return { ...household, reference_code: recipientApplicationReference(household.id), address, application, flags, children: children.map((child) => { let details = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} return { ...child, details }; }) };
     }));
     return json({ recipients });
   }
