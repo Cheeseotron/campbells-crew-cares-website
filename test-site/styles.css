@@ -60,6 +60,8 @@ h1, h2, h3, p { margin-top: 0; }
 /* Shared shell */
 .app-shell { min-height: 100vh; background: var(--white); }
 .app-shell > #main { margin: 0; padding: 0; }
+html[data-live-public-recipient="true"] .app-header,
+html[data-live-public-recipient="true"] .app-footer { display: none; }
 /* The old prototype notice occupied this spot. The live organizer starts
    directly beneath its header. */
 .app-shell > .prototype-notice { display: none !important; }
