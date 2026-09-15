@@ -114,6 +114,13 @@ export default {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/test-site")) return new Response("Not found", { status: 404 });
 
+    // The former prototype used hash routes such as /test-site/#volunteer.
+    // Fragments never reach the server, so always send its entry page to the
+    // database-backed public signup instead of reviving the retired prototype.
+    if (url.pathname === "/test-site" || url.pathname === "/test-site/") {
+      return Response.redirect(`${url.origin}/volunteer`, 302);
+    }
+
     if (!env.TEST_SITE_PIN || !env.SESSION_SECRET) {
       return new Response("The private test site is not configured.", { status: 503, headers: securityHeaders() });
     }
@@ -148,7 +155,6 @@ export default {
 
     const authenticated = await verifySession(readCookie(request, COOKIE_NAME), env.SESSION_SECRET);
     if (!authenticated) return loginPage();
-    if (url.pathname === "/test-site") return Response.redirect(`${url.origin}/test-site/`, 308);
     return serveProtectedAsset(request, env, url);
   }
 };
