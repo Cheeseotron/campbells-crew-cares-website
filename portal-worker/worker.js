@@ -29,6 +29,16 @@ function randomId(prefix) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
 
+function recipientApplicationReference(value = null) {
+  if (typeof value === "string" && /^CCC-\d{6}$/.test(value)) return value;
+  if (value) {
+    let hash = 2166136261;
+    for (const character of String(value)) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+    return `CCC-${String((hash >>> 0) % 1000000).padStart(6, "0")}`;
+  }
+  return `CCC-${String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0")}`;
+}
+
 function photoFromDataUrl(value) {
   if (!value || typeof value !== "string") return null;
   const match = value.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
@@ -409,7 +419,7 @@ async function registerRecipient(env, input, codeGranted = false) {
   const codeMatches = status === "code" && String(input.accessCode || "").trim() === String(settings.recipientCode || "").trim();
   if (!event || event.event_type !== "shopping" || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches)) return { error: "That recipient application is not available." };
   if (!input.guardianName || !input.email || !input.phone || !Array.isArray(input.children) || !input.children.length) return { error: "Please complete the responsible party information and add at least one child." };
-  const householdId = randomId("household");
+  const householdId = recipientApplicationReference();
   await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .bind(householdId, event.id, String(input.guardianName).slice(0, 120), String(input.email).trim().toLowerCase(), String(input.phone).slice(0, 30), JSON.stringify(input.address || {}), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000), ...(input.application && typeof input.application === "object" ? input.application : {}) })).run();
   for (const child of input.children.slice(0, 12)) {
@@ -507,8 +517,15 @@ async function api(request, env, url, user) {
 
   if (url.pathname === "/portal-api/organizer/recipients" && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
-    const { results } = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, h.phone, h.status, h.created_at, e.title AS event_title, COUNT(c.id) AS child_count, GROUP_CONCAT(TRIM(COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '')), '||') AS child_names FROM recipient_households h JOIN events e ON e.id = h.event_id LEFT JOIN recipient_children c ON c.household_id = h.id GROUP BY h.id ORDER BY h.created_at DESC").all();
-    return json({ recipients: results });
+    const { results } = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, h.phone, h.status, h.created_at, h.address_json, h.application_json, e.title AS event_title FROM recipient_households h JOIN events e ON e.id = h.event_id ORDER BY h.created_at DESC").all();
+    const recipients = await Promise.all(results.map(async (household) => {
+      const { results: children } = await env.DB.prepare("SELECT id, first_name, last_name, birth_date, details_json FROM recipient_children WHERE household_id = ? ORDER BY first_name, last_name").bind(household.id).all();
+      let address = {}; let application = {};
+      try { address = JSON.parse(household.address_json || "{}"); } catch {}
+      try { application = JSON.parse(household.application_json || "{}"); } catch {}
+      return { ...household, reference_code: recipientApplicationReference(household.id), address, application, children: children.map((child) => { let details = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} return { ...child, details }; }) };
+    }));
+    return json({ recipients });
   }
 
   if (url.pathname === "/portal-api/organizer/reports" && request.method === "GET") {

@@ -290,23 +290,32 @@
     if (!response.ok) throw new Error("The live recipient applications could not be loaded.");
     const payload = await response.json();
     state.applications = (payload.recipients || []).map((record) => {
-      const names = String(record.child_names || "").split("||").map((name) => name.trim()).filter(Boolean);
-      const count = Math.max(Number(record.child_count) || 0, names.length);
+      const address = record.address && typeof record.address === "object" ? record.address : {};
+      const application = record.application && typeof record.application === "object" ? record.application : {};
       return {
         id: record.id,
+        referenceCode: record.reference_code || record.id,
         guardian: record.guardian_name || "",
         email: record.email || "",
         phone: record.phone || "",
+        address: address.address || "",
+        city: address.city || "",
+        zip: address.zip || "",
+        referral: application.referral || "",
+        emergencyName: application.emergencyName || "",
+        emergencyPhone: application.emergencyPhone || "",
+        emergencyRelation: application.emergencyRelation || "",
+        notes: application.notes || "",
         submitted: record.created_at || "",
         status: record.status || "submitted",
         archived: false,
         eventName: record.event_title || "",
         flags: [],
         previousAttendance: [],
-        children: Array.from({ length: count }, (_, index) => {
-          const name = names[index] || `Child ${index + 1}`;
-          const parts = name.split(/\s+/);
-          return { id: `${record.id}-child-${index}`, name, firstName: parts[0] || "", lastName: parts.slice(1).join(" "), age: "", decision: "review", attendance: "expected" };
+        children: (record.children || []).map((child) => {
+          const details = child.details && typeof child.details === "object" ? child.details : {};
+          const firstName = child.first_name || ""; const lastName = child.last_name || "";
+          return { id: child.id, name: `${firstName} ${lastName}`.trim(), firstName, lastName, birthdate: child.birth_date || "", age: "", gender: details.gender || "", shirt: details.shirt || "", pants: details.pants || "", shoes: details.shoes || "", underwear: details.underwear || "", coat: details.coat || "", preferences: details.preferences || "", accommodations: details.accommodations || "", decision: "review", attendance: "expected" };
         })
       };
     });
@@ -1427,7 +1436,7 @@
   function openApplication(id) {
     const item = state.applications.find((record) => record.id === id);
     if (!item) return;
-    dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Recipient application ${esc(item.id)}</p><h2 id="dialog-title">${esc(item.guardian)}</h2><p class="dialog-subtitle">Submitted ${esc(item.submitted)} · ${statusPill(item.status)}</p>
+    dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Recipient application ${esc(item.referenceCode || item.id)}</p><h2 id="dialog-title">${esc(item.guardian)}</h2><p class="dialog-subtitle">Submitted ${esc(item.submitted)} · ${statusPill(item.status)}</p>
       ${(item.flags.length || item.updated || (item.previousAttendance || []).length) ? `<div class="dialog-section"><h3>Review history & flags</h3><div class="flag-list">${item.updated ? `<span class="flag flag--blue">Application updated · possible review</span>` : ""}${(item.previousAttendance || []).map((entry) => `<span class="flag ${entry.result === "No-show" ? "flag--danger" : ""}">${esc(entry.event)} · ${esc(entry.result)}</span>`).join("")}${item.flags.map((flag) => `<span class="flag">${esc(flag)}</span>`).join("")}</div><p class="field-help">Flags organize human review. They never automatically reject a family.</p></div>` : ""}
       <div class="dialog-section"><h3>Household</h3><div class="detail-grid"><div class="detail-item"><span>Email</span><strong>${esc(item.email)}</strong></div><div class="detail-item"><span>Phone</span><strong>${esc(item.phone)}</strong></div><div class="detail-item"><span>Address</span><strong>${esc(item.address)}, ${esc(item.city)}, AZ ${esc(item.zip)}</strong></div><div class="detail-item"><span>Referral</span><strong>${esc(item.referral)}</strong></div><div class="detail-item"><span>Emergency contact</span><strong>${esc(item.emergencyName)}</strong></div><div class="detail-item"><span>Emergency phone</span><strong>${esc(item.emergencyPhone)}</strong></div></div></div>
       <div class="dialog-section"><h3>Independent child decisions</h3><p class="field-help">Choose a separate outcome for every child in this household.</p>${item.children.map((child) => `<div class="child-card"><div class="child-card__heading"><strong>${esc(child.name)} · Age ${esc(child.age)} · ${esc(child.gender)}</strong>${statusPill(child.decision || "review")}</div><p>Shirt ${esc(child.shirt)} · Pants ${esc(child.pants)} · Shoes ${esc(child.shoes)} · Underwear ${esc(child.underwear)} · Coat ${esc(child.coat)}</p><p><strong>Preferences:</strong> ${esc(child.preferences)}</p><p><strong>Accommodations:</strong> ${esc(child.accommodations)}</p><div class="child-decision-actions"><button type="button" data-child-decision="approved" data-child-id="${esc(child.id)}">Approve</button><button type="button" data-child-decision="info" data-child-id="${esc(child.id)}">Needs information</button><button type="button" data-child-decision="waitlisted" data-child-id="${esc(child.id)}">Waitlist</button><button type="button" data-child-decision="declined" data-child-id="${esc(child.id)}">Decline</button></div></div>`).join("")}</div></div>`;
