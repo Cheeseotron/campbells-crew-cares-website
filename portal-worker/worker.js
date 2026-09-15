@@ -213,11 +213,11 @@ async function sendRecipientConfirmation(env, recipient, guardianName, event) {
   await sendEmail(env, recipient, `Application received: ${emailLine(event.title)}`, `Hi ${emailLine(guardianName)},\n\nYour Campbell's Crew Cares application for ${emailLine(event.title)} has been received and is now awaiting review.\n\nEvent date: ${details.date}\n\nSubmitting an application does not guarantee approval. We will contact you if we need more information or when there is an update.`);
 }
 
-async function sendRecipientDecisionEmail(env, recipient, guardianName, childName, decision, event) {
+async function sendRecipientDecisionEmail(env, recipient, guardianName, childName, decision, event, decisionNote = "") {
   const details = eventEmailDetails(event);
   const messages = {
     approved: { subject: `Approved: ${emailLine(event.title)}`, body: `We are happy to let you know that ${emailLine(childName)} has been approved for ${emailLine(event.title)}.\n\nDate: ${details.date}\nTime: ${details.time}\nLocation: ${details.location}${details.address ? `\nAddress: ${details.address}` : ""}\n\nWe look forward to seeing you there.` },
-    declined: { subject: `Application update: ${emailLine(event.title)}`, body: `Thank you for applying for ${emailLine(event.title)}. At this time, we are unable to offer ${emailLine(childName)} a place in this event.\n\nWe appreciate your understanding and hope you will consider future Campbell's Crew Cares events.` },
+    declined: { subject: `An update on ${emailLine(childName)}’s application`, body: `Thank you for taking the time to apply for ${emailLine(event.title)}. After careful review, we are unable to offer ${emailLine(childName)} a place in this event.\n\nReason provided by the Campbell's Crew Cares team:\n${emailLine(decisionNote)}\n\nWe understand this may be disappointing. We appreciate your understanding and hope you will consider future Campbell's Crew Cares opportunities.` },
     waitlisted: { subject: `Waitlist update: ${emailLine(event.title)}`, body: `${emailLine(childName)} has been placed on the waitlist for ${emailLine(event.title)}.\n\nWe will contact you if a place becomes available. Please do not make event plans until you receive a separate approval message.` }
   };
   const message = messages[decision];
@@ -607,22 +607,26 @@ async function api(request, env, url, user) {
     if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
     const input = await request.json();
     const decision = String(input.decision || "");
+    const decisionNote = String(input.decisionNote || "").trim().slice(0, 1000);
     if (!["approved", "declined", "waitlisted", "needs_information", "review"].includes(decision)) return json({ error: "That decision is not supported." }, 400);
+    if (decision === "declined" && !decisionNote) return json({ error: "Please provide a reason before declining this application." }, 400);
     const household = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, e.title, e.event_date, e.settings_json FROM recipient_households h JOIN events e ON e.id = h.event_id WHERE h.id = ?").bind(recipientDecisionMatch[1]).first();
     if (!household) return json({ error: "That recipient household was not found." }, 404);
-    const child = await env.DB.prepare("SELECT id, first_name, last_name FROM recipient_children WHERE id = ? AND household_id = ?").bind(recipientDecisionMatch[2], household.id).first();
+    const child = await env.DB.prepare("SELECT id, first_name, last_name, details_json FROM recipient_children WHERE id = ? AND household_id = ?").bind(recipientDecisionMatch[2], household.id).first();
     if (!child) return json({ error: "That child was not found in this household." }, 404);
-    await env.DB.prepare("UPDATE recipient_children SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(decision, child.id).run();
+    let details = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {}
+    if (decision === "declined") details.organizerDecisionNote = decisionNote;
+    await env.DB.prepare("UPDATE recipient_children SET status = ?, details_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(decision, JSON.stringify(details), child.id).run();
     const { results: children } = await env.DB.prepare("SELECT status FROM recipient_children WHERE household_id = ?").bind(household.id).all();
     const statuses = children.map((record) => record.status);
     const householdStatus = statuses.every((status) => status === "approved") ? "approved" : statuses.every((status) => status === "declined") ? "declined" : "review";
     await env.DB.prepare("UPDATE recipient_households SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(householdStatus, household.id).run();
     let emailSent = null;
     if (["approved", "declined", "waitlisted"].includes(decision)) {
-      try { await sendRecipientDecisionEmail(env, household.email, household.guardian_name, `${child.first_name} ${child.last_name}`.trim(), decision, household); emailSent = true; }
+      try { await sendRecipientDecisionEmail(env, household.email, household.guardian_name, `${child.first_name} ${child.last_name}`.trim(), decision, household, decisionNote); emailSent = true; }
       catch (error) { console.error("Recipient decision delivery failed", error); emailSent = false; }
     }
-    await audit(env, user, `recipient_child_${decision}`, "recipient_child", child.id, household.event_id);
+    await audit(env, user, `recipient_child_${decision}`, "recipient_child", child.id, household.event_id, decision === "declined" ? { decisionNote } : {});
     return json({ id: child.id, decision, householdStatus, emailSent });
   }
 
