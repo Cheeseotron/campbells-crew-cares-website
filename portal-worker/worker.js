@@ -504,6 +504,9 @@ async function registerRecipient(env, input, codeGranted = false) {
   if (!event || event.event_type !== "shopping" || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches)) return { error: "That recipient application is not available." };
   if (!input.guardianName || !input.email || !input.phone || !Array.isArray(input.children) || !input.children.length) return { error: "Please complete the responsible party information and add at least one child." };
   if (!isValidEmailAddress(input.email)) return { error: "Enter a complete email address, such as name@example.com." };
+  const submittedChildren = input.children.slice(0, 12).filter((child) => child?.firstName && child?.lastName);
+  if (!submittedChildren.length) return { error: "Add at least one child with a full name." };
+  if (submittedChildren.some((child) => !photoFromDataUrl(child.photoDataUrl))) return { error: "A valid JPG or PNG photo is required for every child before the application can be submitted." };
   const email = String(input.email).trim().toLowerCase();
   const phone = String(input.phone).trim();
   const address = input.address && typeof input.address === "object" ? input.address : {};
@@ -517,8 +520,7 @@ async function registerRecipient(env, input, codeGranted = false) {
   while (await env.DB.prepare("SELECT id FROM recipient_households WHERE id = ?").bind(householdId).first()) householdId = recipientApplicationReference();
   await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, flags_json, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
     .bind(householdId, event.id, String(input.guardianName).slice(0, 120), email, phone.slice(0, 30), JSON.stringify(flags), JSON.stringify(address), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000), ...(input.application && typeof input.application === "object" ? input.application : {}) })).run();
-  for (const child of input.children.slice(0, 12)) {
-    if (!child.firstName || !child.lastName) continue;
+  for (const child of submittedChildren) {
     const childId = randomId("child");
     const photo = photoFromDataUrl(child.photoDataUrl);
     let photoKey = null;
@@ -531,7 +533,7 @@ async function registerRecipient(env, input, codeGranted = false) {
     if (photoKey) await env.DB.prepare("UPDATE recipient_children SET photo_key = ? WHERE id = ?").bind(photoKey, childId).run();
   }
   await audit(env, null, "recipient_application_submitted", "recipient_household", householdId, event.id);
-  return { id: householdId, event, flags };
+  return { id: householdId, event, flags, photosSaved: submittedChildren.length };
 }
 
 async function audit(env, actor, action, targetType, targetId, eventId = null, metadata = {}) {
