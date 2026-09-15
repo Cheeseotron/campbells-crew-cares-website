@@ -6,6 +6,7 @@
   const LIVE_PUBLIC_RECIPIENT = document.documentElement.dataset.livePublicRecipient === "true";
   const SESSION_KEY = "ccc-test-site-unlocked";
   const STATE_KEY = "ccc-signup-prototype-state-v7";
+  const ACTIVE_EVENT_KEY = "ccc-organizer-active-event";
   const main = document.querySelector("#main");
   const lockScreen = document.querySelector("#lock-screen");
   const appShell = document.querySelector("#app-shell");
@@ -199,6 +200,13 @@
 
   function activeEvents() { return state.events.filter((event) => !event.closed); }
   function activeEventOptions() { return activeEvents().map((event) => `<option value="${esc(event.id)}" ${event.id === state.activeEventId ? "selected" : ""}>${esc(event.title)}</option>`).join(""); }
+  function setActiveEvent(eventId) {
+    if (!state.events.some((event) => event.id === eventId && !event.closed)) return false;
+    state.activeEventId = eventId;
+    if (SERVER_AUTH) localStorage.setItem(ACTIVE_EVENT_KEY, eventId);
+    saveState();
+    return true;
+  }
 
   let state = prepareEventCollection((SERVER_AUTH || LIVE_PUBLIC_RECIPIENT) ? createLiveState() : loadState());
   if (!SERVER_AUTH && !LIVE_PUBLIC_RECIPIENT) {
@@ -260,7 +268,11 @@
       const settings = record.settings && typeof record.settings === "object" ? record.settings : {};
       return { ...settings, id: record.id, title: record.title, date: record.event_date || settings.date || "", type: record.event_type === "food_bag" ? "food-bag" : "shopping", closed: record.status === "closed", volunteerStatus: settings.volunteerStatus || (record.status === "open" ? "open" : "closed"), recipientStatus: settings.recipientStatus || "closed", roles: Array.isArray(settings.roles) ? settings.roles : [], questions: settings.questions || {}, budgetItems: Array.isArray(settings.budgetItems) ? settings.budgetItems : [], bagItems: Array.isArray(settings.bagItems) ? settings.bagItems : [], activity: undefined };
     });
-    state = prepareEventCollection({ ...createLiveState(), events, activeEventId: events.find((event) => !event.closed)?.id || events[0]?.id || "" });
+    const rememberedEventId = localStorage.getItem(ACTIVE_EVENT_KEY);
+    const activeEventId = events.some((event) => event.id === rememberedEventId && !event.closed)
+      ? rememberedEventId
+      : events.find((event) => !event.closed)?.id || events[0]?.id || "";
+    state = prepareEventCollection({ ...createLiveState(), events, activeEventId });
   }
 
   async function loadLiveRecipientEvents() {
@@ -833,6 +845,14 @@
     if (!portalUser) { renderOrganizerLogin(); return; }
     const role = previewRole || portalUser;
     const allowed = roleRoutes(role).includes(subroute);
+    const unavailableForEvent = state.event?.type === "food-bag" && ["applications", "recipient-history", "packets"].includes(subroute);
+    if (unavailableForEvent) {
+      // A food-bag event does not have recipient applications or clothing
+      // packets.  Never strand someone on a route that belongs to shopping.
+      if (window.location.hash !== "#organizer/dashboard") window.location.hash = "organizer/dashboard";
+      else renderOrganizer("dashboard");
+      return;
+    }
     if (!allowed) {
       main.innerHTML = organizerShell(subroute, `<section class="locked-panel"><span>🔒</span><p class="eyebrow">Restricted for ${esc(role)}</p><h1>This area is not part of your access.</h1><p>Your workspace navigation only shows the tools assigned to your role.</p></section>`); bindOrganizer(subroute); return;
     }
@@ -1314,7 +1334,7 @@
     const finishEvent = document.querySelector("[data-finish-event]");
     if (finishEvent) finishEvent.addEventListener("click", openFinishEvent);
     document.querySelectorAll("[data-create-event]").forEach((button) => button.addEventListener("click", openCreateEvent));
-    document.querySelectorAll("[data-active-event]").forEach((select) => select.addEventListener("change", () => { state.activeEventId = select.value; saveState(); renderOrganizer(subroute); }));
+    document.querySelectorAll("[data-active-event]").forEach((select) => select.addEventListener("change", () => { if (setActiveEvent(select.value)) renderRoute(); }));
     const impactForm = document.querySelector("#impact-form");
     if (impactForm) impactForm.addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); state.publicStats = Object.fromEntries(["families","children","volunteers","years"].map((key)=>[key,Number(data.get(key)||0)])); saveState(); toast("Public impact totals saved in this demonstration browser."); });
     const addVolunteer = document.querySelector("[data-add-volunteer]");
@@ -1726,7 +1746,7 @@
     }
     setUnlocked(false);
   });
-  headerActiveEvent?.addEventListener("change", () => { state.activeEventId = headerActiveEvent.value; saveState(); renderRoute(); });
+  headerActiveEvent?.addEventListener("change", () => { if (setActiveEvent(headerActiveEvent.value)) renderRoute(); });
   document.querySelector("[data-close-dialog]").addEventListener("click", closeDialog);
   appDialog.addEventListener("click", (event) => { if (event.target === appDialog) closeDialog(); });
   window.addEventListener("hashchange", renderRoute);
