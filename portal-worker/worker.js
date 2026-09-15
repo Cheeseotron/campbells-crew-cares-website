@@ -38,13 +38,13 @@ function randomId(prefix) {
 }
 
 function recipientApplicationReference(value = null) {
-  if (typeof value === "string" && /^CCC-\d{6}$/.test(value)) return value;
+  if (typeof value === "string" && /^CCC-\d{4}$/.test(value)) return value;
   if (value) {
     let hash = 2166136261;
     for (const character of String(value)) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
-    return `CCC-${String((hash >>> 0) % 1000000).padStart(6, "0")}`;
+    return `CCC-${String((hash >>> 0) % 10000).padStart(4, "0")}`;
   }
-  return `CCC-${String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0")}`;
+  return `CCC-${String(crypto.getRandomValues(new Uint32Array(1))[0] % 10000).padStart(4, "0")}`;
 }
 
 function photoFromDataUrl(value) {
@@ -472,7 +472,8 @@ async function registerRecipient(env, input, codeGranted = false) {
   if (existingHouseholds.some((household) => normalizedMatchValue(household.phone) === normalizedMatchValue(phone))) flags.push("Phone used on another application");
   const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
   if (addressKey && existingHouseholds.some((household) => { try { const saved = JSON.parse(household.address_json || "{}"); return normalizedMatchValue(`${saved.address || ""}${saved.zip || ""}`) === addressKey; } catch { return false; } })) flags.push("Household address matches another application");
-  const householdId = recipientApplicationReference();
+  let householdId = recipientApplicationReference();
+  while (await env.DB.prepare("SELECT id FROM recipient_households WHERE id = ?").bind(householdId).first()) householdId = recipientApplicationReference();
   await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, flags_json, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
     .bind(householdId, event.id, String(input.guardianName).slice(0, 120), email, phone.slice(0, 30), JSON.stringify(flags), JSON.stringify(address), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000), ...(input.application && typeof input.application === "object" ? input.application : {}) })).run();
   for (const child of input.children.slice(0, 12)) {
