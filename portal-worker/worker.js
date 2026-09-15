@@ -209,6 +209,18 @@ async function sendRecipientConfirmation(env, recipient, guardianName, event) {
   await sendEmail(env, recipient, `Application received: ${emailLine(event.title)}`, `Hi ${emailLine(guardianName)},\n\nYour Campbell's Crew Cares application for ${emailLine(event.title)} has been received and is now awaiting review.\n\nEvent date: ${details.date}\n\nSubmitting an application does not guarantee approval. We will contact you if we need more information or when there is an update.`);
 }
 
+async function sendRecipientDecisionEmail(env, recipient, guardianName, childName, decision, event) {
+  const details = eventEmailDetails(event);
+  const messages = {
+    approved: { subject: `Approved: ${emailLine(event.title)}`, body: `We are happy to let you know that ${emailLine(childName)} has been approved for ${emailLine(event.title)}.\n\nDate: ${details.date}\nTime: ${details.time}\nLocation: ${details.location}${details.address ? `\nAddress: ${details.address}` : ""}\n\nWe look forward to seeing you there.` },
+    declined: { subject: `Application update: ${emailLine(event.title)}`, body: `Thank you for applying for ${emailLine(event.title)}. At this time, we are unable to offer ${emailLine(childName)} a place in this event.\n\nWe appreciate your understanding and hope you will consider future Campbell's Crew Cares events.` },
+    waitlisted: { subject: `Waitlist update: ${emailLine(event.title)}`, body: `${emailLine(childName)} has been placed on the waitlist for ${emailLine(event.title)}.\n\nWe will contact you if a place becomes available. Please do not make event plans until you receive a separate approval message.` }
+  };
+  const message = messages[decision];
+  if (!message) return;
+  await sendEmail(env, recipient, message.subject, `Hi ${emailLine(guardianName)},\n\n${message.body}`);
+}
+
 async function sendOrganizerInvitation(env, recipient, name, role, setupUrl) {
   const labels = { event_admin: "Event Administrator", read_only: "Read-Only Coordinator", checkin_staff: "Check-In Staff" };
   await sendEmail(env, recipient, "Set up your Campbell's Crew organizer account", `Hi ${emailLine(name)},\n\nYou have been invited to the Campbell's Crew Cares organizer portal as ${labels[role] || "an organizer"}.\n\nCreate your password using this secure link:\n${setupUrl}\n\nThis link expires in seven days. If you were not expecting this invitation, you can ignore this email.`);
@@ -547,13 +559,37 @@ async function api(request, env, url, user) {
     if (!user) return json({ error: "Sign in required." }, 401);
     const { results } = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, h.phone, h.status, h.created_at, h.address_json, h.application_json, e.title AS event_title FROM recipient_households h JOIN events e ON e.id = h.event_id ORDER BY h.created_at DESC").all();
     const recipients = await Promise.all(results.map(async (household) => {
-      const { results: children } = await env.DB.prepare("SELECT id, first_name, last_name, birth_date, details_json FROM recipient_children WHERE household_id = ? ORDER BY first_name, last_name").bind(household.id).all();
+      const { results: children } = await env.DB.prepare("SELECT id, first_name, last_name, birth_date, status, details_json FROM recipient_children WHERE household_id = ? ORDER BY first_name, last_name").bind(household.id).all();
       let address = {}; let application = {};
       try { address = JSON.parse(household.address_json || "{}"); } catch {}
       try { application = JSON.parse(household.application_json || "{}"); } catch {}
       return { ...household, reference_code: recipientApplicationReference(household.id), address, application, children: children.map((child) => { let details = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} return { ...child, details }; }) };
     }));
     return json({ recipients });
+  }
+
+  const recipientDecisionMatch = url.pathname.match(/^\/portal-api\/organizer\/recipients\/([^/]+)\/children\/([^/]+)$/);
+  if (recipientDecisionMatch && request.method === "PATCH") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
+    const input = await request.json();
+    const decision = String(input.decision || "");
+    if (!["approved", "declined", "waitlisted", "needs_information", "review"].includes(decision)) return json({ error: "That decision is not supported." }, 400);
+    const household = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, e.title, e.event_date, e.settings_json FROM recipient_households h JOIN events e ON e.id = h.event_id WHERE h.id = ?").bind(recipientDecisionMatch[1]).first();
+    if (!household) return json({ error: "That recipient household was not found." }, 404);
+    const child = await env.DB.prepare("SELECT id, first_name, last_name FROM recipient_children WHERE id = ? AND household_id = ?").bind(recipientDecisionMatch[2], household.id).first();
+    if (!child) return json({ error: "That child was not found in this household." }, 404);
+    await env.DB.prepare("UPDATE recipient_children SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(decision, child.id).run();
+    const { results: children } = await env.DB.prepare("SELECT status FROM recipient_children WHERE household_id = ?").bind(household.id).all();
+    const statuses = children.map((record) => record.status);
+    const householdStatus = statuses.every((status) => status === "approved") ? "approved" : statuses.every((status) => status === "declined") ? "declined" : "review";
+    await env.DB.prepare("UPDATE recipient_households SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(householdStatus, household.id).run();
+    let emailSent = null;
+    if (["approved", "declined", "waitlisted"].includes(decision)) {
+      try { await sendRecipientDecisionEmail(env, household.email, household.guardian_name, `${child.first_name} ${child.last_name}`.trim(), decision, household); emailSent = true; }
+      catch (error) { console.error("Recipient decision delivery failed", error); emailSent = false; }
+    }
+    await audit(env, user, `recipient_child_${decision}`, "recipient_child", child.id, household.event_id);
+    return json({ id: child.id, decision, householdStatus, emailSent });
   }
 
   if (url.pathname === "/portal-api/organizer/reports" && request.method === "GET") {

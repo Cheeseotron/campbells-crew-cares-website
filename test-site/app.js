@@ -326,7 +326,7 @@
         children: (record.children || []).map((child) => {
           const details = child.details && typeof child.details === "object" ? child.details : {};
           const firstName = child.first_name || ""; const lastName = child.last_name || "";
-          return { id: child.id, name: `${firstName} ${lastName}`.trim(), firstName, lastName, birthdate: child.birth_date || "", age: "", gender: details.gender || "", shirt: details.shirt || "", pants: details.pants || "", shoes: details.shoes || "", underwear: details.underwear || "", coat: details.coat || "", preferences: details.preferences || "", accommodations: details.accommodations || "", decision: "review", attendance: "expected" };
+          return { id: child.id, name: `${firstName} ${lastName}`.trim(), firstName, lastName, birthdate: child.birth_date || "", age: "", gender: details.gender || "", shirt: details.shirt || "", pants: details.pants || "", shoes: details.shoes || "", underwear: details.underwear || "", coat: details.coat || "", preferences: details.preferences || "", accommodations: details.accommodations || "", decision: child.status || "review", attendance: "expected" };
         })
       };
     });
@@ -1461,10 +1461,23 @@
       <div class="dialog-section"><h3>Independent child decisions</h3><p class="field-help">Choose a separate outcome for every child in this household.</p>${item.children.map((child) => `<div class="child-card"><div class="child-card__heading"><strong>${esc(child.name)} · Age ${esc(child.age)} · ${esc(child.gender)}</strong>${statusPill(child.decision || "review")}</div><p>Shirt ${esc(child.shirt)} · Pants ${esc(child.pants)} · Shoes ${esc(child.shoes)} · Underwear ${esc(child.underwear)} · Coat ${esc(child.coat)}</p><p><strong>Preferences:</strong> ${esc(child.preferences)}</p><p><strong>Accommodations:</strong> ${esc(child.accommodations)}</p><div class="child-decision-actions"><button type="button" data-child-decision="approved" data-child-id="${esc(child.id)}">Approve</button><button type="button" data-child-decision="info" data-child-id="${esc(child.id)}">Needs information</button><button type="button" data-child-decision="waitlisted" data-child-id="${esc(child.id)}">Waitlist</button><button type="button" data-child-decision="declined" data-child-id="${esc(child.id)}">Decline</button></div></div>`).join("")}</div></div>`;
     appDialog.showModal();
     document.body.classList.add("dialog-open");
-    dialogContent.querySelectorAll("[data-child-decision]").forEach((button) => button.addEventListener("click", () => {
+    dialogContent.querySelectorAll("[data-child-decision]").forEach((button) => button.addEventListener("click", async () => {
       if (item.archived) { toast("Closed-out application records are read-only."); return; }
       const child = item.children.find((record) => record.id === button.dataset.childId); if (!child) return;
-      child.decision = button.dataset.childDecision;
+      const decision = button.dataset.childDecision;
+      if (SERVER_AUTH) {
+        button.disabled = true;
+        try {
+          const response = await fetch(`/portal-api/organizer/recipients/${encodeURIComponent(item.id)}/children/${encodeURIComponent(child.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }) });
+          const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The recipient decision could not be saved.");
+          child.decision = payload.decision; item.status = payload.householdStatus || item.status;
+          await loadLiveApplications();
+          toast(payload.emailSent === false ? `${child.name} marked ${formatStatus(decision)}, but the email could not be sent.` : `${child.name} marked ${formatStatus(decision)}.${payload.emailSent ? " An email was sent." : ""}`);
+          closeDialog(); renderOrganizer("applications");
+        } catch (error) { toast(error.message || "The recipient decision could not be saved."); button.disabled = false; }
+        return;
+      }
+      child.decision = decision;
       const decisions = item.children.map((record) => record.decision);
       item.status = decisions.every((status) => status === decisions[0]) ? decisions[0] : "mixed";
       item.updated = false; state.activity.unshift({ text: `${child.name} in ${item.id} was marked ${formatStatus(child.decision)}.`, time: "Just now" }); saveState(); toast(`${child.name} marked ${formatStatus(child.decision)}.`); closeDialog(); renderOrganizer("applications");
