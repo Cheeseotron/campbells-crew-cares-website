@@ -936,7 +936,7 @@
   }
 
   function organizerSettings() {
-    return `${heading("Workspace administration", "Settings", "Manage people, permissions, and security defaults.", `<button class="button button--green" type="button" data-add-user>+ Add user</button>`)}<article class="panel"><div class="panel-header"><div><h2>Users & permissions</h2><p>Fewer than ten trusted people will have organizer access.</p></div></div><div class="permission-legend"><span><b>Executive Owner</b> Everything</span><span><b>Event Administrator</b> All event operations</span><span><b>Read-Only Coordinator</b> View without editing</span><span><b>Check-In Staff</b> Check-in only; other panels locked</span></div><div class="user-list">${organizerUserRows()}</div></article><article class="panel"><div class="panel-header"><div><h2>Security & retention</h2><p>Current planning decisions</p></div></div><div class="detail-grid"><div class="detail-item"><span>Organizer login</span><strong>Google Workspace planned</strong></div><div class="detail-item"><span>Event history</span><strong>Retain all years</strong></div><div class="detail-item"><span>Audit log</span><strong>Decisions, edits, emails and exports</strong></div><div class="detail-item"><span>Search visibility</span><strong>No indexing</strong></div></div></article>`;
+    return `${heading("Workspace administration", "Settings", "Manage people, permissions, and security defaults.", `<div class="heading-actions" data-settings-actions><button class="button button--green" type="button" data-add-user>+ Add user</button></div>`)}<article class="panel"><div class="panel-header"><div><h2>Users & permissions</h2><p>Fewer than ten trusted people will have organizer access.</p></div></div><div class="permission-legend"><span><b>Executive Owner</b> Everything</span><span><b>Event Administrator</b> All event operations</span><span><b>Read-Only Coordinator</b> View without editing</span><span><b>Check-In Staff</b> Check-in only; other panels locked</span></div><div class="user-list">${organizerUserRows()}</div></article><article class="panel"><div class="panel-header"><div><h2>Security & retention</h2><p>Current planning decisions</p></div></div><div class="detail-grid"><div class="detail-item"><span>Organizer login</span><strong>Google Workspace planned</strong></div><div class="detail-item"><span>Event history</span><strong>Retain all years</strong></div><div class="detail-item"><span>Audit log</span><strong>Decisions, edits, emails and exports</strong></div><div class="detail-item"><span>Search visibility</span><strong>No indexing</strong></div></div></article>`;
   }
 
   function organizerSettingsV5() {
@@ -1148,7 +1148,7 @@
       if (addUser) {
         const connectTop = document.createElement("a");
         connectTop.className = "button button--light"; connectTop.href = "/google-email/connect"; connectTop.textContent = "Connect Submission email";
-        addUser.after(connectTop);
+        document.querySelector("[data-settings-actions]")?.append(connectTop);
       }
       document.querySelectorAll(".user-row").forEach((row, index) => {
         const account = state.users[index];
