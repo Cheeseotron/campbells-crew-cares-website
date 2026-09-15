@@ -10,7 +10,8 @@
     "html_handling": "none"
   },
   "vars": {
-    "PORTAL_MODE": "closed"
+    "PORTAL_MODE": "closed",
+    "GOOGLE_OAUTH_CLIENT_ID": "142554695071-lkl9k20sfcjc0i074opd9h6vhuogip84.apps.googleusercontent.com"
   },
   "routes": [
     { "pattern": "campbellscrew.com/volunteer*", "zone_name": "campbellscrew.com" },

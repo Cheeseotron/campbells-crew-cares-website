@@ -603,7 +603,7 @@ export default {
       if (!env.GOOGLE_OAUTH_CLIENT_ID || !env.GOOGLE_OAUTH_CLIENT_SECRET) return portalStatusPage("Email connection unavailable", "Add the Google OAuth client ID and secret in Cloudflare before connecting email delivery.");
       const state = await makeSession(user, env.PORTAL_SESSION_SECRET, 600);
       const authorization = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-      authorization.search = new URLSearchParams({ client_id: env.GOOGLE_OAUTH_CLIENT_ID, redirect_uri: `${url.origin}/google-email/callback`, response_type: "code", scope: "https://www.googleapis.com/auth/gmail.send", access_type: "offline", prompt: "consent", login_hint: EMAIL_SENDER, state }).toString();
+      authorization.search = new URLSearchParams({ client_id: env.GOOGLE_OAUTH_CLIENT_ID, redirect_uri: `${url.origin}/google-email/callback`, response_type: "code", scope: "https://www.googleapis.com/auth/gmail.send", access_type: "offline", include_granted_scopes: "true", prompt: "select_account consent", login_hint: EMAIL_SENDER, state }).toString();
       return Response.redirect(authorization.toString(), 302);
     }
     if (url.pathname === "/google-email/callback") {
@@ -612,7 +612,11 @@ export default {
       if (!owner || !OWNER_ROLES.has(owner.role) || !code) return portalStatusPage("Email connection could not be completed", "Return to Settings and try connecting the Submission mailbox again.");
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_OAUTH_CLIENT_ID, client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET, redirect_uri: `${url.origin}/google-email/callback`, grant_type: "authorization_code" }) });
       const token = await tokenResponse.json();
-      if (!tokenResponse.ok || !token.refresh_token) return portalStatusPage("Email connection could not be completed", "Google did not return a reusable authorization. Return to Settings and try again.");
+      if (!tokenResponse.ok) {
+        console.error("Google OAuth code exchange failed", tokenResponse.status, token.error, token.error_description);
+        return portalStatusPage("Email connection could not be completed", "Google rejected the connection details. In Cloudflare, confirm the Google OAuth client ID and client secret are both saved exactly as provided by Google, then return to Settings and try again.");
+      }
+      if (!token.refresh_token) return portalStatusPage("Email connection needs one more approval", "Choose Submission@campbellscrew.com when Google asks which account to use, then approve the requested permission. Google needs to issue a reusable authorization so password-reset emails can be sent later.");
       const encrypted = await encryptEmailToken(token.refresh_token, env);
       await env.DB.prepare("INSERT INTO email_oauth_credentials (id, encrypted_refresh_token, sender_email, updated_at) VALUES (1, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET encrypted_refresh_token = excluded.encrypted_refresh_token, sender_email = excluded.sender_email, updated_at = CURRENT_TIMESTAMP").bind(encrypted, EMAIL_SENDER).run();
       await audit(env, owner, "google_email_connected", "email_sender", EMAIL_SENDER);
