@@ -326,7 +326,7 @@
         children: (record.children || []).map((child) => {
           const details = child.details && typeof child.details === "object" ? child.details : {};
           const firstName = child.first_name || ""; const lastName = child.last_name || "";
-          return { id: child.id, name: `${firstName} ${lastName}`.trim(), firstName, lastName, birthdate: child.birth_date || "", age: "", gender: details.gender || "", shirt: details.shirt || "", pants: details.pants || "", shoes: details.shoes || "", underwear: details.underwear || "", coat: details.coat || "", preferences: details.preferences || "", accommodations: details.accommodations || "", decisionNote: details.organizerDecisionNote || "", decision: child.status || "review", attendance: "expected" };
+          return { id: child.id, name: `${firstName} ${lastName}`.trim(), firstName, lastName, birthdate: child.birth_date || "", age: "", gender: details.gender || "", shirt: details.shirt || "", pants: details.pants || "", shoes: details.shoes || "", underwear: details.underwear || "", coat: details.coat || "", preferences: details.preferences || "", accommodations: details.accommodations || "", photoUrl: child.photo_url || "", decisionNote: details.organizerDecisionNote || "", decision: child.status || "review", attendance: "expected" };
         })
       };
     });
@@ -618,22 +618,22 @@
     panel.innerHTML = `
       <p class="eyebrow">Step 3 of 5</p><h2>Participating children.</h2><p>Add every child being considered. Exact sizes and preferences help the assigned shopping volunteer.</p>
       <form id="children-form">${recipientDraft.children.map((child, index) => childFormHtml(child, index)).join("")}<button class="button button--ghost" type="button" id="add-child">+ Add another child</button><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Continue <span>→</span></button></div></form>`;
-    document.querySelector("#add-child").addEventListener("click", () => {
-      syncChildren();
+    document.querySelector("#add-child").addEventListener("click", async () => {
+      await syncChildren();
       recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" });
       renderRecipient();
     });
-    document.querySelectorAll("[data-remove-child]").forEach((button) => button.addEventListener("click", () => {
-      syncChildren();
+    document.querySelectorAll("[data-remove-child]").forEach((button) => button.addEventListener("click", async () => {
+      await syncChildren();
       recipientDraft.children.splice(Number(button.dataset.removeChild), 1);
       if (!recipientDraft.children.length) recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" });
       renderRecipient();
     }));
-    document.querySelector("[data-recipient-back]").addEventListener("click", () => { syncChildren(); recipientStep = 1; renderRecipient(); });
-    document.querySelector("#children-form").addEventListener("submit", (event) => {
+    document.querySelector("[data-recipient-back]").addEventListener("click", async () => { await syncChildren(); recipientStep = 1; renderRecipient(); });
+    document.querySelector("#children-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!event.currentTarget.reportValidity()) return;
-      syncChildren();
+      await syncChildren();
       recipientStep = 3; recipientMaxStep = Math.max(recipientMaxStep, 3);
       renderRecipient();
     });
@@ -657,15 +657,28 @@
     return `<div class="field size-field"><label for="${inputId}">${label} size</label><input id="${inputId}" name="${inputId}" value="${esc(value || "")}" placeholder="Enter size" required></div>`;
   }
 
-  function syncChildren() {
+  async function photoDataUrl(file) {
+    const source = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error("The photo could not be read.")); reader.readAsDataURL(file); });
+    if (file.size <= 700 * 1024) return source;
+    return new Promise((resolve, reject) => {
+      const image = new Image(); image.onload = () => {
+        let width = image.naturalWidth; let height = image.naturalHeight; const scale = Math.min(1, 1200 / Math.max(width, height)); width = Math.max(1, Math.round(width * scale)); height = Math.max(1, Math.round(height * scale));
+        const canvas = document.createElement("canvas"); const context = canvas.getContext("2d"); let output = "";
+        while (width >= 400 && height >= 400) { canvas.width = width; canvas.height = height; context.drawImage(image, 0, 0, width, height); output = canvas.toDataURL("image/jpeg", .8); if (output.length <= 1300000) break; width = Math.round(width * .8); height = Math.round(height * .8); }
+        URL.revokeObjectURL(image.src); resolve(output);
+      }; image.onerror = () => reject(new Error("Please choose a JPG or PNG photo.")); image.src = URL.createObjectURL(file);
+    });
+  }
+
+  async function syncChildren() {
     const form = document.querySelector("#children-form");
     if (!form) return;
     const data = new FormData(form);
-    recipientDraft.children = recipientDraft.children.map((child, index) => {
+    recipientDraft.children = await Promise.all(recipientDraft.children.map(async (child, index) => {
       const next = {};
-      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || ""); next.name = `${next.firstName} ${next.lastName}`.trim();
+      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || ""); next.photoDataUrl = photo && photo.files[0] ? await photoDataUrl(photo.files[0]) : (child.photoDataUrl || ""); next.name = `${next.firstName} ${next.lastName}`.trim();
       return next;
-    });
+    }));
   }
 
   function renderEmergency(panel) {
@@ -748,7 +761,7 @@
           eventId: state.event.id, guardianName: recipientDraft.guardian, email: recipientDraft.email, phone: recipientDraft.phone,
           address: { address: recipientDraft.address, city: recipientDraft.city, zip: recipientDraft.zip }, notes: recipientDraft.notes,
           application: { referral: recipientDraft.referral, preferredContact: recipientDraft.preferredContact, emergencyName: recipientDraft.emergencyName, emergencyPhone: recipientDraft.emergencyPhone, emergencyRelation: recipientDraft.emergencyRelation, agreementSignature: recipientDraft.agreementSignature, finalSignature: recipientDraft.finalSignature, acknowledgments: recipientDraft.acknowledgments },
-          children: recipientDraft.children.map((child) => ({ firstName: child.firstName, lastName: child.lastName, birthDate: child.birthdate, details: { gender: child.gender, shirt: child.shirt, pants: child.pants, shoes: child.shoes, socks: child.socks, underwear: child.underwear, coat: child.coat, preferences: child.preferences, accommodations: child.accommodations } }))
+          children: recipientDraft.children.map((child) => ({ firstName: child.firstName, lastName: child.lastName, birthDate: child.birthdate, photoDataUrl: child.photoDataUrl || "", details: { gender: child.gender, shirt: child.shirt, pants: child.pants, shoes: child.shoes, socks: child.socks, underwear: child.underwear, coat: child.coat, preferences: child.preferences, accommodations: child.accommodations } }))
         }) });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "Your application could not be submitted.");
@@ -1048,7 +1061,7 @@
     const isFoodBag = state.event.type === "food-bag";
     const actions = `<div class="heading-actions"><button class="button button--green" type="button" data-print-badges="volunteers">Download volunteer badges</button>${isFoodBag ? "" : `<button class="button button--light" type="button" data-print-badges="children">Download child badges</button>`}</div>`;
     const childControls = isFoodBag ? "" : `<div class="field"><label for="child-badge-size">Child badge holder insert<select id="child-badge-size" data-badge-setting="child"><option value="vertical-3x4">Vertical · 3 × 4 in · 4 per page</option><option value="vertical-225x35">Vertical · 2¼ × 3½ in · up to 9 per page</option></select></label></div>`;
-    const childBadgesSection = isFoodBag ? "" : `<div class="badge-section-heading"><div><h2 class="section-title">Child badges</h2><p>${childBadges.length} vertical cardstock inserts, arranged several to a page whenever space permits.</p></div></div><div class="badge-grid badge-grid--children">${childBadges.map(({ child, household }) => `<article class="badge-card badge-card--recipient" data-badge-id="${esc(child.id)}" data-badge-kind="children"><div class="badge-photo">${child.photoName ? "Child photo" : "Photo"}</div><img class="badge-logo" src="../assets/images/ccc-logo.png" alt=""><span>Campbell's Crew Cares</span><strong>${esc(child.name)}</strong><b>${esc(household.id)}</b></article>`).join("")}</div>`;
+    const childBadgesSection = isFoodBag ? "" : `<div class="badge-section-heading"><div><h2 class="section-title">Child badges</h2><p>${childBadges.length} vertical cardstock inserts, arranged several to a page whenever space permits.</p></div></div><div class="badge-grid badge-grid--children">${childBadges.map(({ child, household }) => `<article class="badge-card badge-card--recipient" data-badge-id="${esc(child.id)}" data-badge-kind="children"><div class="badge-photo">${child.photoUrl ? `<img src="${esc(child.photoUrl)}" alt="Photo of ${esc(child.name)}">` : "Photo"}</div><img class="badge-logo" src="../assets/images/ccc-logo.png" alt=""><span>Campbell's Crew Cares</span><strong>${esc(child.name)}</strong><b>${esc(household.referenceCode || household.id)}</b></article>`).join("")}</div>`;
     const sizeNote = isFoodBag ? `<article class="badge-size-note"><h2>Current badge size</h2><p><strong>Volunteers:</strong> <span id="volunteer-size-summary">Avery 8395-compatible removable adhesive badges, 3⅜ × 2⅓ inches, horizontal, 8 per letter-size sheet.</span></p><p>Always print at <strong>100% / Actual Size</strong>; disable “Fit to page” so label alignment remains accurate.</p></article>` : `<article class="badge-size-note"><h2>Current badge sizes</h2><p><strong>Volunteers:</strong> <span id="volunteer-size-summary">Avery 8395-compatible removable adhesive badges, 3⅜ × 2⅓ inches, horizontal, 8 per letter-size sheet.</span></p><p><strong>Children:</strong> <span id="child-size-summary">3 × 4 inch vertical cardstock inserts, arranged 4 per letter-size page.</span></p><p>Always print at <strong>100% / Actual Size</strong>; disable “Fit to page” so badge measurements remain accurate.</p></article>`;
     return `${heading("Event-day printing", "Print badges", isFoodBag ? "Create volunteer badge sheets for this food bag event." : "Create one volunteer badge file or one child badge file. Child badges are grouped efficiently on each page.", actions)}
       <div class="badge-settings panel"><div class="field"><label for="volunteer-badge-stock">Volunteer sticker sheet<select id="volunteer-badge-stock" data-badge-setting="volunteer"><option value="avery-8395">Avery 8395 · 3⅜ × 2⅓ in · 8 per sheet</option><option value="horizontal-35">Generic horizontal · 3½ × 2¼ in</option></select></label></div>${childControls}<p>Each download button opens the browser's print screen. Choose <strong>Save as PDF</strong> to download the badge file, or select a printer to print immediately.</p></div>

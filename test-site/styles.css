@@ -688,6 +688,7 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card > span { color:var(--green-dark); font-weight:800; text-transform:uppercase; letter-spacing:.08em; font-size:12px; }
 .badge-card > strong { font-size:25px; line-height:1.1; }
 .badge-photo { width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:#e8ece9;color:#66716a;font-size:12px; }
+.badge-photo img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
 .checkin-row { padding-top:10px; padding-bottom:10px; min-height:64px; }
 .badge-section-heading { display:flex; align-items:end; justify-content:space-between; gap:20px; margin-top:32px; }
 .badge-section-heading .section-title { margin:0 0 5px; }

@@ -573,7 +573,7 @@ async function api(request, env, url, user) {
     if (!user) return json({ error: "Sign in required." }, 401);
     const { results } = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, h.phone, h.status, h.flags_json, h.created_at, h.address_json, h.application_json, e.title AS event_title FROM recipient_households h JOIN events e ON e.id = h.event_id ORDER BY h.created_at DESC").all();
     const recipients = await Promise.all(results.map(async (household) => {
-      const { results: children } = await env.DB.prepare("SELECT id, first_name, last_name, birth_date, status, details_json FROM recipient_children WHERE household_id = ? ORDER BY first_name, last_name").bind(household.id).all();
+      const { results: children } = await env.DB.prepare("SELECT id, first_name, last_name, birth_date, status, photo_key, details_json FROM recipient_children WHERE household_id = ? ORDER BY first_name, last_name").bind(household.id).all();
       let address = {}; let application = {}; let flags = [];
       try { address = JSON.parse(household.address_json || "{}"); } catch {}
       try { application = JSON.parse(household.application_json || "{}"); } catch {}
@@ -583,9 +583,20 @@ async function api(request, env, url, user) {
       if (otherHouseholds.some((other) => other.event_id === household.event_id && normalizedMatchValue(other.phone) === normalizedMatchValue(household.phone)) && !flags.includes("Phone used on another application")) flags.push("Phone used on another application");
       const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
       if (addressKey && otherHouseholds.some((other) => { try { const saved = JSON.parse(other.address_json || "{}"); return other.event_id === household.event_id && normalizedMatchValue(`${saved.address || ""}${saved.zip || ""}`) === addressKey; } catch { return false; } }) && !flags.includes("Household address matches another application")) flags.push("Household address matches another application");
-      return { ...household, reference_code: recipientApplicationReference(household.id), address, application, flags, children: children.map((child) => { let details = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} return { ...child, details }; }) };
+      return { ...household, reference_code: recipientApplicationReference(household.id), address, application, flags, children: children.map((child) => { let details = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} return { ...child, photo_url: child.photo_key ? `/portal-api/organizer/children/${encodeURIComponent(child.id)}/photo` : "", details }; }) };
     }));
     return json({ recipients });
+  }
+
+  const childPhotoMatch = url.pathname.match(/^\/portal-api\/organizer\/children\/([^/]+)\/photo$/);
+  if (childPhotoMatch && request.method === "GET") {
+    if (!user) return json({ error: "Sign in required." }, 401);
+    const child = await env.DB.prepare("SELECT photo_key FROM recipient_children WHERE id = ?").bind(childPhotoMatch[1]).first();
+    if (!child?.photo_key) return json({ error: "A photo was not found for this child." }, 404);
+    const photo = await env.PRIVATE_UPLOADS.get(child.photo_key);
+    if (!photo) return json({ error: "The photo file was not found." }, 404);
+    const headers = securityHeaders(new Headers({ "Content-Type": photo.httpMetadata?.contentType || "image/jpeg" }));
+    return new Response(photo.body, { headers });
   }
 
   const recipientHouseholdMatch = url.pathname.match(/^\/portal-api\/organizer\/recipients\/([^/]+)$/);
