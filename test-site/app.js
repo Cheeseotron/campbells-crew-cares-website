@@ -619,24 +619,24 @@
       <p class="eyebrow">Step 3 of 5</p><h2>Participating children.</h2><p>Add every child being considered. Exact sizes and preferences help the assigned shopping volunteer.</p>
       <form id="children-form">${recipientDraft.children.map((child, index) => childFormHtml(child, index)).join("")}<button class="button button--ghost" type="button" id="add-child">+ Add another child</button><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Continue <span>→</span></button></div></form>`;
     document.querySelector("#add-child").addEventListener("click", async () => {
-      await syncChildren();
+      try { await syncChildren(); } catch (error) { toast(error.message || "Please choose a valid JPG or PNG photo for every child."); return; }
       recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" });
       renderRecipient();
     });
     document.querySelectorAll("[data-remove-child]").forEach((button) => button.addEventListener("click", async () => {
-      await syncChildren();
+      try { await syncChildren(); } catch (error) { toast(error.message || "Please choose a valid JPG or PNG photo for every child."); return; }
       recipientDraft.children.splice(Number(button.dataset.removeChild), 1);
       if (!recipientDraft.children.length) recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" });
       renderRecipient();
     }));
-    document.querySelector("[data-recipient-back]").addEventListener("click", async () => { await syncChildren(); recipientStep = 1; renderRecipient(); });
+    document.querySelector("[data-recipient-back]").addEventListener("click", async () => { try { await syncChildren(); } catch (error) { toast(error.message || "Please choose a valid JPG or PNG photo for every child."); return; } recipientStep = 1; renderRecipient(); });
     document.querySelector("#children-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!revealFirstInvalidField(event.currentTarget)) return;
-      const photoSkipped = await syncChildren();
+      try { await syncChildren(); }
+      catch (error) { toast(error.message || "Please choose a valid JPG or PNG photo for every child."); return; }
       recipientStep = 3; recipientMaxStep = Math.max(recipientMaxStep, 3);
       renderRecipient();
-      if (photoSkipped) toast("Your application can continue, but we could not use that photo. Please bring a JPG or PNG if a badge photo is needed.");
     });
   }
 
@@ -647,7 +647,7 @@
       <div class="field"><label for="child-${index}-gender">Sizing category</label><select id="child-${index}-gender" name="child-${index}-gender" required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This helps the organizers understand the child’s typical sizing.</small></div>
       <div class="field field--span-2 size-guidance"><strong>Clothing sizes</strong><small>Spell out letter sizes—for example: <b>Small</b>, <b>Medium</b>, or <b>Large</b>. You can also be more specific for pants if you know the size, such as <b>30/32</b>. For socks and shoes, please use numbers. If you are unsure, you can always go a little bigger so we can make sure the clothes will fit.</small></div>
       ${sizeField(index,"shirt","Shirt",child.shirt)}${sizeField(index,"pants","Pants",child.pants)}${sizeField(index,"shoes","Shoes",child.shoes)}${sizeField(index,"socks","Socks",child.socks)}${sizeField(index,"underwear","Underwear",child.underwear)}${sizeField(index,"coat","Coat",child.coat)}
-      <div class="field field--span-2"><label for="child-${index}-photo">Recent photo of this child</label><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png"><small>We kindly ask you to share a photo of the child so we can pre-make a badge for them to wear on the day of the event. The badge will also be attached to their clothing bag at the end of the event to help ensure it stays with them. Thank you! JPG or PNG only. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div>
+      <div class="field field--span-2"><label for="child-${index}-photo">Recent photo of this child</label><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png" ${child.photoDataUrl ? "" : "required"}><small>A photo is required for every child so Campbell's Crew can pre-make their event badge and keep it with the correct clothing bag. JPG or PNG only. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div>
       <div class="field field--span-2"><label for="child-${index}-preferences">Colors, styles, interests, likes, or dislikes</label><textarea id="child-${index}-preferences" name="child-${index}-preferences" required>${esc(child.preferences)}</textarea></div>
       <div class="field field--span-2"><label for="child-${index}-accommodations">Medical, sensory, communication, mobility, or behavioral accommodations</label><textarea id="child-${index}-accommodations" name="child-${index}-accommodations" required>${esc(child.accommodations)}</textarea><small>Enter “None” if no accommodation is needed.</small></div>
     </div></section>`;
@@ -664,9 +664,10 @@
     return new Promise((resolve, reject) => {
       const image = new Image(); image.onload = () => {
         let width = image.naturalWidth; let height = image.naturalHeight; const scale = Math.min(1, 1200 / Math.max(width, height)); width = Math.max(1, Math.round(width * scale)); height = Math.max(1, Math.round(height * scale));
+        if (width < 400 || height < 400) { URL.revokeObjectURL(image.src); resolve(source); return; }
         const canvas = document.createElement("canvas"); const context = canvas.getContext("2d"); let output = "";
         while (width >= 400 && height >= 400) { canvas.width = width; canvas.height = height; context.drawImage(image, 0, 0, width, height); output = canvas.toDataURL("image/jpeg", .8); if (output.length <= 1300000) break; width = Math.round(width * .8); height = Math.round(height * .8); }
-        URL.revokeObjectURL(image.src); resolve(output);
+        URL.revokeObjectURL(image.src); resolve(output || source);
       }; image.onerror = () => reject(new Error("Please choose a JPG or PNG photo.")); image.src = URL.createObjectURL(file);
     });
   }
@@ -675,18 +676,15 @@
     const form = document.querySelector("#children-form");
     if (!form) return;
     const data = new FormData(form);
-    let photoSkipped = false;
     recipientDraft.children = await Promise.all(recipientDraft.children.map(async (child, index) => {
       const next = {};
       ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || "");
-      if (photo?.files[0]) {
-        try { next.photoDataUrl = await photoDataUrl(photo.files[0]); }
-        catch (error) { photoSkipped = true; next.photoName = ""; next.photoDataUrl = ""; }
-      } else next.photoDataUrl = child.photoDataUrl || "";
+      if (photo?.files[0]) next.photoDataUrl = await photoDataUrl(photo.files[0]);
+      else next.photoDataUrl = child.photoDataUrl || "";
+      if (!next.photoDataUrl) throw new Error(`Please add a JPG or PNG photo for ${next.firstName || `Child ${index + 1}`}.`);
       next.name = `${next.firstName} ${next.lastName}`.trim();
       return next;
     }));
-    return photoSkipped;
   }
 
   function revealFirstInvalidField(form) {
