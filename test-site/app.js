@@ -1145,11 +1145,10 @@
     const addUser = document.querySelector("[data-add-user]");
     if (addUser) addUser.addEventListener("click", openAddUser);
     if (SERVER_AUTH && subroute === "settings") {
-      const securityPanel = document.querySelector(".detail-grid");
-      if (securityPanel) {
-        const connect = document.createElement("a");
-        connect.className = "button button--light"; connect.href = "/google-email/connect"; connect.textContent = "Connect Submission email";
-        securityPanel.after(connect);
+      if (addUser) {
+        const connectTop = document.createElement("a");
+        connectTop.className = "button button--light"; connectTop.href = "/google-email/connect"; connectTop.textContent = "Connect Submission email";
+        addUser.after(connectTop);
       }
       document.querySelectorAll(".user-row").forEach((row, index) => {
         const account = state.users[index];
