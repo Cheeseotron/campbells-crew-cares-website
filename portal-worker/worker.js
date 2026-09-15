@@ -25,6 +25,10 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
 }
 
+function isValidEmailAddress(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || "").trim());
+}
+
 function randomId(prefix) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
@@ -394,6 +398,7 @@ async function registerVolunteer(env, input, codeGranted = false) {
   const codeMatches = status === "code" && String(input.accessCode || "").trim() === String(settings.volunteerCode || "").trim();
   if (!event || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches) || !roles.includes(String(input.role || ""))) return { error: "That volunteer opportunity is not available." };
   if (!input.name || !input.email || !input.phone || !input.role) return { error: "Please complete your name, email, phone number, and volunteer role." };
+  if (!isValidEmailAddress(input.email)) return { error: "Enter a complete email address, such as name@example.com." };
   const email = String(input.email).trim().toLowerCase();
   let profile = await env.DB.prepare("SELECT id FROM volunteer_profiles WHERE email = ?").bind(email).first();
   if (!profile) {
@@ -419,6 +424,7 @@ async function registerRecipient(env, input, codeGranted = false) {
   const codeMatches = status === "code" && String(input.accessCode || "").trim() === String(settings.recipientCode || "").trim();
   if (!event || event.event_type !== "shopping" || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches)) return { error: "That recipient application is not available." };
   if (!input.guardianName || !input.email || !input.phone || !Array.isArray(input.children) || !input.children.length) return { error: "Please complete the responsible party information and add at least one child." };
+  if (!isValidEmailAddress(input.email)) return { error: "Enter a complete email address, such as name@example.com." };
   const householdId = recipientApplicationReference();
   await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .bind(householdId, event.id, String(input.guardianName).slice(0, 120), String(input.email).trim().toLowerCase(), String(input.phone).slice(0, 30), JSON.stringify(input.address || {}), JSON.stringify({ notes: String(input.notes || "").slice(0, 2000), ...(input.application && typeof input.application === "object" ? input.application : {}) })).run();
