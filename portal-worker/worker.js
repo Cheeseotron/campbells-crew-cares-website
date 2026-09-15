@@ -190,33 +190,50 @@ function childProfilePrintPage({ child, household, event }) {
 
 function childProfileValues({ child, household, event }) {
   const details = child.details || {}; const application = household.application || {}; const settings = eventSettings(event);
+  const birthDate = String(child.birth_date || "").trim();
+  const parsedBirthDate = /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? new Date(`${birthDate}T12:00:00`) : null;
+  const today = new Date();
+  let age = "";
+  if (parsedBirthDate && !Number.isNaN(parsedBirthDate.valueOf())) { age = today.getFullYear() - parsedBirthDate.getFullYear(); const birthdayThisYear = new Date(today.getFullYear(), parsedBirthDate.getMonth(), parsedBirthDate.getDate()); if (today < birthdayThisYear) age -= 1; }
+  const enabledBudgets = Array.isArray(settings.budgetItems) ? settings.budgetItems.filter((item) => item?.enabled) : [];
+  const budgetFor = (...names) => enabledBudgets.filter((item) => names.includes(String(item.label || "").toLowerCase())).reduce((total, item) => total + (Number(item.amount) || 0), 0);
+  const eventDate = event.event_date ? String(event.event_date) : "";
   return {
     name: `${child.first_name || ""} ${child.last_name || ""}`.trim() || "Not provided",
     application: recipientApplicationReference(household.id),
-    event: event.title || "Event",
+    event: [eventDate, event.title].filter(Boolean).join(" · ") || "Event",
     volunteer: "Assigned at check-in",
-    age: details.age || child.age || "Not provided",
+    age: details.age || child.age || (age !== "" ? `${age} years · ${birthDate}` : birthDate || "Not provided"),
     emergency: [application.emergencyName, application.emergencyPhone].filter(Boolean).join(" · ") || "Not provided",
     shirt: details.shirt || "Not provided", pants: details.pants || "Not provided", shoes: details.shoes || "Not provided",
     underwear: details.underwear || "Not provided", socks: details.socks || "Not provided", coat: details.coat || "Not provided",
     preferences: details.preferences || "None provided", accommodations: details.accommodations || "None provided",
-    budget: settings.shoppingBudget || "0"
+    budgets: { shirt: budgetFor("shirts", "shirt"), pants: budgetFor("pants", "pants / shorts"), underwear: budgetFor("underwear", "bras", "undergarments"), socks: budgetFor("socks", "sock"), shoes: budgetFor("shoes", "shoe"), coat: budgetFor("coats", "coat", "coat / jacket") },
+    budgetTotal: settings.shoppingBudget || enabledBudgets.reduce((total, item) => total + (Number(item.amount) || 0), 0) || "0"
   };
 }
 
 function drawProfileOverlay(page, values, font, bold) {
-  const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29);
+  const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const fieldPanel = rgb(238 / 255, 243 / 255, 239 / 255); const paper = rgb(251 / 255, 252 / 255, 251 / 255);
   const draw = (text, x, y, size = 9, options = {}) => page.drawText(String(text || ""), { x, y, size, font: options.bold ? bold : font, color: options.muted ? muted : ink, maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 2 });
-  draw(values.name, 51, 612, 10, { bold: true });
-  draw(values.application, 228, 612, 10, { bold: true });
-  draw(values.event, 404, 612, 8.5, { bold: true, maxWidth: 128 });
-  draw(values.volunteer, 51, 576, 8.5, { maxWidth: 128 });
-  draw(values.age, 228, 576, 9, { maxWidth: 128 });
-  draw(values.emergency, 404, 576, 8.2, { maxWidth: 128 });
-  [[values.shirt, 63, 493], [values.pants, 240, 493], [values.shoes, 416, 493], [values.underwear, 63, 454], [values.socks, 240, 454], [values.coat, 416, 454]].forEach(([text, x, y]) => draw(text, x, y, 9, { bold: true, maxWidth: 118 }));
-  draw(values.preferences, 56, 395, 8.2, { maxWidth: 235, lineHeight: 12 });
-  draw(values.accommodations, 316, 395, 8.2, { maxWidth: 235, lineHeight: 12 });
-  draw(String(values.budget), 218, 108, 10, { bold: true });
+  const clear = (x, y, width, height, color = fieldPanel) => page.drawRectangle({ x, y, width, height, color });
+  // Clear the old write-in lines before placing text so the values sit neatly
+  // in their fields rather than being crossed by the template's underscores.
+  [[51, 603, 132], [228, 603, 132], [404, 603, 130], [51, 567, 132], [228, 567, 132], [404, 567, 130]].forEach(([x, y, width]) => clear(x, y, width, 20));
+  draw(values.name, 51, 608, 9.3, { bold: true, maxWidth: 130 });
+  draw(values.application, 228, 608, 9.3, { bold: true, maxWidth: 130 });
+  draw(values.event, 404, 608, 6.4, { bold: true, maxWidth: 128 });
+  draw(values.volunteer, 51, 572, 7.7, { maxWidth: 130 });
+  draw(values.age, 228, 572, 7.3, { maxWidth: 130 });
+  draw(values.emergency, 404, 572, 6.6, { maxWidth: 128 });
+  [[63, 487, 118], [240, 487, 118], [416, 487, 118], [63, 448, 118], [240, 448, 118], [416, 448, 118]].forEach(([x, y, width]) => clear(x, y, width, 14, paper));
+  [[values.shirt, 63, 490], [values.pants, 240, 490], [values.shoes, 416, 490], [values.underwear, 63, 451], [values.socks, 240, 451], [values.coat, 416, 451]].forEach(([text, x, y]) => draw(text, x, y, 8.3, { bold: true, maxWidth: 118 }));
+  clear(55, 342, 239, 55, paper); clear(315, 342, 239, 55, paper);
+  draw(values.preferences, 56, 383, 7.7, { maxWidth: 232, lineHeight: 10 });
+  draw(values.accommodations, 316, 383, 7.7, { maxWidth: 232, lineHeight: 10 });
+  const budgetRows = [values.budgets.shirt, values.budgets.pants, values.budgets.underwear, values.budgets.socks, values.budgets.shoes, values.budgets.coat];
+  [251, 226, 200, 175, 149, 123].forEach((y, index) => { clear(217, y - 4, 58, 12, paper); draw(`$${budgetRows[index] || 0}`, 218, y, 8.5, { bold: true }); });
+  clear(217, 96, 62, 12, rgb(0.88, 0.95, 0.89)); draw(`$${values.budgetTotal}`, 218, 100, 8.5, { bold: true });
 }
 
 async function templatePdfBytes(env, origin, pathname) {
@@ -710,13 +727,13 @@ async function api(request, env, url, user) {
   const childProfilePdfMatch = url.pathname.match(/^\/portal-api\/organizer\/children\/([^/]+)\/profile\.pdf$/);
   if (childProfilePdfMatch && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
-    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childProfilePdfMatch[1]).first();
+    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.birth_date, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.event_date, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childProfilePdfMatch[1]).first();
     if (!child) return json({ error: "That child record was not found." }, 404);
     let details = {}; let application = {}; let settings = {};
     try { details = JSON.parse(child.details_json || "{}"); } catch {}
     try { application = JSON.parse(child.application_json || "{}"); } catch {}
     try { settings = JSON.parse(child.settings_json || "{}"); } catch {}
-    const pdf = await filledProfileDocument(env, url.origin, [{ child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, settings_json: JSON.stringify(settings) } }]);
+    const pdf = await filledProfileDocument(env, url.origin, [{ child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, event_date: child.event_date, settings_json: JSON.stringify(settings) } }]);
     const filename = `${String(child.first_name || "child").replace(/[^a-z0-9]+/gi, "-")}-shopping-profile.pdf`;
     return new Response(pdf, { headers: securityHeaders(new Headers({ "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${filename}"` })) });
   }
@@ -724,13 +741,13 @@ async function api(request, env, url, user) {
   const childPacketPdfMatch = url.pathname.match(/^\/portal-api\/organizer\/children\/([^/]+)\/packet\.pdf$/);
   if (childPacketPdfMatch && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
-    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childPacketPdfMatch[1]).first();
+    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.birth_date, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.event_date, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childPacketPdfMatch[1]).first();
     if (!child) return json({ error: "That child record was not found." }, 404);
     let details = {}; let application = {}; let settings = {};
     try { details = JSON.parse(child.details_json || "{}"); } catch {}
     try { application = JSON.parse(child.application_json || "{}"); } catch {}
     try { settings = JSON.parse(child.settings_json || "{}"); } catch {}
-    const pdf = await filledProfileDocument(env, url.origin, [{ child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, settings_json: JSON.stringify(settings) } }], true);
+    const pdf = await filledProfileDocument(env, url.origin, [{ child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, event_date: child.event_date, settings_json: JSON.stringify(settings) } }], true);
     const filename = `${String(child.first_name || "child").replace(/[^a-z0-9]+/gi, "-")}-complete-packet.pdf`;
     return new Response(pdf, { headers: securityHeaders(new Headers({ "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${filename}"` })) });
   }
@@ -739,9 +756,9 @@ async function api(request, env, url, user) {
     if (!user) return json({ error: "Sign in required." }, 401);
     const eventId = String(url.searchParams.get("event") || "");
     if (!eventId) return json({ error: "Choose an event before printing packets." }, 400);
-    const { results } = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE h.event_id = ? AND c.status = 'approved' ORDER BY c.first_name, c.last_name").bind(eventId).all();
+    const { results } = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.birth_date, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.event_date, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE h.event_id = ? AND c.status = 'approved' ORDER BY c.first_name, c.last_name").bind(eventId).all();
     if (!results.length) return json({ error: "There are no approved child packets for this event." }, 404);
-    const records = results.map((child) => { let details = {}; let application = {}; let settings = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} try { application = JSON.parse(child.application_json || "{}"); } catch {} try { settings = JSON.parse(child.settings_json || "{}"); } catch {} return { child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, settings_json: JSON.stringify(settings) } }; });
+    const records = results.map((child) => { let details = {}; let application = {}; let settings = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} try { application = JSON.parse(child.application_json || "{}"); } catch {} try { settings = JSON.parse(child.settings_json || "{}"); } catch {} return { child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, event_date: child.event_date, settings_json: JSON.stringify(settings) } }; });
     const pdf = await filledProfileDocument(env, url.origin, records, true);
     return new Response(pdf, { headers: securityHeaders(new Headers({ "Content-Type": "application/pdf", "Content-Disposition": "inline; filename=campbells-crew-complete-packets.pdf" })) });
   }
