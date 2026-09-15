@@ -632,10 +632,11 @@
     document.querySelector("[data-recipient-back]").addEventListener("click", async () => { await syncChildren(); recipientStep = 1; renderRecipient(); });
     document.querySelector("#children-form").addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!event.currentTarget.reportValidity()) return;
-      await syncChildren();
+      if (!revealFirstInvalidField(event.currentTarget)) return;
+      const photoSkipped = await syncChildren();
       recipientStep = 3; recipientMaxStep = Math.max(recipientMaxStep, 3);
       renderRecipient();
+      if (photoSkipped) toast("Your application can continue, but we could not use that photo. Please bring a JPG or PNG if a badge photo is needed.");
     });
   }
 
@@ -674,11 +675,27 @@
     const form = document.querySelector("#children-form");
     if (!form) return;
     const data = new FormData(form);
+    let photoSkipped = false;
     recipientDraft.children = await Promise.all(recipientDraft.children.map(async (child, index) => {
       const next = {};
-      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || ""); next.photoDataUrl = photo && photo.files[0] ? await photoDataUrl(photo.files[0]) : (child.photoDataUrl || ""); next.name = `${next.firstName} ${next.lastName}`.trim();
+      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || "");
+      if (photo?.files[0]) {
+        try { next.photoDataUrl = await photoDataUrl(photo.files[0]); }
+        catch (error) { photoSkipped = true; next.photoName = ""; next.photoDataUrl = ""; }
+      } else next.photoDataUrl = child.photoDataUrl || "";
+      next.name = `${next.firstName} ${next.lastName}`.trim();
       return next;
     }));
+    return photoSkipped;
+  }
+
+  function revealFirstInvalidField(form) {
+    const invalid = [...form.querySelectorAll("input, select, textarea")].find((field) => !field.disabled && !field.checkValidity());
+    if (!invalid) return true;
+    invalid.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => { invalid.focus({ preventScroll: true }); invalid.reportValidity(); }, 150);
+    toast("Please complete the highlighted child information before continuing.");
+    return false;
   }
 
   function renderEmergency(panel) {
