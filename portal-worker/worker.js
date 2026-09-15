@@ -198,10 +198,16 @@ function childProfileValues({ child, household, event }) {
   const enabledBudgets = Array.isArray(settings.budgetItems) ? settings.budgetItems.filter((item) => item?.enabled) : [];
   const budgetFor = (...names) => enabledBudgets.filter((item) => names.includes(String(item.label || "").toLowerCase())).reduce((total, item) => total + (Number(item.amount) || 0), 0);
   const eventDate = event.event_date ? String(event.event_date) : "";
+  const parsedEventDate = eventDate ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(eventDate) ? `${eventDate}T12:00:00` : eventDate) : null;
+  const shortEventDate = parsedEventDate && !Number.isNaN(parsedEventDate.valueOf())
+    ? parsedEventDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : eventDate;
   return {
     name: `${child.first_name || ""} ${child.last_name || ""}`.trim() || "Not provided",
     application: recipientApplicationReference(household.id),
-    event: [eventDate, event.title].filter(Boolean).join(" · ") || "Event",
+    // The profile has a compact single-line Date / Event field.  The complete
+    // event title follows on the rules page, while this keeps the date legible.
+    event: shortEventDate || event.title || "Event",
     volunteer: "Assigned at check-in",
     age: details.age || child.age || (age !== "" ? `${age} years · ${birthDate}` : birthDate || "Not provided"),
     emergency: [application.emergencyName, application.emergencyPhone].filter(Boolean).join(" · ") || "Not provided",
@@ -222,7 +228,7 @@ function drawProfileOverlay(page, values, font, bold) {
   [[51, 603, 132], [228, 603, 132], [404, 603, 130], [51, 567, 132], [228, 567, 132], [404, 567, 130]].forEach(([x, y, width]) => clear(x, y, width, 20));
   draw(values.name, 51, 608, 9.3, { bold: true, maxWidth: 130 });
   draw(values.application, 228, 608, 9.3, { bold: true, maxWidth: 130 });
-  draw(values.event, 404, 608, 6.4, { bold: true, maxWidth: 128 });
+  draw(values.event, 404, 608, 8.2, { bold: true, maxWidth: 128 });
   draw(values.volunteer, 51, 572, 7.7, { maxWidth: 130 });
   draw(values.age, 228, 572, 7.3, { maxWidth: 130 });
   draw(values.emergency, 404, 572, 6.6, { maxWidth: 128 });
