@@ -718,6 +718,8 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card > strong { font-size:25px; line-height:1.1; }
 .badge-photo { width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:#e8ece9;color:#66716a;font-size:12px; }
 .badge-photo img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.badge-photo-upload { padding:7px 9px; color:var(--green-dark); background:var(--mist); border:1px solid var(--line); cursor:pointer; font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+.badge-photo-upload input { position:absolute; width:1px; height:1px; opacity:0; }
 .checkin-row { padding-top:10px; padding-bottom:10px; min-height:64px; }
 .badge-section-heading { display:flex; align-items:end; justify-content:space-between; gap:20px; margin-top:32px; }
 .badge-section-heading .section-title { margin:0 0 5px; }
@@ -763,6 +765,7 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-grid--children { grid-template-columns:repeat(3,2.25in); gap:.1in; }
   body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:2.25in; height:3.5in; }
   body[data-print-badge] .badge-card button { display:none!important; }
+  body[data-print-badge] .badge-photo-upload { display:none!important; }
   body[data-print-bag-guide] .organizer-main > *:not(#event-form), body[data-print-bag-guide] .event-context, body[data-print-bag-guide] .settings-section:not(:has(.bag-packing-guide)), body[data-print-bag-guide] .bag-plan-intro, body[data-print-bag-guide] .bag-plan-table, body[data-print-bag-guide] .bag-plan-actions, body[data-print-bag-guide] .sticky-save { display:none!important; }
   body[data-print-bag-guide] .settings-section { display:block!important; border:0!important; }
   body[data-print-bag-guide] .settings-section summary, body[data-print-bag-guide] .settings-section__body > :not(.bag-packing-guide) { display:none!important; }

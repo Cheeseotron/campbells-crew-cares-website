@@ -599,6 +599,20 @@ async function api(request, env, url, user) {
     return new Response(photo.body, { headers });
   }
 
+  if (childPhotoMatch && request.method === "POST") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
+    const input = await request.json();
+    const photo = photoFromDataUrl(input.photoDataUrl);
+    if (!photo) return json({ error: "Please choose a JPG, PNG, or WebP photo." }, 400);
+    const child = await env.DB.prepare("SELECT id, household_id, photo_key FROM recipient_children WHERE id = ?").bind(childPhotoMatch[1]).first();
+    if (!child) return json({ error: "That child record was not found." }, 404);
+    const photoKey = child.photo_key || `children/${child.household_id}/${child.id}.jpg`;
+    await env.PRIVATE_UPLOADS.put(photoKey, photo.bytes, { httpMetadata: { contentType: photo.contentType }, customMetadata: { householdId: child.household_id, childId: child.id } });
+    await env.DB.prepare("UPDATE recipient_children SET photo_key = ? WHERE id = ?").bind(photoKey, child.id).run();
+    await audit(env, user, "recipient_child_photo_saved", "recipient_child", child.id);
+    return json({ photoUrl: `/portal-api/organizer/children/${encodeURIComponent(child.id)}/photo` });
+  }
+
   const recipientHouseholdMatch = url.pathname.match(/^\/portal-api\/organizer\/recipients\/([^/]+)$/);
   if (recipientHouseholdMatch && request.method === "DELETE") {
     if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
