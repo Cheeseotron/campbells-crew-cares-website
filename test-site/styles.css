@@ -306,11 +306,12 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .focus-card-head .eyebrow { margin: 0; }
 .dialog-close-inline { display: grid; width: 38px; height: 38px; place-items: center; cursor: pointer; background: var(--white); border: 1px solid var(--line); border-radius: 50%; font-size: 20px; }
 .compact-role-list { display: grid; gap: 10px; }
-.compact-role { position: relative; display: grid; grid-template-columns: 24px 1fr; padding: 17px; align-items: center; gap: 12px; border: 1px solid var(--line); cursor: pointer; background: var(--white); text-align: left; }
+.compact-role { position: relative; display: flex; width: 100%; min-height: 0; padding: 17px; align-items: flex-start; gap: 12px; border: 1px solid var(--line); cursor: pointer; background: var(--white); text-align: left; }
 .compact-role[aria-pressed="true"] { background: #edf9ed; border: 2px solid var(--green-dark); }
-.compact-role__radio { width: 18px; height: 18px; border: 2px solid #94a0a7; border-radius: 50%; box-shadow: inset 0 0 0 4px var(--white); }
+.compact-role__radio { width: 18px; height: 18px; margin-top: 3px; flex: 0 0 18px; border: 2px solid #94a0a7; border-radius: 50%; box-shadow: inset 0 0 0 4px var(--white); }
 .compact-role[aria-pressed="true"] .compact-role__radio { background: var(--green-dark); border-color: var(--ink); }
 .compact-role strong, .compact-role b, .compact-role small { display: block; }
+.compact-role > span:last-child { min-width: 0; flex: 1 1 0; overflow-wrap: anywhere; }
 .compact-role small { margin-top: 5px; color: var(--gray); }
 .selected-role { margin-bottom: 22px; padding: 15px 18px; background: var(--mist); border-left: 5px solid var(--green); }
 .selected-role span, .selected-role strong, .selected-role small { display: block; }
@@ -562,8 +563,7 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
   .volunteer-event-card__body { grid-template-columns: 1fr; padding: 24px 20px; }
   .volunteer-date strong { font-size: 52px; }
   .volunteer-focus-card { padding: 26px 20px 30px; border-radius: 18px; }
-  .compact-role { grid-template-columns: 22px 1fr; }
-  .compact-role > small { grid-column: 2; }
+  .compact-role { gap: 11px; padding: 14px; }
   .event-context, .budget-header, .sticky-save, .danger-zone { align-items: stretch; flex-direction: column; }
   .event-context select, .budget-header > div { width: 100%; min-width: 0; }
   .event-context > div, .volunteer-card-actions { flex-wrap: wrap; }
