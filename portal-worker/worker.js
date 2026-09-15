@@ -1,3 +1,5 @@
+import { PDFDocument, StandardFonts, rgb } from "./vendor/pdf-lib.esm.min.js";
+
 const COOKIE_NAME = "ccc_portal_session";
 const SESSION_SECONDS = 60 * 60 * 8;
 const REMEMBER_SESSION_SECONDS = 60 * 60 * 24 * 30;
@@ -184,6 +186,55 @@ function childProfilePrintPage({ child, household, event }) {
   const value = (item) => escapeHtml(item || "Not provided");
   const size = (label, item) => `<div class="size"><span>${label}</span><strong>${value(item)}</strong></div>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${value(name)} shopping profile</title><style>@page{size:letter;margin:.45in}*{box-sizing:border-box}body{margin:0;color:#111821;background:#fff;font-family:Arial,sans-serif}.sheet{min-height:9.9in;padding:24px;border:1px solid #cbd3ce;border-top:6px solid #35d32f}.eyebrow{margin:0 0 13px;color:#176b39;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{margin:0;font-size:30px;line-height:1.05}h2{margin:30px 0 11px;font-size:16px}.reference{margin:7px 0 26px;color:#617068;font-size:12px;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.box{padding:15px;background:#f3f7f3}.box span,.size span{display:block;margin-bottom:6px;color:#617068;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.box strong{font-size:14px}.sizes{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.size{padding:12px;background:#f3f7f3}.size strong{font-size:14px}.copy{line-height:1.5}.budget{display:flex;margin-top:32px;padding:16px;justify-content:space-between;gap:20px;background:#e8f7e8;border-left:5px solid #176b39;font-weight:700}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><main class="sheet"><p class="eyebrow">Campbell's Crew Cares · Child Shopping Profile</p><h1>${value(name)}</h1><p class="reference">${value(recipientApplicationReference(household.id))} · ${value(event.title)}</p><div class="grid"><div class="box"><span>Responsible party</span><strong>${value(household.guardian_name)}</strong></div><div class="box"><span>Emergency contact</span><strong>${value(application.emergencyName)} · ${value(application.emergencyPhone)}</strong></div></div><h2>Sizes</h2><div class="sizes">${size("Shirt",details.shirt)}${size("Pants",details.pants)}${size("Shoes",details.shoes)}${size("Underwear",details.underwear)}${size("Coat",details.coat)}</div><h2>Preferences & accommodations</h2><p class="copy"><strong>Preferences:</strong> ${value(details.preferences)}</p><p class="copy"><strong>Accommodations:</strong> ${value(details.accommodations)}</p><div class="budget"><span>Shopping budget: $${value(settings.shoppingBudget || "0")}</span><span>Volunteer spending total: $________________</span></div></main><script>addEventListener('load',()=>setTimeout(()=>print(),180))</script></body></html>`;
+}
+
+function childProfileValues({ child, household, event }) {
+  const details = child.details || {}; const application = household.application || {}; const settings = eventSettings(event);
+  return {
+    name: `${child.first_name || ""} ${child.last_name || ""}`.trim() || "Not provided",
+    application: recipientApplicationReference(household.id),
+    event: event.title || "Event",
+    volunteer: "Assigned at check-in",
+    age: details.age || child.age || "Not provided",
+    emergency: [application.emergencyName, application.emergencyPhone].filter(Boolean).join(" · ") || "Not provided",
+    shirt: details.shirt || "Not provided", pants: details.pants || "Not provided", shoes: details.shoes || "Not provided",
+    underwear: details.underwear || "Not provided", socks: details.socks || "Not provided", coat: details.coat || "Not provided",
+    preferences: details.preferences || "None provided", accommodations: details.accommodations || "None provided",
+    budget: settings.shoppingBudget || "0"
+  };
+}
+
+function drawProfileOverlay(page, values, font, bold) {
+  const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29);
+  const draw = (text, x, y, size = 9, options = {}) => page.drawText(String(text || ""), { x, y, size, font: options.bold ? bold : font, color: options.muted ? muted : ink, maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 2 });
+  draw(values.name, 51, 612, 10, { bold: true });
+  draw(values.application, 228, 612, 10, { bold: true });
+  draw(values.event, 404, 612, 8.5, { bold: true, maxWidth: 128 });
+  draw(values.volunteer, 51, 576, 8.5, { maxWidth: 128 });
+  draw(values.age, 228, 576, 9, { maxWidth: 128 });
+  draw(values.emergency, 404, 576, 8.2, { maxWidth: 128 });
+  [[values.shirt, 63, 493], [values.pants, 240, 493], [values.shoes, 416, 493], [values.underwear, 63, 454], [values.socks, 240, 454], [values.coat, 416, 454]].forEach(([text, x, y]) => draw(text, x, y, 9, { bold: true, maxWidth: 118 }));
+  draw(values.preferences, 56, 395, 8.2, { maxWidth: 235, lineHeight: 12 });
+  draw(values.accommodations, 316, 395, 8.2, { maxWidth: 235, lineHeight: 12 });
+  draw(String(values.budget), 218, 108, 10, { bold: true });
+}
+
+async function templatePdfBytes(env, origin, pathname) {
+  const response = await env.ASSETS.fetch(new Request(new URL(pathname, origin)));
+  if (!response.ok) throw new Error(`The packet template could not be loaded (${response.status}).`);
+  return response.arrayBuffer();
+}
+
+async function filledProfileDocument(env, origin, records, includeRules = false) {
+  const profileBytes = await templatePdfBytes(env, origin, "/assets/packets/CCC_Child_Shopping_Profile.pdf");
+  const rulesBytes = includeRules ? await templatePdfBytes(env, origin, "/assets/packets/CCC_Event_Rules_Sheet.pdf") : null;
+  const output = await PDFDocument.create(); const font = await output.embedFont(StandardFonts.Helvetica); const bold = await output.embedFont(StandardFonts.HelveticaBold);
+  for (const record of records) {
+    const source = await PDFDocument.load(profileBytes); const [page] = await output.copyPages(source, [0]); output.addPage(page);
+    drawProfileOverlay(page, childProfileValues(record), font, bold);
+    if (rulesBytes) { const rules = await PDFDocument.load(rulesBytes); const [rulesPage] = await output.copyPages(rules, [0]); output.addPage(rulesPage); }
+  }
+  return output.save();
 }
 
 async function readSignedUserToken(token, env) {
@@ -665,9 +716,34 @@ async function api(request, env, url, user) {
     try { details = JSON.parse(child.details_json || "{}"); } catch {}
     try { application = JSON.parse(child.application_json || "{}"); } catch {}
     try { settings = JSON.parse(child.settings_json || "{}"); } catch {}
-    const pdf = childProfilePdf({ child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, settings_json: JSON.stringify(settings) } });
+    const pdf = await filledProfileDocument(env, url.origin, [{ child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, settings_json: JSON.stringify(settings) } }]);
     const filename = `${String(child.first_name || "child").replace(/[^a-z0-9]+/gi, "-")}-shopping-profile.pdf`;
     return new Response(pdf, { headers: securityHeaders(new Headers({ "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${filename}"` })) });
+  }
+
+  const childPacketPdfMatch = url.pathname.match(/^\/portal-api\/organizer\/children\/([^/]+)\/packet\.pdf$/);
+  if (childPacketPdfMatch && request.method === "GET") {
+    if (!user) return json({ error: "Sign in required." }, 401);
+    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childPacketPdfMatch[1]).first();
+    if (!child) return json({ error: "That child record was not found." }, 404);
+    let details = {}; let application = {}; let settings = {};
+    try { details = JSON.parse(child.details_json || "{}"); } catch {}
+    try { application = JSON.parse(child.application_json || "{}"); } catch {}
+    try { settings = JSON.parse(child.settings_json || "{}"); } catch {}
+    const pdf = await filledProfileDocument(env, url.origin, [{ child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, settings_json: JSON.stringify(settings) } }], true);
+    const filename = `${String(child.first_name || "child").replace(/[^a-z0-9]+/gi, "-")}-complete-packet.pdf`;
+    return new Response(pdf, { headers: securityHeaders(new Headers({ "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${filename}"` })) });
+  }
+
+  if (url.pathname === "/portal-api/organizer/packets.pdf" && request.method === "GET") {
+    if (!user) return json({ error: "Sign in required." }, 401);
+    const eventId = String(url.searchParams.get("event") || "");
+    if (!eventId) return json({ error: "Choose an event before printing packets." }, 400);
+    const { results } = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE h.event_id = ? AND c.status = 'approved' ORDER BY c.first_name, c.last_name").bind(eventId).all();
+    if (!results.length) return json({ error: "There are no approved child packets for this event." }, 404);
+    const records = results.map((child) => { let details = {}; let application = {}; let settings = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} try { application = JSON.parse(child.application_json || "{}"); } catch {} try { settings = JSON.parse(child.settings_json || "{}"); } catch {} return { child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, settings_json: JSON.stringify(settings) } }; });
+    const pdf = await filledProfileDocument(env, url.origin, records, true);
+    return new Response(pdf, { headers: securityHeaders(new Headers({ "Content-Type": "application/pdf", "Content-Disposition": "inline; filename=campbells-crew-complete-packets.pdf" })) });
   }
 
   const childProfilePrintMatch = url.pathname.match(/^\/portal-api\/organizer\/children\/([^/]+)\/profile\/print$/);

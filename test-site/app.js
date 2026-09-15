@@ -1220,7 +1220,12 @@
         return;
       }
       if (button.dataset.printMode === "complete" && button.dataset.printChild) {
-        window.open(`/portal-api/organizer/children/${encodeURIComponent(button.dataset.printChild)}/profile/print`, "_blank", "noopener");
+        window.open(`/portal-api/organizer/children/${encodeURIComponent(button.dataset.printChild)}/packet.pdf`, "_blank", "noopener");
+        return;
+      }
+      if (button.dataset.printMode === "all") {
+        if (!state.event?.id) { toast("Choose an event before printing packets."); return; }
+        window.open(`/portal-api/organizer/packets.pdf?event=${encodeURIComponent(state.event.id)}`, "_blank", "noopener");
         return;
       }
       clearPrintState();
