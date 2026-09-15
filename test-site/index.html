@@ -12,26 +12,18 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <section class="lock-screen" id="lock-screen" aria-labelledby="lock-title">
+  <section class="lock-screen loading-screen" id="lock-screen" aria-labelledby="lock-title">
     <div class="lock-brand">
       <img src="../assets/images/ccc-logo.png" alt="">
       <span>Campbell's Crew Cares</span>
     </div>
     <div class="lock-card">
-      <p class="eyebrow">Private test site</p>
-      <h1 id="lock-title">Welcome back.</h1>
-      <p>This protected preview is for Campbell's Crew organizers and invited testers.</p>
-      <form id="pin-form" novalidate>
-        <label for="pin">Enter your 4-digit PIN</label>
-        <div class="pin-row">
-          <input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="4" pattern="[0-9]{4}" aria-describedby="pin-help pin-error">
-          <button type="submit">Enter <span aria-hidden="true">→</span></button>
-        </div>
-        <p class="field-help" id="pin-help">The PIN was provided by Campbell's Crew.</p>
-        <p class="field-error" id="pin-error" role="alert" hidden>That PIN isn't correct. Please try again.</p>
-      </form>
+      <p class="eyebrow">Campbell's Crew Cares</p>
+      <h1 id="lock-title">Loading<br>workspace.</h1>
+      <p>Preparing your organizer dashboard.</p>
+      <span class="loading-mark" aria-hidden="true"></span>
     </div>
-    <p class="lock-note">Prototype environment · No real recipient information</p>
+    <p class="lock-note">Secure organizer workspace</p>
   </section>
 
   <div class="app-shell" id="app-shell" hidden>

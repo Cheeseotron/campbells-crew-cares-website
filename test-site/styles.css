@@ -56,6 +56,8 @@ h1, h2, h3, p { margin-top: 0; }
 .field-help { color: var(--gray); }
 .field-error { color: var(--danger); font-weight: 700; }
 .lock-note { position: absolute; bottom: 24px; margin: 0; color: #9ba8a1; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.loading-mark { display: block; width: 34px; height: 34px; margin-top: 28px; border: 4px solid #d7e1da; border-top-color: var(--forest); border-radius: 50%; animation: workspace-loading .8s linear infinite; }
+@keyframes workspace-loading { to { transform: rotate(360deg); } }
 
 /* Shared shell */
 .app-shell { min-height: 100vh; background: var(--white); }
@@ -607,6 +609,7 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
   html { scroll-behavior: auto; }
   .path-card { transition: none; }
   .toast { animation: none; }
+  .loading-mark { animation: none; }
 }
 
 /* Revision 8: clearer guided forms and expanded organizer operations */

@@ -388,10 +388,10 @@
       renderRoute();
     } else {
       sessionStorage.removeItem(SESSION_KEY);
-      pinInput.value = "";
-      pinError.hidden = true;
+      if (pinInput) pinInput.value = "";
+      if (pinError) pinError.hidden = true;
       window.location.hash = "";
-      window.setTimeout(() => pinInput.focus(), 0);
+      if (pinInput) window.setTimeout(() => pinInput.focus(), 0);
     }
   }
 
@@ -1562,7 +1562,7 @@
     return [{ name: "Food Bag Order", rows: plan }];
   }
 
-  pinForm.addEventListener("submit", (event) => {
+  pinForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     if (pinInput.value.trim() === TEST_PIN) {
       setUnlocked(true);
@@ -1572,7 +1572,7 @@
     pinInput.select();
   });
 
-  pinInput.addEventListener("input", () => {
+  pinInput?.addEventListener("input", () => {
     pinInput.value = pinInput.value.replace(/\D/g, "").slice(0, 4);
     pinError.hidden = true;
   });
