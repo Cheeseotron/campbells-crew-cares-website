@@ -45,6 +45,7 @@ h1, h2, h3, p { margin-top: 0; }
 .lock-brand img { width: 48px; height: 48px; object-fit: contain; }
 .lock-card { position: relative; z-index: 1; width: min(100%, 580px); padding: clamp(32px, 6vw, 66px); color: var(--ink); background: var(--white); box-shadow: var(--shadow); border-top: 7px solid var(--green); }
 .lock-card h1 { margin: 0 0 18px; font-family: "Arial Black", Impact, sans-serif; font-size: clamp(48px, 8vw, 78px); letter-spacing: -.055em; line-height: .91; text-transform: uppercase; }
+.loading-screen .lock-card h1 { font-size: clamp(42px, 6vw, 56px); letter-spacing: -.045em; line-height: .96; }
 .lock-card > p:not(.eyebrow) { max-width: 420px; margin: 0 0 32px; color: var(--gray); line-height: 1.65; }
 .lock-card label { display: block; margin-bottom: 9px; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .pin-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
