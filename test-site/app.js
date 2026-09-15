@@ -722,7 +722,7 @@
         }) });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "Your application could not be submitted.");
-        recipientConfirmation = { id: payload.id, guardian: recipientDraft.guardian, eventName: state.event.title };
+        recipientConfirmation = { id: payload.id, guardian: recipientDraft.guardian, eventName: state.event.title, flags: [] };
         renderRecipient();
       } catch (error) { toast(error.message || "Your application could not be submitted."); }
       return;

@@ -119,7 +119,7 @@ async function servePortalAsset(request, env, url) {
       .replace("<html lang=\"en\">", "<html lang=\"en\" data-live-public-recipient=\"true\">")
       .replace('href="styles.css"', 'href="/portal-assets/styles.css"')
       .replace('src="xlsx-export.js"', 'src="/portal-assets/xlsx-export.js"')
-      .replace('src="app.js"', 'src="/portal-assets/app.js"')
+      .replace('src="app.js"', 'src="/portal-assets/app.js?v=recipient-confirmation-2"')
       .replaceAll("../assets/", "/assets/");
     headers.set("Content-Type", "text/html; charset=utf-8");
     return new Response(html, { status: asset.status, headers });
