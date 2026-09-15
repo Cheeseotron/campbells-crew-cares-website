@@ -660,15 +660,19 @@
 
   async function photoDataUrl(file) {
     const source = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error("The photo could not be read.")); reader.readAsDataURL(file); });
-    if (file.size <= 700 * 1024) return source;
+    // Most phone PNGs and JPGs can be sent straight through.  Avoid sending a
+    // perfectly valid image back through a second browser decoder merely to
+    // compress it; that decoder was the source of the false "choose a photo"
+    // message on some mobile devices.
+    if (file.size <= 950 * 1024) return source;
     return new Promise((resolve, reject) => {
       const image = new Image(); image.onload = () => {
         let width = image.naturalWidth; let height = image.naturalHeight; const scale = Math.min(1, 1200 / Math.max(width, height)); width = Math.max(1, Math.round(width * scale)); height = Math.max(1, Math.round(height * scale));
-        if (width < 400 || height < 400) { URL.revokeObjectURL(image.src); resolve(source); return; }
+        if (width < 400 || height < 400) { resolve(source); return; }
         const canvas = document.createElement("canvas"); const context = canvas.getContext("2d"); let output = "";
         while (width >= 400 && height >= 400) { canvas.width = width; canvas.height = height; context.drawImage(image, 0, 0, width, height); output = canvas.toDataURL("image/jpeg", .8); if (output.length <= 1300000) break; width = Math.round(width * .8); height = Math.round(height * .8); }
-        URL.revokeObjectURL(image.src); resolve(output || source);
-      }; image.onerror = () => reject(new Error("Please choose a JPG or PNG photo.")); image.src = URL.createObjectURL(file);
+        resolve(output || source);
+      }; image.onerror = () => reject(new Error("This image could not be prepared. Please choose a different JPG or PNG photo.")); image.src = source;
     });
   }
 
