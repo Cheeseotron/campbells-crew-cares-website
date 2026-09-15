@@ -496,6 +496,16 @@ async function api(request, env, url, user) {
     return json({ volunteers: results });
   }
 
+  const volunteerSignupMatch = url.pathname.match(/^\/portal-api\/organizer\/volunteers\/([^/]+)$/);
+  if (volunteerSignupMatch && request.method === "DELETE") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
+    const signup = await env.DB.prepare("SELECT id, event_id FROM volunteer_signups WHERE id = ?").bind(volunteerSignupMatch[1]).first();
+    if (!signup) return json({ error: "That volunteer signup was not found." }, 404);
+    await env.DB.prepare("DELETE FROM volunteer_signups WHERE id = ?").bind(signup.id).run();
+    await audit(env, user, "volunteer_signup_removed", "volunteer_signup", signup.id, signup.event_id);
+    return json({ id: signup.id });
+  }
+
   if (url.pathname === "/portal-api/organizer/recipients" && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
     const { results } = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, h.phone, h.status, h.created_at, e.title AS event_title, COUNT(c.id) AS child_count FROM recipient_households h JOIN events e ON e.id = h.event_id LEFT JOIN recipient_children c ON c.household_id = h.id GROUP BY h.id ORDER BY h.created_at DESC").all();
