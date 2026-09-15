@@ -1461,29 +1461,35 @@
       <div class="dialog-section"><h3>Independent child decisions</h3><p class="field-help">Choose a separate outcome for every child in this household.</p>${item.children.map((child) => `<div class="child-card"><div class="child-card__heading"><strong>${esc(child.name)} · Age ${esc(child.age)} · ${esc(child.gender)}</strong>${statusPill(child.decision || "review")}</div><p>Shirt ${esc(child.shirt)} · Pants ${esc(child.pants)} · Shoes ${esc(child.shoes)} · Underwear ${esc(child.underwear)} · Coat ${esc(child.coat)}</p><p><strong>Preferences:</strong> ${esc(child.preferences)}</p><p><strong>Accommodations:</strong> ${esc(child.accommodations)}</p><div class="child-decision-actions"><button type="button" data-child-decision="approved" data-child-id="${esc(child.id)}">Approve</button><button type="button" data-child-decision="info" data-child-id="${esc(child.id)}">Needs information</button><button type="button" data-child-decision="waitlisted" data-child-id="${esc(child.id)}">Waitlist</button><button type="button" data-child-decision="declined" data-child-id="${esc(child.id)}">Decline</button></div></div>`).join("")}</div></div>`;
     appDialog.showModal();
     document.body.classList.add("dialog-open");
-    dialogContent.querySelectorAll("[data-child-decision]").forEach((button) => button.addEventListener("click", async () => {
+    dialogContent.querySelectorAll("[data-child-decision]").forEach((button) => button.addEventListener("click", () => {
       if (item.archived) { toast("Closed-out application records are read-only."); return; }
       const child = item.children.find((record) => record.id === button.dataset.childId); if (!child) return;
-      const decision = button.dataset.childDecision;
-      const decisionLabel = formatStatus(decision);
-      if (!window.confirm(`Mark ${child.name} as ${decisionLabel}?${["approved", "declined", "waitlisted"].includes(decision) ? " This will also email the guardian." : ""}`)) return;
+      openChildDecisionConfirmation(item, child, button.dataset.childDecision);
+    }));
+  }
+
+  function openChildDecisionConfirmation(item, child, decision) {
+    const label = formatStatus(decision);
+    const emailsGuardian = ["approved", "declined", "waitlisted"].includes(decision);
+    dialogContent.innerHTML = `<div class="dialog-body confirm-dialog"><p class="eyebrow">Confirm child decision</p><h2 id="dialog-title">Mark ${esc(child.name)} as ${esc(label)}?</h2><p class="dialog-subtitle">This will update the live recipient record.${emailsGuardian ? " The guardian will also receive an email." : ""}</p><div class="confirmation-box"><strong>Please verify this choice before continuing.</strong><p>After confirmation, the organizer record is updated immediately.</p></div><div class="dialog-actions"><button class="button button--light" type="button" data-cancel-child-decision>Go back</button><button class="button button--green" type="button" data-confirm-child-decision>Yes, mark ${esc(label)}</button></div></div>`;
+    dialogContent.querySelector("[data-cancel-child-decision]").addEventListener("click", () => openApplication(item.id));
+    dialogContent.querySelector("[data-confirm-child-decision]").addEventListener("click", async (event) => {
+      const confirmButton = event.currentTarget; confirmButton.disabled = true; confirmButton.textContent = "Saving…";
       if (SERVER_AUTH) {
-        button.disabled = true;
         try {
           const response = await fetch(`/portal-api/organizer/recipients/${encodeURIComponent(item.id)}/children/${encodeURIComponent(child.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }) });
           const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The recipient decision could not be saved.");
-          child.decision = payload.decision; item.status = payload.householdStatus || item.status;
           await loadLiveApplications();
-          toast(payload.emailSent === false ? `${child.name} marked ${formatStatus(decision)}, but the email could not be sent.` : `${child.name} marked ${formatStatus(decision)}.${payload.emailSent ? " An email was sent." : ""}`);
+          toast(payload.emailSent === false ? `${child.name} marked ${label}, but the email could not be sent.` : `${child.name} marked ${label}.${payload.emailSent ? " An email was sent." : ""}`);
           closeDialog(); renderOrganizer("applications");
-        } catch (error) { toast(error.message || "The recipient decision could not be saved."); button.disabled = false; }
+        } catch (error) { toast(error.message || "The recipient decision could not be saved."); confirmButton.disabled = false; confirmButton.textContent = `Yes, mark ${label}`; }
         return;
       }
       child.decision = decision;
       const decisions = item.children.map((record) => record.decision);
       item.status = decisions.every((status) => status === decisions[0]) ? decisions[0] : "mixed";
-      item.updated = false; state.activity.unshift({ text: `${child.name} in ${item.id} was marked ${formatStatus(child.decision)}.`, time: "Just now" }); saveState(); toast(`${child.name} marked ${formatStatus(child.decision)}.`); closeDialog(); renderOrganizer("applications");
-    }));
+      item.updated = false; state.activity.unshift({ text: `${child.name} in ${item.id} was marked ${label}.`, time: "Just now" }); saveState(); toast(`${child.name} marked ${label}.`); closeDialog(); renderOrganizer("applications");
+    });
   }
 
   function updateApplicationStatus(id, status) {
