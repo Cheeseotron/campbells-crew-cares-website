@@ -220,18 +220,24 @@ function childProfileValues({ child, household, event }) {
 }
 
 function drawProfileOverlay(page, values, font, bold) {
-  const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const fieldPanel = rgb(238 / 255, 243 / 255, 239 / 255); const paper = rgb(251 / 255, 252 / 255, 251 / 255);
+  const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const fieldPanel = rgb(238 / 255, 243 / 255, 239 / 255); const paper = rgb(251 / 255, 252 / 255, 251 / 255); const border = rgb(0.77, 0.82, 0.79);
   const draw = (text, x, y, size = 9, options = {}) => page.drawText(String(text || ""), { x, y, size, font: options.bold ? bold : font, color: options.muted ? muted : ink, maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 2 });
   const clear = (x, y, width, height, color = fieldPanel) => page.drawRectangle({ x, y, width, height, color });
-  // Clear the old write-in lines before placing text so the values sit neatly
-  // in their fields rather than being crossed by the template's underscores.
-  [[51, 603, 132], [228, 603, 132], [404, 603, 130], [51, 567, 132], [228, 567, 132], [404, 567, 130]].forEach(([x, y, width]) => clear(x, y, width, 20));
-  draw(values.name, 51, 608, 9.3, { bold: true, maxWidth: 130 });
-  draw(values.application, 228, 608, 9.3, { bold: true, maxWidth: 130 });
-  draw(values.event, 404, 608, 8.2, { bold: true, maxWidth: 128 });
-  draw(values.volunteer, 51, 572, 7.7, { maxWidth: 130 });
-  draw(values.age, 228, 572, 7.3, { maxWidth: 130 });
-  draw(values.emergency, 404, 572, 6.6, { maxWidth: 128 });
+  // The supplied PDF has two tables that extend beyond their parent panels.
+  // Rebuild the small details table at the panel's true width instead of
+  // letting its original fill-in lines and outer edge show through.
+  clear(41, 574, 550, 71);
+  page.drawRectangle({ x: 41, y: 574, width: 529, height: 71, borderColor: border, borderWidth: .55 });
+  page.drawLine({ start: { x: 217, y: 574 }, end: { x: 217, y: 645 }, thickness: .55, color: border });
+  page.drawLine({ start: { x: 393, y: 574 }, end: { x: 393, y: 645 }, thickness: .55, color: border });
+  page.drawLine({ start: { x: 41, y: 609 }, end: { x: 570, y: 609 }, thickness: .55, color: border });
+  [["CHILD NAME", 51, 629], ["APPLICATION #", 228, 629], ["DATE / EVENT", 404, 629], ["VOLUNTEER", 51, 593], ["AGE / BIRTHDATE", 228, 593], ["EMERGENCY CONTACT", 404, 593]].forEach(([label, x, y]) => draw(label, x, y, 6.3, { bold: true, muted: true }));
+  draw(values.name, 51, 615, 9.3, { bold: true, maxWidth: 130 });
+  draw(values.application, 228, 615, 9.3, { bold: true, maxWidth: 130 });
+  draw(values.event, 404, 615, 8.2, { bold: true, maxWidth: 128 });
+  draw(values.volunteer, 51, 580, 7.7, { maxWidth: 130 });
+  draw(values.age, 228, 580, 7.3, { maxWidth: 130 });
+  draw(values.emergency, 404, 580, 6.6, { maxWidth: 128 });
   [[63, 487, 118], [240, 487, 118], [416, 487, 118], [63, 448, 118], [240, 448, 118], [416, 448, 118]].forEach(([x, y, width]) => clear(x, y, width, 14, paper));
   [[values.shirt, 63, 490], [values.pants, 240, 490], [values.shoes, 416, 490], [values.underwear, 63, 451], [values.socks, 240, 451], [values.coat, 416, 451]].forEach(([text, x, y]) => draw(text, x, y, 8.3, { bold: true, maxWidth: 118 }));
   clear(55, 342, 239, 55, paper); clear(315, 342, 239, 55, paper);
@@ -240,6 +246,11 @@ function drawProfileOverlay(page, values, font, bold) {
   const budgetRows = [values.budgets.shirt, values.budgets.pants, values.budgets.underwear, values.budgets.socks, values.budgets.shoes, values.budgets.coat];
   [251, 226, 200, 175, 149, 123].forEach((y, index) => { clear(217, y - 4, 58, 12, paper); draw(`$${budgetRows[index] || 0}`, 218, y, 8.5, { bold: true }); });
   clear(217, 96, 62, 12, rgb(0.88, 0.95, 0.89)); draw(`$${values.budgetTotal}`, 218, 100, 8.5, { bold: true });
+  // Clip the source template's overhanging right borders to the panel edge.
+  clear(570, 437, 21, 86, paper);
+  clear(570, 88, 21, 184, paper);
+  page.drawLine({ start: { x: 570, y: 437 }, end: { x: 570, y: 523 }, thickness: .55, color: border });
+  page.drawLine({ start: { x: 570, y: 88 }, end: { x: 570, y: 272 }, thickness: .55, color: border });
 }
 
 async function templatePdfBytes(env, origin, pathname) {
