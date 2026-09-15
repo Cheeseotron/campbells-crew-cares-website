@@ -641,6 +641,7 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
   body[data-print-mode="rules"] .print-child-sheet { display: none; }
   body[data-print-mode="complete"] .print-child-sheet, body[data-print-mode="all"] .print-child-sheet { break-after: page; }
   body[data-print-mode="complete"] .print-rules-sheet, body[data-print-mode="all"] .print-rules-sheet { break-after: page; }
+  .print-child-sheet, .print-rules-sheet { min-height: 9.6in; }
   .packet-size-grid { grid-template-columns: repeat(5, 1fr); }
 }
 
