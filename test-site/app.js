@@ -3,7 +3,7 @@
 
   const TEST_PIN = "2017";
   const SERVER_AUTH = document.documentElement.dataset.serverAuth === "true";
-  const LIVE_PUBLIC_RECIPIENT = window.CCC_LIVE_PUBLIC_RECIPIENT === true;
+  const LIVE_PUBLIC_RECIPIENT = document.documentElement.dataset.livePublicRecipient === "true";
   const SESSION_KEY = "ccc-test-site-unlocked";
   const STATE_KEY = "ccc-signup-prototype-state-v7";
   const main = document.querySelector("#main");
@@ -364,7 +364,8 @@
   function renderRoute() {
     if (sessionStorage.getItem(SESSION_KEY) !== "yes") return;
     clearPrintState();
-    const [route, subroute = "dashboard"] = routeParts();
+    let [route, subroute = "dashboard"] = routeParts();
+    if (LIVE_PUBLIC_RECIPIENT) route = "recipient";
     updateNav(route);
     if (route === "volunteer") renderVolunteer();
     else if (route === "recipient") renderRecipient();

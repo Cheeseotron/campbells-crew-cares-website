@@ -120,8 +120,7 @@ async function servePortalAsset(request, env, url) {
       .replace('href="styles.css"', 'href="/portal-assets/styles.css"')
       .replace('src="xlsx-export.js"', 'src="/portal-assets/xlsx-export.js"')
       .replace('src="app.js"', 'src="/portal-assets/app.js"')
-      .replaceAll("../assets/", "/assets/")
-      .replace("</head>", "<script>window.CCC_LIVE_PUBLIC_RECIPIENT=true;sessionStorage.setItem('ccc-test-site-unlocked','yes');location.hash='recipient';</script></head>");
+      .replaceAll("../assets/", "/assets/");
     headers.set("Content-Type", "text/html; charset=utf-8");
     return new Response(html, { status: asset.status, headers });
   }
