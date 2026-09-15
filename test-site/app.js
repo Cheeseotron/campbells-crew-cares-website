@@ -284,6 +284,34 @@
     }));
   }
 
+  async function loadLiveApplications() {
+    if (!SERVER_AUTH) return;
+    const response = await fetch("/portal-api/organizer/recipients", { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("The live recipient applications could not be loaded.");
+    const payload = await response.json();
+    state.applications = (payload.recipients || []).map((record) => {
+      const names = String(record.child_names || "").split("||").map((name) => name.trim()).filter(Boolean);
+      const count = Math.max(Number(record.child_count) || 0, names.length);
+      return {
+        id: record.id,
+        guardian: record.guardian_name || "",
+        email: record.email || "",
+        phone: record.phone || "",
+        submitted: record.created_at || "",
+        status: record.status || "submitted",
+        archived: false,
+        eventName: record.event_title || "",
+        flags: [],
+        previousAttendance: [],
+        children: Array.from({ length: count }, (_, index) => {
+          const name = names[index] || `Child ${index + 1}`;
+          const parts = name.split(/\s+/);
+          return { id: `${record.id}-child-${index}`, name, firstName: parts[0] || "", lastName: parts.slice(1).join(" "), age: "", decision: "review", attendance: "expected" };
+        })
+      };
+    });
+  }
+
   async function loadLiveUsers() {
     if (!SERVER_AUTH) return;
     const response = await fetch("/portal-api/organizer/users", { headers: { Accept: "application/json" } });
@@ -1560,6 +1588,7 @@
       try {
         await loadLiveEvents();
         await loadLiveVolunteers();
+        await loadLiveApplications();
         await loadLiveUsers();
       } catch (error) {
         main.innerHTML = `<section class="page-content"><article class="content-card"><h1>Organizer records could not load</h1><p>Please refresh the page. No changes were made.</p></article></section>`;
