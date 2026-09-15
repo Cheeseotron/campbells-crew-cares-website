@@ -490,7 +490,7 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .detail-item { padding: 14px; background: var(--mist-2); }
 .detail-item span { display: block; margin-bottom: 5px; color: var(--gray); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
-.toast-region { position: fixed; z-index: 1000; right: 22px; bottom: 22px; display: grid; gap: 10px; width: min(360px, calc(100% - 44px)); }
+.toast-region { position: fixed; z-index: 1000; right: 22px; bottom: 84px; display: grid; gap: 10px; width: min(360px, calc(100% - 44px)); }
 .toast { padding: 16px 18px; color: var(--white); background: var(--ink); border-left: 5px solid var(--green); box-shadow: var(--shadow); font-size: 13px; line-height: 1.45; animation: toast-in .2s ease-out; }
 @keyframes toast-in { from { transform: translateY(12px); opacity: 0; } }
 
