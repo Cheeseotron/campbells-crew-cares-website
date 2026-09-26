@@ -17,6 +17,7 @@
       if (yearsOutput && years > 0) yearsOutput.textContent = `${years} years`;
       showMinimum("[data-impact-children]", Number(impact.children_minimum || 0));
       showMinimum("[data-impact-families]", Number(impact.families_minimum || 0));
+      showMinimum("[data-impact-people-fed]", Number(impact.people_fed_minimum || 0));
     })
     .catch(() => { /* The static “Since 2017” fallback remains visible. */ });
 })();
