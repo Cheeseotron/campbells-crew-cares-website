@@ -933,7 +933,7 @@ async function api(request, env, url, user) {
     const input = await request.json();
     const decision = String(input.decision || "");
     const decisionNote = String(input.decisionNote || "").trim().slice(0, 1000);
-    if (!["approved", "declined", "waitlisted", "needs_information", "review"].includes(decision)) return json({ error: "That decision is not supported." }, 400);
+    if (!["approved", "declined", "waitlisted", "needs_information", "info", "review"].includes(decision)) return json({ error: "That decision is not supported." }, 400);
     if (decision === "declined" && !decisionNote) return json({ error: "Please provide a reason before declining this application." }, 400);
     const household = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, e.title, e.event_date, e.settings_json FROM recipient_households h JOIN events e ON e.id = h.event_id WHERE h.id = ?").bind(recipientDecisionMatch[1]).first();
     if (!household) return json({ error: "That recipient household was not found." }, 404);
@@ -943,8 +943,8 @@ async function api(request, env, url, user) {
     if (decision === "declined") details.organizerDecisionNote = decisionNote;
     await env.DB.prepare("UPDATE recipient_children SET status = ?, details_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(decision, JSON.stringify(details), child.id).run();
     const { results: children } = await env.DB.prepare("SELECT status FROM recipient_children WHERE household_id = ?").bind(household.id).all();
-    const statuses = children.map((record) => record.status);
-    const householdStatus = statuses.every((status) => status === "approved") ? "approved" : statuses.every((status) => status === "declined") ? "declined" : "review";
+    const statuses = children.map((record) => record.status === "needs_information" ? "info" : record.status);
+    const householdStatus = !statuses.length ? "review" : statuses.every((status) => status === statuses[0]) ? statuses[0] : statuses.some((status) => ["review", "submitted", "info"].includes(status)) ? "review" : "mixed";
     await env.DB.prepare("UPDATE recipient_households SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(householdStatus, household.id).run();
     let emailSent = null;
     if (["approved", "declined", "waitlisted"].includes(decision)) {

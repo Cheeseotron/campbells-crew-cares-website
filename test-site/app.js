@@ -430,6 +430,11 @@
     state.applications = (payload.recipients || []).map((record) => {
       const address = record.address && typeof record.address === "object" ? record.address : {};
       const application = record.application && typeof record.application === "object" ? record.application : {};
+      const children = (record.children || []).map((child) => {
+        const details = child.details && typeof child.details === "object" ? child.details : {};
+        const firstName = child.first_name || ""; const lastName = child.last_name || "";
+        return { id: child.id, name: `${firstName} ${lastName}`.trim(), firstName, lastName, birthdate: child.birth_date || "", age: "", gender: details.gender || "", shirt: details.shirt || "", pants: details.pants || "", shoes: details.shoes || "", underwear: details.underwear || "", bra: details.bra || "", coat: details.coat || "", preferences: details.preferences || "", accommodations: details.accommodations || "", photoUrl: child.photo_url || "", decisionNote: details.organizerDecisionNote || "", decision: child.status || "review", attendance: "expected" };
+      });
       return {
         id: record.id,
         referenceCode: record.reference_code || record.id,
@@ -445,16 +450,12 @@
         emergencyRelation: application.emergencyRelation || "",
         notes: application.notes || "",
         submitted: record.created_at || "",
-        status: record.status || "submitted",
+        status: householdStatusFromChildren(children, record.status || "submitted"),
         archived: false,
         eventName: record.event_title || "",
         flags: Array.isArray(record.flags) ? record.flags : [],
         previousAttendance: [],
-        children: (record.children || []).map((child) => {
-          const details = child.details && typeof child.details === "object" ? child.details : {};
-          const firstName = child.first_name || ""; const lastName = child.last_name || "";
-          return { id: child.id, name: `${firstName} ${lastName}`.trim(), firstName, lastName, birthdate: child.birth_date || "", age: "", gender: details.gender || "", shirt: details.shirt || "", pants: details.pants || "", shoes: details.shoes || "", underwear: details.underwear || "", bra: details.bra || "", coat: details.coat || "", preferences: details.preferences || "", accommodations: details.accommodations || "", photoUrl: child.photo_url || "", decisionNote: details.organizerDecisionNote || "", decision: child.status || "review", attendance: "expected" };
-        })
+        children
       };
     });
   }
@@ -479,8 +480,17 @@
   }
 
   function formatStatus(value) {
-    const labels = { open: "Open", code: "Access code", closed: "Closed", submitted: "Submitted", review: "Under review", approved: "Approved", info: "Needs information", waitlisted: "Waitlisted", declined: "Declined", mixed: "Mixed decisions", checked: "Checked in" };
+    const labels = { open: "Open", code: "Access code", closed: "Closed", submitted: "Submitted", review: "Under review", approved: "Approved", info: "Needs information", needs_information: "Needs information", waitlisted: "Waitlisted", declined: "Declined", mixed: "Mixed decisions", checked: "Checked in" };
     return labels[value] || value;
+  }
+
+  function householdStatusFromChildren(children, fallback = "review") {
+    const statuses = (children || []).map((child) => child.decision || child.status || "review").map((status) => status === "needs_information" ? "info" : status);
+    if (!statuses.length) return fallback;
+    if (statuses.every((status) => status === statuses[0])) return statuses[0];
+    // Once every child has an outcome, differing outcomes are clear rather
+    // than a household still awaiting review.
+    return statuses.some((status) => ["review", "submitted", "info"].includes(status)) ? "review" : "mixed";
   }
 
   function statusPill(value, override) {
