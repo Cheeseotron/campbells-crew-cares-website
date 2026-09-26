@@ -361,11 +361,31 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
 }
 
 function drawRulesOverlay(page, event, font, bold) {
-  const settings = eventSettings(event); const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const mist = rgb(238 / 255, 245 / 255, 239 / 255); const line = rgb(0.77, 0.82, 0.79);
-  const draw = (text, x, y, size = 8, options = {}) => page.drawText(String(text), { x, y, size, font: options.bold ? bold : font, color: options.muted ? muted : ink, maxWidth: options.maxWidth });
+  const settings = eventSettings(event); const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const mist = rgb(238 / 255, 245 / 255, 239 / 255); const line = rgb(0.77, 0.82, 0.79); const green = rgb(0.03, 0.47, 0.23); const orange = rgb(0.66, 0.24, 0); const cream = rgb(1, 242 / 255, 223 / 255); const pale = rgb(247 / 255, 250 / 255, 247 / 255);
+  const draw = (text, x, y, size = 8, options = {}) => page.drawText(String(text), { x, y, size, font: options.bold ? bold : font, color: options.color || (options.muted ? muted : ink), maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 1.8 });
   const items = Array.isArray(settings.budgetItems) ? settings.budgetItems : [];
   const toy = items.find((item) => item?.enabled && /toy/i.test(`${item.id || ""} ${item.label || ""}`));
   const bra = items.find((item) => item?.enabled && /bra/i.test(`${item.id || ""} ${item.label || ""}`));
+  // These two panels are event-specific. Cover the template wording so a
+  // clothing-only event never accidentally suggests that toys or bras are okay.
+  page.drawRectangle({ x: 42, y: 542, width: 528, height: 70, color: toy ? cream : mist, borderColor: toy ? orange : green, borderWidth: 1 });
+  if (toy) {
+    draw("TOYS: FIXED LIMIT - NO EXCEPTIONS", 58, 592, 12, { bold: true, maxWidth: 480 });
+    draw(`A toy is allowed only when it is printed on the child's sheet. The fixed toy maximum is $${Number(toy.amount) || 0}: clothing money can never be used for a more expensive toy. Toy money may be used for clothing instead.`, 58, 576, 8.3, { maxWidth: 494 });
+  } else {
+    draw("CLOTHING-ONLY EVENT - NO TOYS OR ACCESSORIES", 58, 592, 10.8, { bold: true, maxWidth: 480 });
+    draw("This event is restricted to clothing only. Do not purchase toys or accessories. Purchase only clothes from the categories listed on the child's information sheet.", 58, 576, 8.6, { maxWidth: 494 });
+  }
+  page.drawRectangle({ x: 42, y: 310, width: 255, height: 64, color: pale, borderColor: line, borderWidth: .8 });
+  page.drawRectangle({ x: 54, y: 340, width: 28, height: 22, color: green });
+  draw("03", 61, 347, 8, { bold: true, color: rgb(1, 1, 1) });
+  if (bra) {
+    draw("Bras are limited and specific", 92, 361, 10, { bold: true, maxWidth: 190 });
+    draw("Bras are only for Girls/Women who truly need them, and only when both a bra size and bra budget are printed. Otherwise, they are not approved.", 92, 345, 6.9, { maxWidth: 190 });
+  } else {
+    draw("Bras are not approved", 92, 361, 10, { bold: true, maxWidth: 190 });
+    draw("Do not purchase bras for this event. Only the clothing categories and items printed on the child's information sheet are permitted.", 92, 345, 6.9, { maxWidth: 190 });
+  }
   // This dedicated panel is intentionally the one dynamic part of the rules
   // page. Only active special-item rules appear, so volunteers cannot mistake
   // an optional item from another event as permission for this child.
@@ -376,6 +396,14 @@ function drawRulesOverlay(page, event, font, bold) {
   if (toy) { draw(`TOYS - FIXED $${Number(toy.amount) || 0} MAX. Clothing money cannot be used for toys; toy money may be used for clothing.`, 58, y, 7.2, { bold: true, maxWidth: 495 }); y -= 16; }
   if (bra) { draw("BRAS - only for Girls/Women who truly need them, and only when both Bra Size and a Bra budget are printed on the child's sheet.", 58, y, 6.8, { bold: true, maxWidth: 495 }); }
   if (!toy && !bra) draw("No additional special-item approvals are active for this event.", 58, y, 8, { muted: true });
+}
+
+async function eventRulesDocument(env, origin, event) {
+  const source = await PDFDocument.load(await templatePdfBytes(env, origin, "/assets/packets/CCC_Event_Rules_Sheet.pdf"));
+  const output = await PDFDocument.create(); const font = await output.embedFont(StandardFonts.Helvetica); const bold = await output.embedFont(StandardFonts.HelveticaBold);
+  const [page] = await output.copyPages(source, [0]); output.addPage(page);
+  drawRulesOverlay(page, event, font, bold);
+  return output.save();
 }
 
 async function templatePdfBytes(env, origin, pathname) {
@@ -933,6 +961,16 @@ async function api(request, env, url, user) {
     if (!photo) return json({ error: "The photo file was not found." }, 404);
     const headers = securityHeaders(new Headers({ "Content-Type": photo.httpMetadata?.contentType || "image/jpeg" }));
     return new Response(photo.body, { headers });
+  }
+
+  const eventRulesPdfMatch = url.pathname.match(/^\/portal-api\/organizer\/events\/([^/]+)\/rules\.pdf$/);
+  if (eventRulesPdfMatch && request.method === "GET") {
+    if (!user) return json({ error: "Sign in required." }, 401);
+    const event = await env.DB.prepare("SELECT id, title, event_date, settings_json FROM events WHERE id = ?").bind(eventRulesPdfMatch[1]).first();
+    if (!event) return json({ error: "Event not found." }, 404);
+    const pdf = await eventRulesDocument(env, url.origin, event);
+    const filename = `${String(event.title || "event").replace(/[^a-z0-9]+/gi, "-")}-rules.pdf`;
+    return new Response(pdf, { headers: securityHeaders(new Headers({ "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${filename}"` })) });
   }
 
   if (childPhotoMatch && request.method === "POST") {
