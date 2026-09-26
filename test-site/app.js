@@ -798,7 +798,7 @@
       <div class="field"><label for="child-${index}-birthdate">Date of birth</label><input id="child-${index}-birthdate" name="child-${index}-birthdate" type="date" value="${esc(child.birthdate)}" required></div>
       <div class="field"><label for="child-${index}-gender">Sizing category</label><select id="child-${index}-gender" name="child-${index}-gender" data-child-gender="${index}" required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This helps the organizers understand the child’s typical sizing.</small></div>
       <div class="field field--span-2 size-guidance"><strong>Clothing sizes</strong><small>Spell out letter sizes—for example: <b>Small</b>, <b>Medium</b>, or <b>Large</b>. You can also be more specific for pants if you know the size, such as <b>30/32</b>. For socks and shoes, please use numbers. If you are unsure, you can always go a little bigger so we can make sure the clothes will fit.</small></div>
-      ${sizeField(index,"shirt","Shirt",child.shirt)}${sizeField(index,"pants","Pants",child.pants)}${sizeField(index,"shoes","Shoes",child.shoes)}${sizeField(index,"socks","Socks",child.socks)}${sizeField(index,"underwear","Underwear",child.underwear)}${state.event.questions?.braSize ? braSizeField(index, child) : ""}${sizeField(index,"coat","Coat",child.coat)}
+      ${sizeField(index,"shirt","Shirt",child.shirt)}${sizeField(index,"pants","Pants",child.pants)}${sizeField(index,"shoes","Shoes",child.shoes)}${sizeField(index,"socks","Socks",child.socks)}${sizeField(index,"underwear","Underwear",child.underwear)}${braBudgetEnabled() ? braSizeField(index, child) : ""}${sizeField(index,"coat","Coat",child.coat)}
       <div class="field field--span-2"><label for="child-${index}-photo">Recent photo of this child</label><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png" ${child.photoDataUrl ? "" : "required"}><small>A photo is required for every child so Campbell's Crew can pre-make their event badge and keep it with the correct clothing bag. Badges use a square, center-cropped photo so the child’s face should be near the middle. JPG or PNG only. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div>
       <div class="field field--span-2"><label for="child-${index}-preferences">Colors, styles, interests, likes, or dislikes</label><textarea id="child-${index}-preferences" name="child-${index}-preferences" required>${esc(child.preferences)}</textarea></div>
       <div class="field field--span-2"><label for="child-${index}-accommodations">Medical, sensory, communication, mobility, or behavioral accommodations</label><textarea id="child-${index}-accommodations" name="child-${index}-accommodations" required>${esc(child.accommodations)}</textarea><small>Enter “None” if no accommodation is needed.</small></div>
@@ -830,6 +830,10 @@
 
   function braSizeApplies(gender) { return /girl|women|female/i.test(String(gender || "")); }
 
+  function braBudgetEnabled() {
+    return Array.isArray(state.event.budgetItems) && state.event.budgetItems.some((item) => item.enabled && /bra/i.test(`${item.id || ""} ${item.label || ""}`));
+  }
+
   function braSizeField(index, child) {
     const applicable = braSizeApplies(child.gender);
     return `<div class="field size-field" data-bra-field="${index}" ${applicable ? "" : "hidden"}><label for="child-${index}-bra">Bra size <span>(if applicable)</span></label><input id="child-${index}-bra" name="child-${index}-bra" value="${esc(child.bra || "")}" placeholder="Enter size" ${applicable ? "" : "disabled"}></div>`;
@@ -851,7 +855,7 @@
     recipientDraft.children = await Promise.all(recipientDraft.children.map(async (child, index) => {
       const next = {};
       ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "bra", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); });
-      if (!state.event.questions?.braSize || !braSizeApplies(next.gender)) next.bra = "";
+      if (!braBudgetEnabled() || !braSizeApplies(next.gender)) next.bra = "";
       const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || "");
       if (photo?.files[0]) next.photoDataUrl = await photoDataUrl(photo.files[0]);
       else next.photoDataUrl = child.photoDataUrl || "";
@@ -1082,7 +1086,7 @@
       <div class="sticky-save"><span>All changes are saved.</span><button class="button button--green" type="submit">Save & update event →</button></div></form>`;
   }
 
-  function questionToggle(id, label, checked) { if (id === "documents") return ""; return `<label class="question-toggle"><input type="checkbox" name="question-${id}" ${checked ? "checked" : ""}><span class="switch-control" aria-hidden="true"></span><span><strong>${esc(label)}</strong><small>${checked ? "Shown" : "Hidden"} on the public form</small></span></label>`; }
+  function questionToggle(id, label, checked) { if (id === "documents" || id === "braSize") return ""; return `<label class="question-toggle"><input type="checkbox" name="question-${id}" ${checked ? "checked" : ""}><span class="switch-control" aria-hidden="true"></span><span><strong>${esc(label)}</strong><small>${checked ? "Shown" : "Hidden"} on the public form</small></span></label>`; }
 
   function statusChoice(name, value, title, copy, current) {
     return `<div class="status-choice"><input id="${name}-${value}" type="radio" name="${name}" value="${value}" ${current === value ? "checked" : ""}><label for="${name}-${value}"><strong>${esc(title)}</strong><span>${esc(copy)}</span></label></div>`;
@@ -1787,7 +1791,7 @@
       `Shoes ${esc(child.shoes || "Not provided")}`,
       `Underwear ${esc(child.underwear || "Not provided")}`
     ];
-    if (state.event.questions?.braSize && braSizeApplies(child.gender) && child.bra) sizes.push(`Bra ${esc(child.bra)}`);
+    if (braBudgetEnabled() && braSizeApplies(child.gender) && child.bra) sizes.push(`Bra ${esc(child.bra)}`);
     sizes.push(`Coat ${esc(child.coat || "Not provided")}`);
     return sizes.join(" · ");
   }
