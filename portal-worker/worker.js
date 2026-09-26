@@ -304,11 +304,14 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
   page.drawLine({ start: { x: 217, y: 574 }, end: { x: 217, y: 645 }, thickness: .55, color: border });
   page.drawLine({ start: { x: 393, y: 574 }, end: { x: 393, y: 645 }, thickness: .55, color: border });
   page.drawLine({ start: { x: 41, y: 609 }, end: { x: 570, y: 609 }, thickness: .55, color: border });
+  // This is deliberately the only white cell: the assigned volunteer writes
+  // their own name here at check-in, using a regular pen.
+  page.drawRectangle({ x: 41, y: 574, width: 176, height: 35, color: rgb(1, 1, 1), borderColor: border, borderWidth: .55 });
   [["CHILD NAME", 51, 629], ["APPLICATION #", 228, 629], ["DATE / EVENT", 404, 629], ["VOLUNTEER", 51, 593], ["AGE / BIRTHDATE", 228, 593], ["EMERGENCY CONTACT", 404, 593]].forEach(([label, x, y]) => draw(label, x, y, 7, { bold: true, muted: true }));
   draw(values.name, 51, 615, 10.5, { bold: true, maxWidth: 130 });
   draw(values.application, 228, 615, 10.5, { bold: true, maxWidth: 130 });
   draw(values.event, 404, 615, 9, { bold: true, maxWidth: 128 });
-  draw(values.volunteer, 51, 580, 8.5, { maxWidth: 130 });
+  page.drawLine({ start: { x: 51, y: 580 }, end: { x: 207, y: 580 }, thickness: .6, color: muted });
   draw(values.age, 228, 580, 8.2, { maxWidth: 130 });
   draw(values.emergency, 404, 580, 7.4, { maxWidth: 128 });
   // Sizes panel: the header, table, and all value cells share the same outer
