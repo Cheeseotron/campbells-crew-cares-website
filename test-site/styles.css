@@ -716,8 +716,8 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card { min-height:190px; padding:22px; border:2px solid var(--ink); background:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:9px; }
 .badge-card > span { color:var(--green-dark); font-weight:800; text-transform:uppercase; letter-spacing:.08em; font-size:12px; }
 .badge-card > strong { font-size:25px; line-height:1.1; }
-.badge-photo { width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:#e8ece9;color:#66716a;font-size:12px; }
-.badge-photo img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.badge-photo { width:64px; height:64px; aspect-ratio:1 / 1; overflow:hidden; display:grid; place-items:center; background:#e8ece9; color:#66716a; font-size:12px; }
+.badge-photo img { display:block; width:100%!important; height:100%!important; max-width:none; flex:none; object-fit:cover; object-position:center; }
 .badge-photo-upload { padding:7px 9px; color:var(--green-dark); background:var(--mist); border:1px solid var(--line); cursor:pointer; font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
 .badge-photo-upload input { position:absolute; width:1px; height:1px; opacity:0; }
 .checkin-row { padding-top:10px; padding-bottom:10px; min-height:64px; }
@@ -731,7 +731,7 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card--volunteer > button { align-self:flex-end; }
 .badge-card--recipient { width:min(100%, var(--child-badge-width, 300px)); min-height:0; aspect-ratio:var(--child-badge-ratio, 3 / 4); justify-self:center; }
 .badge-card--recipient .badge-logo { width:40px; height:40px; object-fit:contain; }
-.badge-card--recipient .badge-photo { width:96px; height:96px; }
+.badge-card--recipient .badge-photo { width:96px; height:96px; min-width:96px; min-height:96px; }
 body[data-volunteer-badge-size="horizontal-35"] .badge-card--volunteer { aspect-ratio:3.5 / 2.25; }
 body[data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:min(100%,260px); aspect-ratio:2.25 / 3.5; }
 body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer { flex-direction:column; justify-content:center; text-align:center; }
