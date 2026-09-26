@@ -224,11 +224,13 @@ function drawProfileOverlay(page, values, font, bold) {
   const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const fieldPanel = rgb(238 / 255, 243 / 255, 239 / 255); const paper = rgb(251 / 255, 252 / 255, 251 / 255); const border = rgb(0.77, 0.82, 0.79);
   const draw = (text, x, y, size = 9, options = {}) => page.drawText(String(text || ""), { x, y, size, font: options.bold ? bold : font, color: options.muted ? muted : ink, maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 2 });
   const clear = (x, y, width, height, color = fieldPanel) => page.drawRectangle({ x, y, width, height, color });
-  // The supplied PDF has inconsistent panel insets plus grid lines that run
-  // past the right edge. Rebuild every filled region on the same 41–570 grid.
-  clear(570, 88, 42, 557, paper);
+  // The supplied template has several overlapping panel edges and labels.  Do
+  // not try to patch those individual marks: cover the whole data region and
+  // rebuild it on one shared 41-570 point grid so every edge lands together.
+  const left = 41; const right = 570; const width = right - left;
+  clear(31, 80, 560, 570, paper);
   clear(41, 574, 550, 71);
-  page.drawRectangle({ x: 41, y: 574, width: 529, height: 71, borderColor: border, borderWidth: .55 });
+  page.drawRectangle({ x: left, y: 574, width, height: 71, color: fieldPanel, borderColor: border, borderWidth: .55 });
   page.drawLine({ start: { x: 217, y: 574 }, end: { x: 217, y: 645 }, thickness: .55, color: border });
   page.drawLine({ start: { x: 393, y: 574 }, end: { x: 393, y: 645 }, thickness: .55, color: border });
   page.drawLine({ start: { x: 41, y: 609 }, end: { x: 570, y: 609 }, thickness: .55, color: border });
@@ -242,9 +244,8 @@ function drawProfileOverlay(page, values, font, bold) {
   // Sizes panel: the header, table, and all value cells share the same outer
   // edge as the details, notes, and budget panels. A bra field only exists
   // when that event enabled it and the child's sizing category is applicable.
-  clear(41, 420, 550, 142, paper);
-  page.drawRectangle({ x: 41, y: 420, width: 529, height: 142, borderColor: border, borderWidth: .55 });
-  page.drawRectangle({ x: 41, y: 534, width: 529, height: 28, color: fieldPanel, borderColor: border, borderWidth: .55 });
+  page.drawRectangle({ x: left, y: 420, width, height: 142, color: paper, borderColor: border, borderWidth: .55 });
+  page.drawRectangle({ x: left, y: 534, width, height: 28, color: fieldPanel, borderColor: border, borderWidth: .55 });
   draw("Sizes", 53, 544, 13, { bold: true });
   const sizeTop = 523; const sizeBottom = 430; const sizeLeft = 52; const sizeRight = 559; const rowMid = 477;
   page.drawRectangle({ x: sizeLeft, y: sizeBottom, width: sizeRight - sizeLeft, height: sizeTop - sizeBottom, borderColor: border, borderWidth: .5 });
@@ -263,18 +264,38 @@ function drawProfileOverlay(page, values, font, bold) {
     [["UNDERWEAR", values.underwear], ["SOCKS", values.socks], ["COAT / JACKET", values.coat]].forEach(([label, item], index) => drawSizeCell(label, item, columns[index], sizeBottom, columns[index + 1] - columns[index]));
   }
   // Preferences are redrawn to remove the template's inset left/right edges.
-  clear(41, 317, 550, 91, paper);
-  page.drawRectangle({ x: 41, y: 317, width: 529, height: 91, borderColor: border, borderWidth: .55 });
+  page.drawRectangle({ x: left, y: 317, width, height: 91, color: paper, borderColor: border, borderWidth: .55 });
   page.drawLine({ start: { x: 305, y: 317 }, end: { x: 305, y: 408 }, thickness: .55, color: border });
   draw("Preferences, likes, colors, and styles", 53, 389, 8, { bold: true });
   draw("Accommodations and helpful notes", 317, 389, 8, { bold: true });
   draw(values.preferences, 53, 365, 7.7, { maxWidth: 240, lineHeight: 10 });
   draw(values.accommodations, 317, 365, 7.7, { maxWidth: 240, lineHeight: 10 });
+  // Rebuild the budget table too. Its source table is wider than the profile
+  // panels, which was the remaining right-side overhang in printed packets.
+  const budgetTop = 295; const budgetBottom = 88; const headerBottom = 270;
+  const columns = [52, 204, 285, 385, 559];
+  page.drawRectangle({ x: left, y: budgetBottom, width, height: budgetTop - budgetBottom, color: paper, borderColor: border, borderWidth: .55 });
+  page.drawRectangle({ x: left, y: headerBottom, width, height: budgetTop - headerBottom, color: fieldPanel, borderColor: border, borderWidth: .55 });
+  draw("Budget and optional spending tracker", 53, 280, 13, { bold: true });
+  page.drawRectangle({ x: 52, y: 247, width: 507, height: 23, color: rgb(0.07, 0.10, 0.13) });
+  ["ESSENTIAL", "BUDGET", "AMOUNT SPENT", "ITEM / NOTES"].forEach((label, index) => draw(label, columns[index] + 10, 255, 6.8, { bold: true, muted: true }));
+  const budgetLabels = ["Shirt / blouse / dress", "Pants / shorts", "Undergarments", "Socks", "Shoes", "Coat / jacket"];
   const budgetRows = [values.budgets.shirt, values.budgets.pants, values.budgets.underwear, values.budgets.socks, values.budgets.shoes, values.budgets.coat];
-  [251, 226, 200, 175, 149, 123].forEach((y, index) => { clear(217, y - 4, 58, 12, paper); draw(`$${budgetRows[index] || 0}`, 218, y, 8.5, { bold: true }); });
-  clear(217, 96, 62, 12, rgb(0.88, 0.95, 0.89)); draw(`$${values.budgetTotal}`, 218, 100, 8.5, { bold: true });
-  // Restore clean shared right borders after covering the template overhang.
-  page.drawLine({ start: { x: 570, y: 88 }, end: { x: 570, y: 272 }, thickness: .55, color: border });
+  const rowHeight = 24; const firstRowBottom = 223;
+  for (let index = 0; index < 6; index += 1) {
+    const y = firstRowBottom - index * rowHeight;
+    page.drawRectangle({ x: 52, y, width: 507, height: rowHeight, color: paper, borderColor: border, borderWidth: .45 });
+    draw(budgetLabels[index], 62, y + 8, 7.7, { maxWidth: 132 });
+    draw(`$${budgetRows[index] || 0}`, 214, y + 8, 8, { bold: true, maxWidth: 60 });
+    draw("$____________", 295, y + 8, 7.4, { maxWidth: 80 });
+    page.drawLine({ start: { x: 397, y: y + 10 }, end: { x: 545, y: y + 10 }, thickness: .45, color: muted });
+  }
+  page.drawRectangle({ x: 52, y: 88, width: 507, height: 15, color: rgb(0.88, 0.95, 0.89), borderColor: border, borderWidth: .45 });
+  draw("TOTAL", 62, 93, 7.5, { bold: true });
+  draw(`$${values.budgetTotal}`, 214, 93, 8, { bold: true });
+  draw("$_______", 295, 93, 7.4, { bold: true });
+  draw("Remaining: $_______", 397, 93, 7.2, { bold: true });
+  columns.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: 88 }, end: { x, y: 270 }, thickness: .45, color: border }));
 }
 
 async function templatePdfBytes(env, origin, pathname) {
