@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from "./vendor/pdf-lib.esm.min.js";
+import { PDFDocument, StandardFonts, rgb, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } from "./vendor/pdf-lib.esm.min.js";
 
 const COOKIE_NAME = "ccc_portal_session";
 const SESSION_SECONDS = 60 * 60 * 8;
@@ -268,16 +268,18 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   // Remove the template's internal "profile" label; the child's name is the
   // useful title for volunteers sorting a stack of sheets.
   clear(390, 740, 180, 28, paper);
-  draw(values.name, left, 710, 25, { bold: true, maxWidth: photo ? 410 : 500 });
+  draw(values.name, left, 710, 25, { bold: true, maxWidth: photo ? 400 : 500 });
   draw("Child information sheet", left, 686, 10.5, { muted: true });
   if (photo) {
-    const photoLeft = 507; const photoBottom = 674; const photoSide = 52;
-    // Fit inside the square instead of stretching or bleeding outside the
-    // frame; badge upload cropping already keeps the photo well composed.
-    const scale = Math.min(photoSide / photo.width, photoSide / photo.height);
+    const photoLeft = 494; const photoBottom = 665; const photoSide = 64;
+    // Fill, center, and clip the square so every packet uses the same crop
+    // treatment as the child badge rather than letterboxing the source image.
+    const scale = Math.max(photoSide / photo.width, photoSide / photo.height);
     const photoWidth = photo.width * scale; const photoHeight = photo.height * scale;
     page.drawRectangle({ x: photoLeft - 2, y: photoBottom - 2, width: photoSide + 4, height: photoSide + 4, color: paper, borderColor: rgb(0.09, 0.42, 0.22), borderWidth: 1.5 });
+    page.pushOperators(pushGraphicsState(), rectangle(photoLeft, photoBottom, photoSide, photoSide), clip(), endPath());
     page.drawImage(photo, { x: photoLeft + (photoSide - photoWidth) / 2, y: photoBottom + (photoSide - photoHeight) / 2, width: photoWidth, height: photoHeight });
+    page.pushOperators(popGraphicsState());
   }
   // The original template's details panel is wider than the rebuilt grid.
   // Keep this cover exactly on the shared right edge so no colored strip leaks
