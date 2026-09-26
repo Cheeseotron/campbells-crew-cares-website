@@ -359,20 +359,20 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
   for (let index = 0; index < budgetRows.length; index += 1) {
     const y = firstRowBottom - index * rowHeight;
     page.drawRectangle({ x: 52, y, width: 507, height: rowHeight, color: paper, borderColor: border, borderWidth: .45 });
-    // Keep every handwritten entry baseline aligned across the row. The
-    // notes line used to sit on the row midpoint, which made it look like a
-    // stray divider rather than the matching writing line for Amount Spent.
+    // Keep labels centered, but set the handwriting baselines low in the
+    // cells. That leaves the middle of each cell for a person to write in.
     const textY = y + Math.max(5.8, (rowHeight - 8.8) / 2);
+    const writingLineY = y + 3.5;
     const textSize = rowHeight < 20 ? 7.6 : 8.5;
     draw(budgetRows[index].fixedCap ? "TOYS — FIXED CAP" : budgetRows[index].label, 62, textY, textSize, { bold: Boolean(budgetRows[index].fixedCap), maxWidth: 132 });
     draw(`$${budgetRows[index].amount}`, 214, textY, textSize, { bold: true, maxWidth: 60 });
-    draw("$____________", 295, textY, rowHeight < 20 ? 7.4 : 8.1, { maxWidth: 80 });
-    page.drawLine({ start: { x: 397, y: textY + 1.7 }, end: { x: 545, y: textY + 1.7 }, thickness: .45, color: muted });
+    draw("$____________", 295, writingLineY - 1.2, rowHeight < 20 ? 7.4 : 8.1, { maxWidth: 80 });
+    page.drawLine({ start: { x: 397, y: writingLineY }, end: { x: 545, y: writingLineY }, thickness: .45, color: muted });
   }
   page.drawRectangle({ x: 52, y: 113, width: 507, height: 15, color: rgb(0.88, 0.95, 0.89), borderColor: border, borderWidth: .45 });
   draw("TOTAL", 62, 118, 7.5, { bold: true });
   draw(`$${values.budgetTotal}`, 214, 118, 8, { bold: true });
-  draw("$_______", 295, 118, 7.4, { bold: true });
+  draw("$_______", 295, 115.5, 7.4, { bold: true });
   const toyBudget = budgetRows.find((item) => item.fixedCap);
   draw(toyBudget ? `TOYS: FIXED $${toyBudget.amount} MAX - NO TRANSFERS` : "Remaining: $_______", 397, 118, toyBudget ? 6.4 : 7.2, { bold: true, maxWidth: 150 });
   columns.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: 113 }, end: { x, y: 300 }, thickness: .45, color: border }));
