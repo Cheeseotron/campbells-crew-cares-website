@@ -742,8 +742,8 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card--recipient::after { content:"✦  •  ✦  •  ✦"; position:absolute; z-index:0; right:-17px; bottom:4px; color:rgba(23,107,57,.16); font-size:28px; font-weight:800; letter-spacing:3px; transform:rotate(-15deg); white-space:nowrap; }
 .badge-card--recipient > * { position:relative; z-index:1; }
 .badge-card--recipient .badge-logo { width:38px; height:38px; padding:2px; object-fit:contain; border:2px solid var(--green-dark); border-radius:50%; background:#fff; }
-.badge-card--recipient .badge-photo { width:82px; height:82px; min-width:82px; min-height:82px; padding:4px; border:3px solid var(--green); background:#fff; box-shadow:3px 3px 0 var(--ink); }
-.badge-card--recipient .badge-photo img { border:0; }
+.badge-card--recipient .badge-photo { width:82px; height:82px; min-width:82px; min-height:82px; padding:0; border:3px solid var(--green); background:#fff; box-shadow:3px 3px 0 var(--ink); }
+.badge-card--recipient .badge-photo img { width:100%!important; height:100%!important; border:0; object-fit:cover!important; object-position:center center; }
 .badge-card--recipient > span { padding:0 4px; color:var(--green-dark); font-size:9px; letter-spacing:.1em; }
 .badge-card--recipient > strong { max-width:100%; color:var(--ink); font-size:20px; letter-spacing:-.035em; overflow-wrap:anywhere; }
 .badge-card--recipient > b { padding:4px 8px; color:#fff; background:var(--ink); border-radius:999px; font-size:10px; letter-spacing:.08em; }
