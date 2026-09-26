@@ -3,7 +3,7 @@
     const card = document.querySelector(selector);
     const output = card?.querySelector("strong");
     if (!card || !output || !Number.isFinite(value) || value <= 0) return;
-    output.textContent = `At least ${value.toLocaleString()}+`;
+    output.textContent = `${value.toLocaleString()}+`;
     card.hidden = false;
   };
 
