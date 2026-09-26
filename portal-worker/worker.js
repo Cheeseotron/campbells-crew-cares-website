@@ -212,7 +212,8 @@ function childProfileValues({ child, household, event }) {
     age: details.age || child.age || (age !== "" ? `${age} years · ${birthDate}` : birthDate || "Not provided"),
     emergency: [application.emergencyName, application.emergencyPhone].filter(Boolean).join(" · ") || "Not provided",
     shirt: details.shirt || "Not provided", pants: details.pants || "Not provided", shoes: details.shoes || "Not provided",
-    underwear: details.underwear || "Not provided", socks: details.socks || "Not provided", coat: details.coat || "Not provided",
+    underwear: details.underwear || "Not provided", socks: details.socks || "Not provided", bra: details.bra || "Not provided", coat: details.coat || "Not provided",
+    showBra: Boolean(settings.questions?.braSize) && /girl|women|female/i.test(String(details.gender || "")),
     preferences: details.preferences || "None provided", accommodations: details.accommodations || "None provided",
     budgets: { shirt: budgetFor("shirts", "shirt"), pants: budgetFor("pants", "pants / shorts"), underwear: budgetFor("underwear", "bras", "undergarments"), socks: budgetFor("socks", "sock"), shoes: budgetFor("shoes", "shoe"), coat: budgetFor("coats", "coat", "coat / jacket") },
     budgetTotal: settings.shoppingBudget || enabledBudgets.reduce((total, item) => total + (Number(item.amount) || 0), 0) || "0"
@@ -223,9 +224,9 @@ function drawProfileOverlay(page, values, font, bold) {
   const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const fieldPanel = rgb(238 / 255, 243 / 255, 239 / 255); const paper = rgb(251 / 255, 252 / 255, 251 / 255); const border = rgb(0.77, 0.82, 0.79);
   const draw = (text, x, y, size = 9, options = {}) => page.drawText(String(text || ""), { x, y, size, font: options.bold ? bold : font, color: options.muted ? muted : ink, maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 2 });
   const clear = (x, y, width, height, color = fieldPanel) => page.drawRectangle({ x, y, width, height, color });
-  // The supplied PDF has two tables that extend beyond their parent panels.
-  // Rebuild the small details table at the panel's true width instead of
-  // letting its original fill-in lines and outer edge show through.
+  // The supplied PDF has inconsistent panel insets plus grid lines that run
+  // past the right edge. Rebuild every filled region on the same 41–570 grid.
+  clear(570, 88, 42, 557, paper);
   clear(41, 574, 550, 71);
   page.drawRectangle({ x: 41, y: 574, width: 529, height: 71, borderColor: border, borderWidth: .55 });
   page.drawLine({ start: { x: 217, y: 574 }, end: { x: 217, y: 645 }, thickness: .55, color: border });
@@ -238,18 +239,41 @@ function drawProfileOverlay(page, values, font, bold) {
   draw(values.volunteer, 51, 580, 7.7, { maxWidth: 130 });
   draw(values.age, 228, 580, 7.3, { maxWidth: 130 });
   draw(values.emergency, 404, 580, 6.6, { maxWidth: 128 });
-  [[63, 487, 118], [240, 487, 118], [416, 487, 118], [63, 448, 118], [240, 448, 118], [416, 448, 118]].forEach(([x, y, width]) => clear(x, y, width, 14, paper));
-  [[values.shirt, 63, 490], [values.pants, 240, 490], [values.shoes, 416, 490], [values.underwear, 63, 451], [values.socks, 240, 451], [values.coat, 416, 451]].forEach(([text, x, y]) => draw(text, x, y, 8.3, { bold: true, maxWidth: 118 }));
-  clear(55, 342, 239, 55, paper); clear(315, 342, 239, 55, paper);
-  draw(values.preferences, 56, 383, 7.7, { maxWidth: 232, lineHeight: 10 });
-  draw(values.accommodations, 316, 383, 7.7, { maxWidth: 232, lineHeight: 10 });
+  // Sizes panel: the header, table, and all value cells share the same outer
+  // edge as the details, notes, and budget panels. A bra field only exists
+  // when that event enabled it and the child's sizing category is applicable.
+  clear(41, 420, 550, 142, paper);
+  page.drawRectangle({ x: 41, y: 420, width: 529, height: 142, borderColor: border, borderWidth: .55 });
+  page.drawRectangle({ x: 41, y: 534, width: 529, height: 28, color: fieldPanel, borderColor: border, borderWidth: .55 });
+  draw("Sizes", 53, 544, 13, { bold: true });
+  const sizeTop = 523; const sizeBottom = 430; const sizeLeft = 52; const sizeRight = 559; const rowMid = 477;
+  page.drawRectangle({ x: sizeLeft, y: sizeBottom, width: sizeRight - sizeLeft, height: sizeTop - sizeBottom, borderColor: border, borderWidth: .5 });
+  page.drawLine({ start: { x: sizeLeft, y: rowMid }, end: { x: sizeRight, y: rowMid }, thickness: .5, color: border });
+  const drawSizeCell = (label, item, x, y, width) => { draw(label, x + 10, y + 28, 6.8, { bold: true, muted: true }); draw(item, x + 10, y + 12, 8.5, { bold: true, maxWidth: width - 20 }); };
+  if (values.showBra) {
+    const four = [52, 179, 306, 433, 559]; const three = [52, 221, 390, 559];
+    four.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: rowMid }, end: { x, y: sizeTop }, thickness: .5, color: border }));
+    three.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: sizeBottom }, end: { x, y: rowMid }, thickness: .5, color: border }));
+    [["SHIRT / TOP", values.shirt], ["PANTS / SHORTS", values.pants], ["SHOES", values.shoes], ["UNDERWEAR", values.underwear]].forEach(([label, item], index) => drawSizeCell(label, item, four[index], rowMid, four[index + 1] - four[index]));
+    [["SOCKS", values.socks], ["COAT / JACKET", values.coat], ["BRA SIZE", values.bra]].forEach(([label, item], index) => drawSizeCell(label, item, three[index], sizeBottom, three[index + 1] - three[index]));
+  } else {
+    const columns = [52, 221, 390, 559];
+    columns.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: sizeBottom }, end: { x, y: sizeTop }, thickness: .5, color: border }));
+    [["SHIRT / TOP", values.shirt], ["PANTS / SHORTS", values.pants], ["SHOES", values.shoes]].forEach(([label, item], index) => drawSizeCell(label, item, columns[index], rowMid, columns[index + 1] - columns[index]));
+    [["UNDERWEAR", values.underwear], ["SOCKS", values.socks], ["COAT / JACKET", values.coat]].forEach(([label, item], index) => drawSizeCell(label, item, columns[index], sizeBottom, columns[index + 1] - columns[index]));
+  }
+  // Preferences are redrawn to remove the template's inset left/right edges.
+  clear(41, 317, 550, 91, paper);
+  page.drawRectangle({ x: 41, y: 317, width: 529, height: 91, borderColor: border, borderWidth: .55 });
+  page.drawLine({ start: { x: 305, y: 317 }, end: { x: 305, y: 408 }, thickness: .55, color: border });
+  draw("Preferences, likes, colors, and styles", 53, 389, 8, { bold: true });
+  draw("Accommodations and helpful notes", 317, 389, 8, { bold: true });
+  draw(values.preferences, 53, 365, 7.7, { maxWidth: 240, lineHeight: 10 });
+  draw(values.accommodations, 317, 365, 7.7, { maxWidth: 240, lineHeight: 10 });
   const budgetRows = [values.budgets.shirt, values.budgets.pants, values.budgets.underwear, values.budgets.socks, values.budgets.shoes, values.budgets.coat];
   [251, 226, 200, 175, 149, 123].forEach((y, index) => { clear(217, y - 4, 58, 12, paper); draw(`$${budgetRows[index] || 0}`, 218, y, 8.5, { bold: true }); });
   clear(217, 96, 62, 12, rgb(0.88, 0.95, 0.89)); draw(`$${values.budgetTotal}`, 218, 100, 8.5, { bold: true });
-  // Clip the source template's overhanging right borders to the panel edge.
-  clear(570, 437, 21, 86, paper);
-  clear(570, 88, 21, 184, paper);
-  page.drawLine({ start: { x: 570, y: 437 }, end: { x: 570, y: 523 }, thickness: .55, color: border });
+  // Restore clean shared right borders after covering the template overhang.
   page.drawLine({ start: { x: 570, y: 88 }, end: { x: 570, y: 272 }, thickness: .55, color: border });
 }
 

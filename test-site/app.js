@@ -89,7 +89,7 @@
         recipientCapacity: 100,
         shoppingBudget: 150,
         roles: volunteerRoles.map((role) => ({ ...role })),
-        questions: { shirtSize: true, volunteerNotes: true, accommodations: true, preferences: true, documents: true },
+        questions: { shirtSize: true, volunteerNotes: true, accommodations: true, preferences: true, braSize: false, documents: true },
         budgetItems: [
           { id: "shirts", label: "Shirts", enabled: true, mode: "always", amount: 20 },
           { id: "pants", label: "Pants", enabled: true, mode: "always", amount: 25 },
@@ -191,6 +191,7 @@
       if (event.volunteerEnabled === undefined) event.volunteerEnabled = true;
       if (event.recipientEnabled === undefined) event.recipientEnabled = true;
       if (!event.type) event.type = "shopping";
+      event.questions = { braSize: false, ...(event.questions || {}) };
       if (!Number.isFinite(event.bagGoal)) event.bagGoal = 100;
       if (!Array.isArray(event.bagItems)) event.bagItems = routineBagItems();
     });
@@ -244,7 +245,7 @@
   function createRecipientDraft() {
     return {
       acknowledgments: {}, agreementSignature: "", finalSignature: "", guardian: "", email: "", phone: "", address: "", city: "", zip: "", referral: "", preferredContact: "Email", notes: "",
-      children: [{ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" }],
+      children: [{ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", bra: "", coat: "", preferences: "", accommodations: "" }],
       emergencyName: "", emergencyPhone: "", emergencyRelation: "", recipientCode: "", documents: []
     };
   }
@@ -331,7 +332,7 @@
     if (form.id === "children-form") {
       recipientDraft.children = recipientDraft.children.map((child, index) => {
         const next = { ...child };
-        ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => {
+        ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "bra", "coat"].forEach((key) => {
           next[key] = String(data.get(`child-${index}-${key}`) || "").trim();
         });
         next.name = `${next.firstName} ${next.lastName}`.trim();
@@ -433,7 +434,7 @@
         children: (record.children || []).map((child) => {
           const details = child.details && typeof child.details === "object" ? child.details : {};
           const firstName = child.first_name || ""; const lastName = child.last_name || "";
-          return { id: child.id, name: `${firstName} ${lastName}`.trim(), firstName, lastName, birthdate: child.birth_date || "", age: "", gender: details.gender || "", shirt: details.shirt || "", pants: details.pants || "", shoes: details.shoes || "", underwear: details.underwear || "", coat: details.coat || "", preferences: details.preferences || "", accommodations: details.accommodations || "", photoUrl: child.photo_url || "", decisionNote: details.organizerDecisionNote || "", decision: child.status || "review", attendance: "expected" };
+          return { id: child.id, name: `${firstName} ${lastName}`.trim(), firstName, lastName, birthdate: child.birth_date || "", age: "", gender: details.gender || "", shirt: details.shirt || "", pants: details.pants || "", shoes: details.shoes || "", underwear: details.underwear || "", bra: details.bra || "", coat: details.coat || "", preferences: details.preferences || "", accommodations: details.accommodations || "", photoUrl: child.photo_url || "", decisionNote: details.organizerDecisionNote || "", decision: child.status || "review", attendance: "expected" };
         })
       };
     });
@@ -738,18 +739,19 @@
       <form id="children-form">${recipientDraft.children.map((child, index) => childFormHtml(child, index)).join("")}<button class="button button--ghost" type="button" id="add-child">+ Add another child</button><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Continue <span>→</span></button></div></form>`;
     document.querySelector("#add-child").addEventListener("click", async () => {
       try { await syncChildren(); } catch (error) { toast(error.message || "Please choose a valid JPG or PNG photo for every child."); return; }
-      recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" });
+      recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", bra: "", coat: "", preferences: "", accommodations: "" });
       touchRecipientDraft(); saveRecipientDraft();
       renderRecipient();
     });
     document.querySelectorAll("[data-remove-child]").forEach((button) => button.addEventListener("click", async () => {
       try { await syncChildren(); } catch (error) { toast(error.message || "Please choose a valid JPG or PNG photo for every child."); return; }
       recipientDraft.children.splice(Number(button.dataset.removeChild), 1);
-      if (!recipientDraft.children.length) recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" });
+      if (!recipientDraft.children.length) recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", bra: "", coat: "", preferences: "", accommodations: "" });
       touchRecipientDraft(); saveRecipientDraft();
       renderRecipient();
     }));
     document.querySelector("[data-recipient-back]").addEventListener("click", async () => { try { await syncChildren(); } catch (error) { saveVisibleRecipientStep(); } touchRecipientDraft(); saveRecipientDraft(); recipientStep = 1; renderRecipient(); });
+    document.querySelectorAll("[data-child-gender]").forEach((picker) => picker.addEventListener("change", () => updateBraField(picker)));
     document.querySelector("#children-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!revealFirstInvalidField(event.currentTarget)) return;
@@ -765,9 +767,9 @@
     return `<section class="child-card"><div class="child-card__header"><h3>Child ${index + 1}</h3>${recipientDraft.children.length > 1 ? `<button class="link-button" type="button" data-remove-child="${index}">Remove</button>` : ""}</div><div class="form-grid">
       <div class="field"><label for="child-${index}-firstName">Child's first name</label><input id="child-${index}-firstName" name="child-${index}-firstName" value="${esc(child.firstName || "")}" required></div><div class="field"><label for="child-${index}-lastName">Child's last name</label><input id="child-${index}-lastName" name="child-${index}-lastName" value="${esc(child.lastName || "")}" required></div>
       <div class="field"><label for="child-${index}-birthdate">Date of birth</label><input id="child-${index}-birthdate" name="child-${index}-birthdate" type="date" value="${esc(child.birthdate)}" required></div>
-      <div class="field"><label for="child-${index}-gender">Sizing category</label><select id="child-${index}-gender" name="child-${index}-gender" required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This helps the organizers understand the child’s typical sizing.</small></div>
+      <div class="field"><label for="child-${index}-gender">Sizing category</label><select id="child-${index}-gender" name="child-${index}-gender" data-child-gender="${index}" required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This helps the organizers understand the child’s typical sizing.</small></div>
       <div class="field field--span-2 size-guidance"><strong>Clothing sizes</strong><small>Spell out letter sizes—for example: <b>Small</b>, <b>Medium</b>, or <b>Large</b>. You can also be more specific for pants if you know the size, such as <b>30/32</b>. For socks and shoes, please use numbers. If you are unsure, you can always go a little bigger so we can make sure the clothes will fit.</small></div>
-      ${sizeField(index,"shirt","Shirt",child.shirt)}${sizeField(index,"pants","Pants",child.pants)}${sizeField(index,"shoes","Shoes",child.shoes)}${sizeField(index,"socks","Socks",child.socks)}${sizeField(index,"underwear","Underwear",child.underwear)}${sizeField(index,"coat","Coat",child.coat)}
+      ${sizeField(index,"shirt","Shirt",child.shirt)}${sizeField(index,"pants","Pants",child.pants)}${sizeField(index,"shoes","Shoes",child.shoes)}${sizeField(index,"socks","Socks",child.socks)}${sizeField(index,"underwear","Underwear",child.underwear)}${state.event.questions?.braSize ? braSizeField(index, child) : ""}${sizeField(index,"coat","Coat",child.coat)}
       <div class="field field--span-2"><label for="child-${index}-photo">Recent photo of this child</label><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png" ${child.photoDataUrl ? "" : "required"}><small>A photo is required for every child so Campbell's Crew can pre-make their event badge and keep it with the correct clothing bag. JPG or PNG only. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div>
       <div class="field field--span-2"><label for="child-${index}-preferences">Colors, styles, interests, likes, or dislikes</label><textarea id="child-${index}-preferences" name="child-${index}-preferences" required>${esc(child.preferences)}</textarea></div>
       <div class="field field--span-2"><label for="child-${index}-accommodations">Medical, sensory, communication, mobility, or behavioral accommodations</label><textarea id="child-${index}-accommodations" name="child-${index}-accommodations" required>${esc(child.accommodations)}</textarea><small>Enter “None” if no accommodation is needed.</small></div>
@@ -797,13 +799,29 @@
     });
   }
 
+  function braSizeApplies(gender) { return /girl|women|female/i.test(String(gender || "")); }
+
+  function braSizeField(index, child) {
+    const applicable = braSizeApplies(child.gender);
+    return `<div class="field size-field" data-bra-field="${index}" ${applicable ? "" : "hidden"}><label for="child-${index}-bra">Bra size <span>(if applicable)</span></label><input id="child-${index}-bra" name="child-${index}-bra" value="${esc(child.bra || "")}" placeholder="Enter size" ${applicable ? "" : "disabled"}></div>`;
+  }
+
+  function updateBraField(picker) {
+    const field = document.querySelector(`[data-bra-field="${picker.dataset.childGender}"]`);
+    if (!field) return;
+    const applicable = braSizeApplies(picker.value);
+    field.hidden = !applicable;
+    const input = field.querySelector("input");
+    if (input) input.disabled = !applicable;
+  }
+
   async function syncChildren() {
     const form = document.querySelector("#children-form");
     if (!form) return;
     const data = new FormData(form);
     recipientDraft.children = await Promise.all(recipientDraft.children.map(async (child, index) => {
       const next = {};
-      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || "");
+      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "bra", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || "");
       if (photo?.files[0]) next.photoDataUrl = await photoDataUrl(photo.files[0]);
       else next.photoDataUrl = child.photoDataUrl || "";
       if (!next.photoDataUrl) throw new Error(`Please add a JPG or PNG photo for ${next.firstName || `Child ${index + 1}`}.`);
@@ -899,7 +917,7 @@
           eventId: state.event.id, guardianName: recipientDraft.guardian, email: recipientDraft.email, phone: recipientDraft.phone,
           address: { address: recipientDraft.address, city: recipientDraft.city, zip: recipientDraft.zip }, notes: recipientDraft.notes,
           application: { referral: recipientDraft.referral, preferredContact: recipientDraft.preferredContact, emergencyName: recipientDraft.emergencyName, emergencyPhone: recipientDraft.emergencyPhone, emergencyRelation: recipientDraft.emergencyRelation, agreementSignature: recipientDraft.agreementSignature, finalSignature: recipientDraft.finalSignature, acknowledgments: recipientDraft.acknowledgments },
-          children: recipientDraft.children.map((child) => ({ firstName: child.firstName, lastName: child.lastName, birthDate: child.birthdate, photoDataUrl: child.photoDataUrl || "", details: { gender: child.gender, shirt: child.shirt, pants: child.pants, shoes: child.shoes, socks: child.socks, underwear: child.underwear, coat: child.coat, preferences: child.preferences, accommodations: child.accommodations } }))
+          children: recipientDraft.children.map((child) => ({ firstName: child.firstName, lastName: child.lastName, birthDate: child.birthdate, photoDataUrl: child.photoDataUrl || "", details: { gender: child.gender, shirt: child.shirt, pants: child.pants, shoes: child.shoes, socks: child.socks, underwear: child.underwear, bra: child.bra, coat: child.coat, preferences: child.preferences, accommodations: child.accommodations } }))
         }) });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "Your application could not be submitted.");
@@ -1018,7 +1036,7 @@
     return `${heading("Event management", "Event setup", "Configure the public forms, event-day rules, budgets and access in one place.", `<a class="button button--light" href="#volunteer">Preview volunteer page</a>`)}
       <form id="event-form"><details class="settings-section" open><summary><span><b>01</b><strong>Event basics</strong></span><small>Date, place and overall capacity</small></summary><div class="settings-section__body"><div class="form-grid"><div class="field field--span-2"><label for="event-title">Event name</label><input id="event-title" name="title" value="${esc(e.title)}" required></div><div class="field"><label for="event-date">Date</label><input id="event-date" name="date" value="${esc(e.date)}" required></div><div class="field"><label for="event-time">Time</label><input id="event-time" name="time" value="${esc(e.time)}" required></div><div class="field"><label for="event-location">Meeting location</label><input id="event-location" name="location" value="${esc(e.location)}" required></div><div class="field"><label for="event-address">Address</label><input id="event-address" name="address" value="${esc(e.address)}" required></div><div class="field"><label for="vol-capacity">Overall volunteer capacity</label><input id="vol-capacity" name="volunteerCapacity" type="number" min="1" value="${esc(e.volunteerCapacity)}"></div><div class="field"><label for="rec-capacity">Recipient child capacity</label><input id="rec-capacity" name="recipientCapacity" type="number" min="1" value="${esc(e.recipientCapacity)}"></div></div></div></details>
       <details class="settings-section" open><summary><span><b>02</b><strong>Volunteer roles & spots</strong></span><small>Names, shifts and limits</small></summary><div class="settings-section__body"><div class="editor-table"><div class="editor-row editor-row--head"><span>Open</span><span>Role</span><span>Shift</span><span>Spots</span></div>${e.roles.map((role) => `<div class="editor-row"><label class="switch"><input type="checkbox" name="role-enabled-${role.id}" ${role.enabled ? "checked" : ""}><span></span></label><input aria-label="${esc(role.title)} role name" name="role-title-${role.id}" value="${esc(role.title)}"><input aria-label="${esc(role.title)} shift" name="role-shift-${role.id}" value="${esc(role.shift)}"><input aria-label="${esc(role.title)} spots" name="role-capacity-${role.id}" type="number" min="0" value="${esc(role.capacity)}"></div>`).join("")}</div><div class="editor-actions"><button class="button button--light" type="button" data-add-role>+ Add another role</button><button class="button button--light" type="button" data-remove-roles>Remove roles</button></div></div></details>
-      <details class="settings-section"><summary><span><b>03</b><strong>Signup access & questions</strong></span><small>Open, code, closed and field visibility</small></summary><div class="settings-section__body"><h3>Volunteer registration</h3><div class="event-editor-grid">${statusChoice("volunteerStatus", "open", "Open", "Anyone can register.", e.volunteerStatus)}${statusChoice("volunteerStatus", "code", "Access code", "Require an invitation code.", e.volunteerStatus)}${statusChoice("volunteerStatus", "closed", "Closed", "Show a closed message.", e.volunteerStatus)}</div><div class="field"><label for="volunteer-access-code">Volunteer invitation code</label><input id="volunteer-access-code" name="volunteerCode" value="${esc(e.volunteerCode)}"></div><h3>Recipient applications</h3><div class="event-editor-grid">${statusChoice("recipientStatus", "open", "Open", "Applications without a code.", e.recipientStatus)}${statusChoice("recipientStatus", "code", "Access code", "Require referral code.", e.recipientStatus)}${statusChoice("recipientStatus", "closed", "Closed", "Stop new applications.", e.recipientStatus)}</div><div class="field"><label for="recipient-access-code">Recipient invitation code</label><input id="recipient-access-code" name="recipientCode" value="${esc(e.recipientCode)}"></div><div class="toggle-grid">${questionToggle("shirtSize", "Volunteer T-shirt size", e.questions.shirtSize)}${questionToggle("volunteerNotes", "Volunteer special notes", e.questions.volunteerNotes)}${questionToggle("preferences", "Child preferences", e.questions.preferences)}${questionToggle("accommodations", "Child accommodations", e.questions.accommodations)}${questionToggle("documents", "Supporting documents", e.questions.documents)}</div></div></details>
+      <details class="settings-section"><summary><span><b>03</b><strong>Signup access & questions</strong></span><small>Open, code, closed and field visibility</small></summary><div class="settings-section__body"><h3>Volunteer registration</h3><div class="event-editor-grid">${statusChoice("volunteerStatus", "open", "Open", "Anyone can register.", e.volunteerStatus)}${statusChoice("volunteerStatus", "code", "Access code", "Require an invitation code.", e.volunteerStatus)}${statusChoice("volunteerStatus", "closed", "Closed", "Show a closed message.", e.volunteerStatus)}</div><div class="field"><label for="volunteer-access-code">Volunteer invitation code</label><input id="volunteer-access-code" name="volunteerCode" value="${esc(e.volunteerCode)}"></div><h3>Recipient applications</h3><div class="event-editor-grid">${statusChoice("recipientStatus", "open", "Open", "Applications without a code.", e.recipientStatus)}${statusChoice("recipientStatus", "code", "Access code", "Require referral code.", e.recipientStatus)}${statusChoice("recipientStatus", "closed", "Closed", "Stop new applications.", e.recipientStatus)}</div><div class="field"><label for="recipient-access-code">Recipient invitation code</label><input id="recipient-access-code" name="recipientCode" value="${esc(e.recipientCode)}"></div><div class="toggle-grid">${questionToggle("shirtSize", "Volunteer T-shirt size", e.questions.shirtSize)}${questionToggle("volunteerNotes", "Volunteer special notes", e.questions.volunteerNotes)}${questionToggle("preferences", "Child preferences", e.questions.preferences)}${questionToggle("accommodations", "Child accommodations", e.questions.accommodations)}${questionToggle("braSize", "Bra size when applicable", e.questions.braSize)}${questionToggle("documents", "Supporting documents", e.questions.documents)}</div></div></details>
       <details class="settings-section" open><summary><span><b>04</b><strong>Shopping rules & budgets</strong></span><small>Current enabled total: <b id="budget-total">$${budgetTotal}</b></small></summary><div class="settings-section__body"><div class="budget-header"><div><label for="budget">Overall per-child maximum</label><input id="budget" name="shoppingBudget" type="number" min="0" value="${esc(e.shoppingBudget)}"></div><p>Enable only what this event offers. Amounts print automatically on every shopping guide.</p></div><div class="budget-grid">${e.budgetItems.map((item) => `<label class="budget-item"><input type="checkbox" name="budget-enabled-${item.id}" ${item.enabled ? "checked" : ""}><span class="switch-control" aria-hidden="true"></span><span><strong>${esc(item.label)}</strong><small>${esc(item.mode === "relevant" ? "When relevant" : item.mode === "optional" ? "Optional" : "Standard item")}</small></span><b>$</b><input aria-label="${esc(item.label)} budget" name="budget-amount-${item.id}" type="number" min="0" value="${esc(item.amount)}"></label>`).join("")}</div></div></details>
       <div class="sticky-save"><span>All changes are saved.</span><button class="button button--green" type="submit">Save & update event →</button></div></form>`;
   }
