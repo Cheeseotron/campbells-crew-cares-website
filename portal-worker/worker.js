@@ -256,10 +256,19 @@ function childProfileValues({ child, household, event }) {
   };
 }
 
+// Keep the accent away from the page edge. Some printers cannot reliably
+// print in their outermost margin, even though a PDF viewer displays it.
+function drawPrintSafeTopBar(page) {
+  page.drawRectangle({ x: 0, y: 784, width: 612, height: 8, color: rgb(1, 1, 1) });
+  page.drawRectangle({ x: 0, y: 770, width: 205, height: 14, color: rgb(0.21, 0.83, 0.18) });
+  page.drawRectangle({ x: 205, y: 770, width: 407, height: 14, color: rgb(0.07, 0.10, 0.13) });
+}
+
 function drawProfileOverlay(page, values, font, bold, photo = null) {
   const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const fieldPanel = rgb(238 / 255, 243 / 255, 239 / 255); const paper = rgb(251 / 255, 252 / 255, 251 / 255); const border = rgb(0.77, 0.82, 0.79);
   const draw = (text, x, y, size = 9, options = {}) => page.drawText(String(text || ""), { x, y, size, font: options.bold ? bold : font, color: options.color || (options.muted ? muted : ink), maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 2 });
   const clear = (x, y, width, height, color = fieldPanel) => page.drawRectangle({ x, y, width, height, color });
+  drawPrintSafeTopBar(page);
   // The supplied template has several overlapping panel edges and labels.  Do
   // not try to patch those individual marks: cover the whole data region and
   // rebuild it on one shared 41-570 point grid so every edge lands together.
@@ -335,7 +344,9 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   page.drawRectangle({ x: 52, y: 277, width: 507, height: 23, color: rgb(0.07, 0.10, 0.13) });
   ["ESSENTIAL", "BUDGET", "AMOUNT SPENT", "ITEM / NOTES"].forEach((label, index) => draw(label, columns[index] + 10, 285, 7, { bold: true, color: rgb(0.94, 0.98, 0.95) }));
   const budgetRows = values.budgetItems || [];
-  const rowHeight = 154 / Math.max(6, budgetRows.length); const firstRowBottom = 277 - rowHeight;
+  // Reserve the total row before dividing the remaining table height. This
+  // prevents a final optional row (such as Toys) being shortened by overlap.
+  const rowHeight = (277 - 128) / Math.max(6, budgetRows.length); const firstRowBottom = 277 - rowHeight;
   for (let index = 0; index < budgetRows.length; index += 1) {
     const y = firstRowBottom - index * rowHeight;
     page.drawRectangle({ x: 52, y, width: 507, height: rowHeight, color: paper, borderColor: border, borderWidth: .45 });
@@ -359,19 +370,19 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   // Keep the closeout checklist on the child's own sheet, right below the
   // spending tracker where it is most useful at the register.
   clear(41, 24, 529, 86, paper);
-  draw("BEFORE CHECKOUT CHECKLIST", 52, 100, 8, { bold: true, color: rgb(0.03, 0.47, 0.23) });
+  draw("BEFORE CHECKOUT CHECKLIST", 52, 100, 9, { bold: true, color: rgb(0.03, 0.47, 0.23) });
   const checkoutItems = [
-    "Categories fulfilled",
-    "Within a few dollars of total",
-    "Sizes appropriate and modest",
-    "No non-essential items",
-    ...(toyBudget ? ["Toy limit not exceeded"] : []),
-    "CCC questions cleared"
+    "Every printed category has at least one needed item.",
+    "Clothing total is within a few dollars of its budget.",
+    "Clothes and shoes fit, are modest, and age-appropriate.",
+    "No pajamas, hair accessories, jewelry, or extra non-essentials.",
+    ...(toyBudget ? ["Toy spending does not exceed the fixed printed maximum."] : []),
+    "Ask a CCC representative before checkout if anything is unclear."
   ];
   checkoutItems.forEach((item, index) => {
-    const column = index % 3; const row = Math.floor(index / 3); const x = 52 + column * 169; const y = 86 - row * 14;
-    page.drawRectangle({ x, y: y - 1, width: 7.5, height: 7.5, borderColor: muted, borderWidth: .6 });
-    draw(item, x + 11.5, y, 6.8, { maxWidth: 150 });
+    const column = index % 3; const row = Math.floor(index / 3); const x = 52 + column * 169; const y = 84 - row * 25;
+    page.drawRectangle({ x, y: y - 1, width: 8, height: 8, borderColor: muted, borderWidth: .6 });
+    draw(item, x + 12, y, 7.25, { maxWidth: 151, lineHeight: 8.3 });
   });
   page.drawLine({ start: { x: 41, y: 49 }, end: { x: 570, y: 49 }, thickness: .55, color: border });
   draw(`Event date: ${values.eventDate}`, 41, 34, 7.5, { muted: true });
@@ -380,6 +391,7 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
 function drawRulesOverlay(page, event, font, bold) {
   const settings = eventSettings(event); const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const mist = rgb(238 / 255, 245 / 255, 239 / 255); const line = rgb(0.77, 0.82, 0.79); const green = rgb(0.03, 0.47, 0.23); const orange = rgb(0.66, 0.24, 0); const cream = rgb(1, 242 / 255, 223 / 255); const pale = rgb(247 / 255, 250 / 255, 247 / 255);
   const draw = (text, x, y, size = 8, options = {}) => page.drawText(String(text), { x, y, size, font: options.bold ? bold : font, color: options.color || (options.muted ? muted : ink), maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 1.8 });
+  drawPrintSafeTopBar(page);
   const items = Array.isArray(settings.budgetItems) ? settings.budgetItems : [];
   const toy = items.find((item) => item?.enabled && /toy/i.test(`${item.id || ""} ${item.label || ""}`));
   const bra = items.find((item) => item?.enabled && /bra/i.test(`${item.id || ""} ${item.label || ""}`));
