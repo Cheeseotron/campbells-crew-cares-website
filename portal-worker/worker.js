@@ -263,10 +263,10 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   // Remove the template's internal "profile" label; the child's name is the
   // useful title for volunteers sorting a stack of sheets.
   clear(390, 740, 180, 28, paper);
-  draw(values.name, left, 681, 25, { bold: true, maxWidth: photo ? 410 : 500 });
-  draw("Child information sheet", left, 659, 10.5, { muted: true });
+  draw(values.name, left, 710, 25, { bold: true, maxWidth: photo ? 410 : 500 });
+  draw("Child information sheet", left, 686, 10.5, { muted: true });
   if (photo) {
-    const photoLeft = 507; const photoBottom = 660; const photoSide = 52;
+    const photoLeft = 507; const photoBottom = 674; const photoSide = 52;
     // Fit inside the square instead of stretching or bleeding outside the
     // frame; badge upload cropping already keeps the photo well composed.
     const scale = Math.min(photoSide / photo.width, photoSide / photo.height);
