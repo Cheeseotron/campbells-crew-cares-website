@@ -259,12 +259,13 @@ function childProfileValues({ child, household, event }) {
 // Keep the accent away from the page edge. Some printers cannot reliably
 // print in their outermost margin, even though a PDF viewer displays it.
 function drawPrintSafeTopBar(page) {
-  page.drawRectangle({ x: 0, y: 784, width: 612, height: 8, color: rgb(1, 1, 1) });
-  page.drawRectangle({ x: 0, y: 770, width: 205, height: 14, color: rgb(0.21, 0.83, 0.18) });
-  page.drawRectangle({ x: 205, y: 770, width: 407, height: 14, color: rgb(0.07, 0.10, 0.13) });
+  // The taller band still reaches the very top, while extending farther down
+  // the page so printers that trim an edge retain a strong visible accent.
+  page.drawRectangle({ x: 0, y: 770, width: 205, height: 22, color: rgb(0.21, 0.83, 0.18) });
+  page.drawRectangle({ x: 205, y: 770, width: 407, height: 22, color: rgb(0.07, 0.10, 0.13) });
 }
 
-function drawProfileOverlay(page, values, font, bold, photo = null) {
+function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = null) {
   const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const fieldPanel = rgb(238 / 255, 243 / 255, 239 / 255); const paper = rgb(251 / 255, 252 / 255, 251 / 255); const border = rgb(0.77, 0.82, 0.79);
   const draw = (text, x, y, size = 9, options = {}) => page.drawText(String(text || ""), { x, y, size, font: options.bold ? bold : font, color: options.color || (options.muted ? muted : ink), maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 2 });
   const clear = (x, y, width, height, color = fieldPanel) => page.drawRectangle({ x, y, width, height, color });
@@ -274,11 +275,16 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   // rebuild it on one shared 41-570 point grid so every edge lands together.
   const left = 41; const right = 570; const width = right - left;
   clear(31, 80, 560, 656, paper);
+  // Rebuild the brand lockup lower on the page so it has comfortable space
+  // below the stronger print-safe top band.
+  clear(31, 722, 330, 48, paper);
+  if (brandLogo) page.drawImage(brandLogo, { x: 41, y: 728, width: 30, height: 30 });
+  draw("CAMPBELL'S CREW CARES", 79, 739, 9.3, { bold: true, maxWidth: 220 });
   // Remove the template's internal "profile" label; the child's name is the
   // useful title for volunteers sorting a stack of sheets.
   clear(390, 740, 180, 28, paper);
-  draw(values.name, left, 710, 25, { bold: true, maxWidth: photo ? 400 : 500 });
-  draw("Child information sheet", left, 686, 10.5, { muted: true });
+  draw(values.name, left, 696, 25, { bold: true, maxWidth: photo ? 400 : 500 });
+  draw("Child information sheet", left, 672, 10.5, { muted: true });
   if (photo) {
     const photoLeft = 494; const photoBottom = 665; const photoSide = 64;
     // Fill, center, and clip the square so every packet uses the same crop
@@ -370,22 +376,23 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   // Keep the closeout checklist on the child's own sheet, right below the
   // spending tracker where it is most useful at the register.
   clear(41, 24, 529, 86, paper);
-  draw("BEFORE CHECKOUT CHECKLIST", 52, 100, 9, { bold: true, color: rgb(0.03, 0.47, 0.23) });
+  draw("BEFORE CHECKOUT CHECKLIST", 52, 100, 9.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
   const checkoutItems = [
-    "Every printed category has at least one needed item.",
-    "Clothing total is within a few dollars of its budget.",
-    "Clothes and shoes fit, are modest, and age-appropriate.",
-    "No pajamas, hair accessories, jewelry, or extra non-essentials.",
-    ...(toyBudget ? ["Toy spending does not exceed the fixed printed maximum."] : []),
-    "Ask a CCC representative before checkout if anything is unclear."
+    "Bought at least one item from every printed category.",
+    "Stayed within a few dollars of the clothing budget.",
+    "Checked fit, modesty, and age-appropriateness.",
+    "No pajamas, hair accessories, jewelry, or other extras.",
+    ...(toyBudget ? ["Did not spend more than the fixed toy limit."] : [])
   ];
   checkoutItems.forEach((item, index) => {
-    const column = index % 3; const row = Math.floor(index / 3); const x = 52 + column * 169; const y = 84 - row * 25;
+    const column = index % 3; const row = Math.floor(index / 3); const x = 52 + column * 169; const y = 84 - row * 19;
     page.drawRectangle({ x, y: y - 1, width: 8, height: 8, borderColor: muted, borderWidth: .6 });
-    draw(item, x + 12, y, 7.25, { maxWidth: 151, lineHeight: 8.3 });
+    draw(item, x + 12, y, 8.2, { maxWidth: 151, lineHeight: 9.3 });
   });
-  page.drawLine({ start: { x: 41, y: 49 }, end: { x: 570, y: 49 }, thickness: .55, color: border });
-  draw(`Event date: ${values.eventDate}`, 41, 34, 7.5, { muted: true });
+  draw("Need help? Ask a CCC representative before checkout.", 52, 45, 7.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
+  page.drawLine({ start: { x: 52, y: 43 }, end: { x: 295, y: 43 }, thickness: .55, color: rgb(0.03, 0.47, 0.23) });
+  page.drawLine({ start: { x: 41, y: 34 }, end: { x: 570, y: 34 }, thickness: .55, color: border });
+  draw(`Event date: ${values.eventDate}`, 41, 20, 7.5, { muted: true });
 }
 
 function drawRulesOverlay(page, event, font, bold) {
@@ -474,14 +481,24 @@ async function childPhotoForPdf(env, output, photoKey) {
   }
 }
 
+async function brandLogoForPdf(env, origin, output) {
+  try {
+    const bytes = await templatePdfBytes(env, origin, "/assets/images/ccc-logo.png");
+    return output.embedPng(bytes);
+  } catch {
+    // The packet remains printable if the brand image cannot be loaded.
+    return null;
+  }
+}
+
 async function filledProfileDocument(env, origin, records, includeRules = false) {
   const profileBytes = await templatePdfBytes(env, origin, "/assets/packets/CCC_Child_Shopping_Profile.pdf");
   const rulesBytes = includeRules ? await templatePdfBytes(env, origin, "/assets/packets/CCC_Event_Rules_Sheet.pdf") : null;
-  const output = await PDFDocument.create(); const font = await output.embedFont(StandardFonts.Helvetica); const bold = await output.embedFont(StandardFonts.HelveticaBold);
+  const output = await PDFDocument.create(); const font = await output.embedFont(StandardFonts.Helvetica); const bold = await output.embedFont(StandardFonts.HelveticaBold); const brandLogo = await brandLogoForPdf(env, origin, output);
   for (const record of records) {
     const source = await PDFDocument.load(profileBytes); const [page] = await output.copyPages(source, [0]); output.addPage(page);
     const photo = await childPhotoForPdf(env, output, record.child.photo_key);
-    drawProfileOverlay(page, childProfileValues(record), font, bold, photo);
+    drawProfileOverlay(page, childProfileValues(record), font, bold, photo, brandLogo);
     if (rulesBytes) { const rules = await PDFDocument.load(rulesBytes); const [rulesPage] = await output.copyPages(rules, [0]); output.addPage(rulesPage); drawRulesOverlay(rulesPage, record.event, font, bold); }
   }
   return output.save();
