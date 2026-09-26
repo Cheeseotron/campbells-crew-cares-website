@@ -749,9 +749,10 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card--recipient > b { padding:4px 8px; color:#fff; background:var(--ink); border-radius:999px; font-size:10px; letter-spacing:.08em; }
 body[data-volunteer-badge-size="horizontal-35"] .badge-card--volunteer { aspect-ratio:3.5 / 2.25; }
 body[data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:min(100%,220px); aspect-ratio:2 / 3.5; }
-body[data-child-badge-orientation="horizontal"] .badge-card--recipient { width:min(100%, var(--child-badge-width, 330px)); padding:25px 15px 16px 118px; align-items:flex-start; justify-content:center; text-align:left; gap:4px; }
-body[data-child-badge-orientation="horizontal"] .badge-card--recipient .badge-photo { position:absolute; top:43px; left:17px; width:74px; height:74px; min-width:74px; min-height:74px; }
-body[data-child-badge-orientation="horizontal"] .badge-card--recipient .badge-logo { position:absolute; top:18px; left:18px; width:28px; height:28px; padding:1px; }
+body[data-child-badge-orientation="horizontal"] .badge-card--recipient { width:min(100%, var(--child-badge-width, 330px)); padding:50px 15px 16px 118px; align-items:flex-start; justify-content:center; text-align:left; gap:4px; }
+body[data-child-badge-orientation="horizontal"] .badge-card--recipient::before { height:28px; }
+body[data-child-badge-orientation="horizontal"] .badge-card--recipient .badge-photo { position:absolute; top:57px; left:17px; width:74px; height:74px; min-width:74px; min-height:74px; }
+body[data-child-badge-orientation="horizontal"] .badge-card--recipient .badge-logo { position:absolute; z-index:2; top:5px; left:50%; width:40px; height:40px; padding:2px; transform:translateX(-50%); border:2px solid #fff; box-shadow:2px 2px 0 var(--ink); }
 body[data-child-badge-orientation="horizontal"] .badge-card--recipient .badge-photo-upload { position:absolute; z-index:2; bottom:13px; left:12px; margin:0; padding:6px 7px; font-size:8px; }
 body[data-child-badge-orientation="horizontal"] .badge-card--recipient > span { padding:0; font-size:8px; line-height:1.15; }
 body[data-child-badge-orientation="horizontal"] .badge-card--recipient > strong { font-size:19px; line-height:1; }
