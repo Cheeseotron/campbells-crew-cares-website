@@ -833,6 +833,10 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   /* Borders reliably print even when a printer disables background graphics. */
   body[data-print-badge] .badge-topbar { display:flex!important; z-index:4!important; }
   body[data-print-badge] .badge-topbar i { border-top-width:13px!important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  /* The Avery child layout intentionally lets the round logo overlap the
+     top accent. Keep it above that accent in print so the bar never masks
+     the top half of the logo. */
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="avery-8395"] .badge-card--recipient .badge-logo { z-index:5!important; }
   body[data-print-badge] .badge-card--volunteer .badge-role { display:inline-block!important; padding:3px 8px!important; color:var(--ink)!important; background:transparent!important; border:2px solid var(--ink)!important; border-radius:999px!important; font-size:10px!important; line-height:1.05!important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   body[data-print-bag-guide] .organizer-main > *:not(#event-form), body[data-print-bag-guide] .event-context, body[data-print-bag-guide] .settings-section:not(:has(.bag-packing-guide)), body[data-print-bag-guide] .bag-plan-intro, body[data-print-bag-guide] .bag-plan-table, body[data-print-bag-guide] .bag-plan-actions, body[data-print-bag-guide] .sticky-save { display:none!important; }
   body[data-print-bag-guide] .settings-section { display:block!important; border:0!important; }
