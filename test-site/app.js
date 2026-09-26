@@ -28,6 +28,11 @@
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
   }
 
+  function currencyValue(value) {
+    const amount = Number(String(value || "").replace(/[^0-9.-]/g, ""));
+    return Number.isFinite(amount) ? Math.max(0, amount) : 0;
+  }
+
   function hasCompleteEmailAddress(value) {
     return /^\S+@\S+\.\S{2,}$/.test(String(value || "").trim());
   }
@@ -1709,12 +1714,12 @@
     const checkedChildren = state.applications.filter((item)=>!item.archived && item.eventName === state.event.title).flatMap((item)=>item.children).filter((child)=>child.attendance==="checked").length;
     const checkedVolunteers = state.volunteers.filter((item)=>item.currentEvent === state.event.title && item.checkedIn).length;
     dialogContent.innerHTML=`<form class="dialog-body finish-dialog" id="finish-event-form"><p class="eyebrow">Permanent event close-out</p><h2 id="dialog-title">Finish ${esc(state.event.title)}?</h2><p>Enter final totals. Finishing moves recipient applications to Past Recipients / History and converts current volunteer signups into event history.</p><div class="form-grid"><div class="field"><label>Children registered<input name="childrenRegistered" type="number" value="${currentChildren}" required></label></div><div class="field"><label>Children attended<input name="childrenAttended" type="number" value="${checkedChildren}" required></label></div><div class="field"><label>Volunteers registered<input name="volunteersRegistered" type="number" value="${currentVolunteers}" required></label></div><div class="field"><label>Volunteers attended<input name="volunteersAttended" type="number" value="${checkedVolunteers}" required></label></div><div class="field"><label>Volunteer hours<input name="volunteerHours" type="number" value="0" required></label></div><div class="field"><label>Total event spending<input name="totalSpent" type="number" value="0" required></label></div><div class="field field--span-2"><label>Close-out notes<textarea name="notes"></textarea></label></div></div><div class="finish-confirm"><strong>Slide all the way right to confirm</strong><input id="finish-slider" type="range" min="0" max="100" value="0"><small id="finish-slider-copy">Event is not yet finished.</small></div><button class="button button--danger button--wide" id="finish-submit" type="submit" disabled>Finish Event permanently</button></form>`;
-    appDialog.showModal(); document.body.classList.add("dialog-open");
+    appDialog.showModal(); appDialog.dataset.dismissLocked = "true"; document.body.classList.add("dialog-open");
     const slider = dialogContent.querySelector("#finish-slider"); const submit = dialogContent.querySelector("#finish-submit");
     slider.addEventListener("input", () => { submit.disabled = Number(slider.value) < 100; dialogContent.querySelector("#finish-slider-copy").textContent = submit.disabled ? "Keep sliding to confirm." : "Confirmed. You may now finish the event."; });
     dialogContent.querySelector("#finish-event-form").addEventListener("submit", async (event) => {
       event.preventDefault(); if (Number(slider.value) < 100) return;
-      const data = new FormData(event.currentTarget); const num = (key) => Number(data.get(key) || 0); const finishedTitle = state.event.title;
+      const data = new FormData(event.currentTarget); const num = (key) => key === "totalSpent" ? currencyValue(data.get(key)) : Number(data.get(key) || 0); const finishedTitle = state.event.title;
       const previousStatus = { closed: state.event.closed, volunteerStatus: state.event.volunteerStatus, recipientStatus: state.event.recipientStatus };
       state.event.volunteerStatus = "closed"; state.event.recipientStatus = "closed"; state.event.closed = true;
       try { await saveLiveEvent(state.event); }
@@ -1730,13 +1735,16 @@
   function openFinishFoodBagEvent() {
     const currentVolunteers = state.volunteers.filter((item) => item.currentEvent === state.event.title).length;
     const checkedIn = state.volunteers.filter((item) => item.currentEvent === state.event.title && item.checkedIn).length;
-    dialogContent.innerHTML = `<form class="dialog-body finish-dialog" id="finish-food-bag-form"><p class="eyebrow">Permanent Food Bag Event close-out</p><h2 id="dialog-title">Finish ${esc(state.event.title)}?</h2><p>Enter the final bag and volunteer totals. Finishing keeps the completed event in Reports & History and moves volunteer registrations into their permanent event history.</p><div class="form-grid"><div class="field"><label>Food bags planned<input name="bagsPlanned" type="number" min="0" value="${esc(state.event.bagGoal || 0)}" required></label></div><div class="field"><label>Food bags made<input name="bagsMade" type="number" min="0" value="0" required></label></div><div class="field"><label>Volunteers registered<input name="volunteersRegistered" type="number" min="0" value="${currentVolunteers}" required></label></div><div class="field"><label>Volunteers attended<input name="volunteersAttended" type="number" min="0" value="${checkedIn}" required></label></div><div class="field"><label>Volunteer hours<input name="volunteerHours" type="number" min="0" value="0" required></label></div><div class="field"><label>Total food & supply spending<input name="totalSpent" type="number" min="0" value="0" required></label></div><div class="field field--span-2"><label>Close-out notes<textarea name="notes"></textarea></label></div></div><div class="finish-confirm"><strong>Slide all the way right to confirm</strong><input id="finish-food-slider" type="range" min="0" max="100" value="0"><small id="finish-food-slider-copy">Event is not yet finished.</small></div><button class="button button--danger button--wide" id="finish-food-submit" type="submit" disabled>Finish Food Bag Event permanently</button></form>`;
-    appDialog.showModal(); document.body.classList.add("dialog-open");
+    dialogContent.innerHTML = `<form class="dialog-body finish-dialog" id="finish-food-bag-form"><p class="eyebrow">Permanent Food Bag Event close-out</p><h2 id="dialog-title">Finish ${esc(state.event.title)}?</h2><p>Enter the final bag and volunteer totals. Finishing keeps the completed event in Reports & History and moves volunteer registrations into their permanent event history.</p><div class="form-grid"><div class="field"><label>Food bags planned<input name="bagsPlanned" type="number" min="0" value="${esc(state.event.bagGoal || 0)}" required></label></div><div class="field"><label>Food bags made<input name="bagsMade" type="number" min="0" value="0" required></label></div><div class="field"><label>Volunteers registered<input name="volunteersRegistered" type="number" min="0" value="${currentVolunteers}" required></label></div><div class="field"><label>Volunteers attended<input name="volunteersAttended" type="number" min="0" value="${checkedIn}" required></label></div><div class="field"><label>Volunteer hours<input name="volunteerHours" type="number" min="0" value="0" required></label></div><div class="field"><label>Total food & supply spending<input name="totalSpent" type="text" inputmode="decimal" value="$0.00" required></label></div><div class="field field--span-2"><label>Close-out notes<textarea name="notes"></textarea></label></div></div><div class="finish-confirm"><strong>Slide all the way right to confirm</strong><input id="finish-food-slider" type="range" min="0" max="100" value="0"><small id="finish-food-slider-copy">Event is not yet finished.</small></div><button class="button button--danger button--wide" id="finish-food-submit" type="submit" disabled>Finish Food Bag Event permanently</button></form>`;
+    appDialog.showModal(); appDialog.dataset.dismissLocked = "true"; document.body.classList.add("dialog-open");
     const slider = dialogContent.querySelector("#finish-food-slider"); const submit = dialogContent.querySelector("#finish-food-submit");
+    const spendingInput = dialogContent.querySelector('[name="totalSpent"]');
+    spendingInput.addEventListener("focus", () => spendingInput.select());
+    spendingInput.addEventListener("blur", () => { spendingInput.value = `$${currencyValue(spendingInput.value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; });
     slider.addEventListener("input", () => { submit.disabled = Number(slider.value) < 100; dialogContent.querySelector("#finish-food-slider-copy").textContent = submit.disabled ? "Keep sliding to confirm." : "Confirmed. You may now finish the event."; });
     dialogContent.querySelector("#finish-food-bag-form").addEventListener("submit", async (event) => {
       event.preventDefault(); if (Number(slider.value) < 100) return;
-      const data = new FormData(event.currentTarget); const num = (key) => Number(data.get(key) || 0); const finishedTitle = state.event.title;
+      const data = new FormData(event.currentTarget); const num = (key) => key === "totalSpent" ? currencyValue(data.get(key)) : Number(data.get(key) || 0); const finishedTitle = state.event.title;
       const previousStatus = { closed: state.event.closed, volunteerStatus: state.event.volunteerStatus, recipientStatus: state.event.recipientStatus };
       state.event.volunteerStatus = "closed"; state.event.recipientStatus = "closed"; state.event.closed = true;
       try { await saveLiveEvent(state.event); }
@@ -1929,6 +1937,7 @@
 
   function closeDialog() {
     if (appDialog.open) appDialog.close();
+    delete appDialog.dataset.dismissLocked;
     document.body.classList.remove("dialog-open");
   }
 
@@ -2052,7 +2061,8 @@
   });
   headerActiveEvent?.addEventListener("change", () => { if (setActiveEvent(headerActiveEvent.value)) renderRoute(); });
   document.querySelector("[data-close-dialog]").addEventListener("click", closeDialog);
-  appDialog.addEventListener("click", (event) => { if (event.target === appDialog) closeDialog(); });
+  appDialog.addEventListener("click", (event) => { if (event.target === appDialog && !appDialog.dataset.dismissLocked) closeDialog(); });
+  appDialog.addEventListener("cancel", (event) => { if (appDialog.dataset.dismissLocked) event.preventDefault(); });
   window.addEventListener("hashchange", renderRoute);
   window.addEventListener("afterprint", clearPrintState);
 
