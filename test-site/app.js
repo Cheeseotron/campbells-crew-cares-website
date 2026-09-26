@@ -1485,6 +1485,7 @@
       const requested = button.dataset.printBadge || "";
       document.body.dataset.printBadge = requested.replace(/-bag$/, "") || "all";
       document.body.dataset.printBadgeGroup = button.dataset.printBadges || "single";
+      enableZeroMarginBadgePrint();
       document.querySelectorAll(".badge-card").forEach((card)=>card.classList.toggle("is-badge-print-target", button.dataset.printBadges === "all" || card.dataset.badgeKind === button.dataset.printBadges || card.dataset.badgeId === requested.replace(/-bag$/, "")));
       if (requested.endsWith("-bag")) { const source=document.querySelector(`[data-badge-id="${requested.replace(/-bag$/,"")}"]`); if(source){const copy=source.cloneNode(true);copy.classList.add("badge-print-copy");copy.querySelectorAll("button").forEach((item)=>item.remove());source.after(copy);} }
       window.print();
@@ -1774,6 +1775,15 @@
     document.querySelectorAll(".badge-print-copy").forEach((copy)=>copy.remove());
     document.querySelectorAll(".badge-card").forEach((card)=>card.classList.remove("is-badge-print-target"));
     document.querySelectorAll(".packet-card").forEach((card)=>card.classList.remove("is-print-target"));
+    document.querySelector("#badge-print-page-layout")?.remove();
+  }
+
+  function enableZeroMarginBadgePrint() {
+    document.querySelector("#badge-print-page-layout")?.remove();
+    const style = document.createElement("style");
+    style.id = "badge-print-page-layout";
+    style.textContent = "@page { size: letter portrait; margin: 0; }";
+    document.head.append(style);
   }
 
   const badgeFormats = {
@@ -1782,7 +1792,7 @@
     "business-card": { label:"Business card", width:3.5, height:2, columns:2, perPage:10, orientation:"horizontal", description:"Business card · 3½ × 2 in · horizontal · 10 per letter page" },
     "large-horizontal": { label:"Large event badge", width:4, height:3, columns:2, perPage:6, orientation:"horizontal", description:"Large event badge · 4 × 3 in · horizontal · 6 per letter page" },
     "vertical-3x4": { label:"Standard holder insert", width:3, height:4, columns:2, perPage:4, orientation:"vertical", description:"Standard holder insert · 3 × 4 in · vertical · 4 per letter page" },
-    "vertical-225x35": { label:"Vertical business card", width:2, height:3.5, columns:3, perPage:9, orientation:"vertical", description:"Vertical business card · 2 × 3½ in · up to 9 per letter page" },
+    "vertical-225x35": { label:"Vertical business card", width:2, height:3.5, columns:4, perPage:8, orientation:"vertical", description:"Vertical business card · 2 × 3½ in · 8 per letter page" },
     "standard-id": { label:"Standard ID badge", width:2.125, height:3.375, columns:3, perPage:9, orientation:"vertical", description:"Standard ID badge · 2⅛ × 3⅜ in · vertical · 9 per letter page" },
     "photo-card": { label:"Large photo card", width:4, height:6, columns:2, perPage:2, orientation:"vertical", description:"Large photo card · 4 × 6 in · vertical · 2 per letter page" }
   };
