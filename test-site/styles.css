@@ -729,11 +729,18 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card--volunteer > img { width:72px; height:72px; object-fit:contain; flex:0 0 auto; }
 .badge-card--volunteer > div { display:flex; min-width:0; flex:1; flex-direction:column; gap:5px; }
 .badge-card--volunteer > button { align-self:flex-end; }
-.badge-card--recipient { width:min(100%, var(--child-badge-width, 300px)); min-height:0; aspect-ratio:var(--child-badge-ratio, 3 / 4); justify-self:center; }
-.badge-card--recipient .badge-logo { width:40px; height:40px; object-fit:contain; }
-.badge-card--recipient .badge-photo { width:96px; height:96px; min-width:96px; min-height:96px; }
+.badge-card--recipient { position:relative; isolation:isolate; overflow:hidden; width:min(100%, var(--child-badge-width, 2in)); min-height:0; aspect-ratio:var(--child-badge-ratio, 2 / 3.5); padding:26px 13px 16px; justify-self:center; gap:7px; border:3px solid var(--ink); background:linear-gradient(145deg,#fff 0 58%,#f3fbf2 58% 100%); box-shadow:inset 0 0 0 5px #fff, inset 0 0 0 7px var(--green-dark); }
+.badge-card--recipient::before { content:""; position:absolute; z-index:-1; top:0; right:0; left:0; height:18px; background:linear-gradient(90deg,var(--green) 0 58%,var(--ink) 58% 100%); }
+.badge-card--recipient::after { content:"✦  •  ✦  •  ✦"; position:absolute; z-index:-1; right:-17px; bottom:4px; color:rgba(23,107,57,.16); font-size:28px; font-weight:800; letter-spacing:3px; transform:rotate(-15deg); white-space:nowrap; }
+.badge-card--recipient > * { position:relative; z-index:1; }
+.badge-card--recipient .badge-logo { width:38px; height:38px; padding:2px; object-fit:contain; border:2px solid var(--green-dark); border-radius:50%; background:#fff; }
+.badge-card--recipient .badge-photo { width:82px; height:82px; min-width:82px; min-height:82px; padding:4px; border:3px solid var(--green); background:#fff; box-shadow:3px 3px 0 var(--ink); }
+.badge-card--recipient .badge-photo img { border:0; }
+.badge-card--recipient > span { padding:0 4px; color:var(--green-dark); font-size:9px; letter-spacing:.1em; }
+.badge-card--recipient > strong { max-width:100%; color:var(--ink); font-size:20px; letter-spacing:-.035em; overflow-wrap:anywhere; }
+.badge-card--recipient > b { padding:4px 8px; color:#fff; background:var(--ink); border-radius:999px; font-size:10px; letter-spacing:.08em; }
 body[data-volunteer-badge-size="horizontal-35"] .badge-card--volunteer { aspect-ratio:3.5 / 2.25; }
-body[data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:min(100%,260px); aspect-ratio:2.25 / 3.5; }
+body[data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:min(100%,220px); aspect-ratio:2 / 3.5; }
 body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer { flex-direction:column; justify-content:center; text-align:center; }
 body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div { align-items:center; }
 .badge-size-note { margin-top:38px; padding:24px 28px; border:1px solid var(--line); background:#f3f6f4; }
@@ -762,8 +769,8 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   body[data-print-badge] .badge-card--volunteer { width:var(--volunteer-badge-width, 3.375in); height:var(--volunteer-badge-height, 2.333in); aspect-ratio:auto; margin:0; }
   body[data-print-badge][data-volunteer-badge-size="horizontal-35"] .badge-card--volunteer { width:3.5in; height:2.25in; }
   body[data-print-badge] .badge-card--recipient { width:var(--child-badge-width, 3in); height:var(--child-badge-height, 4in); aspect-ratio:auto; margin:0; break-after:auto; }
-  body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-grid--children { grid-template-columns:repeat(3,2.25in); gap:.1in; }
-  body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:2.25in; height:3.5in; }
+  body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-grid--children { grid-template-columns:repeat(3,2in); gap:.1in; }
+  body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:2in; height:3.5in; }
   body[data-print-badge] .badge-card button { display:none!important; }
   body[data-print-badge] .badge-photo-upload { display:none!important; }
   body[data-print-bag-guide] .organizer-main > *:not(#event-form), body[data-print-bag-guide] .event-context, body[data-print-bag-guide] .settings-section:not(:has(.bag-packing-guide)), body[data-print-bag-guide] .bag-plan-intro, body[data-print-bag-guide] .bag-plan-table, body[data-print-bag-guide] .bag-plan-actions, body[data-print-bag-guide] .sticky-save { display:none!important; }

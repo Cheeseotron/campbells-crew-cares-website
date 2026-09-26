@@ -1227,7 +1227,7 @@
     const isFoodBag = state.event.type === "food-bag";
     const canManagePhotos = ["Executive Owner", "Event Administrator"].includes(previewRole || portalUser);
     const actions = `<div class="heading-actions"><button class="button button--green" type="button" data-print-badges="volunteers">Download volunteer badges</button>${isFoodBag ? "" : `<button class="button button--light" type="button" data-print-badges="children">Download child badges</button>`}</div>`;
-    const childControls = isFoodBag ? "" : `<div class="field"><label for="child-badge-size">Child badge holder insert<select id="child-badge-size" data-badge-setting="child"><option value="vertical-3x4">Vertical · 3 × 4 in · 4 per page</option><option value="vertical-225x35">Vertical · 2¼ × 3½ in · up to 9 per page</option></select></label></div>`;
+    const childControls = isFoodBag ? "" : `<div class="field"><label for="child-badge-size">Child badge holder insert<select id="child-badge-size" data-badge-setting="child"><option value="vertical-225x35" selected>Vertical business card · 2 × 3½ in · up to 9 per page</option><option value="vertical-3x4">Vertical cardstock insert · 3 × 4 in · 4 per page</option></select></label></div>`;
     const childBadgesSection = isFoodBag ? "" : `<div class="badge-section-heading"><div><h2 class="section-title">Child badges</h2><p>${childBadges.length} vertical cardstock inserts, arranged several to a page whenever space permits.</p></div></div><div class="badge-grid badge-grid--children">${childBadges.map(({ child, household }) => `<article class="badge-card badge-card--recipient" data-badge-id="${esc(child.id)}" data-badge-kind="children"><div class="badge-photo">${child.photoUrl ? `<img src="${esc(child.photoUrl)}" alt="Photo of ${esc(child.name)}">` : "Photo"}</div>${canManagePhotos ? `<label class="badge-photo-upload">${child.photoUrl ? "Replace photo" : "Add photo"}<input type="file" accept="image/jpeg,image/png,image/webp" data-badge-photo-upload="${esc(child.id)}"></label>` : ""}<img class="badge-logo" src="../assets/images/ccc-logo.png" alt=""><span>Campbell's Crew Cares</span><strong>${esc(child.name)}</strong><b>${esc(household.referenceCode || household.id)}</b></article>`).join("")}</div>`;
     const sizeNote = isFoodBag ? `<article class="badge-size-note"><h2>Current badge size</h2><p><strong>Volunteers:</strong> <span id="volunteer-size-summary">Avery 8395-compatible removable adhesive badges, 3⅜ × 2⅓ inches, horizontal, 8 per letter-size sheet.</span></p><p>Always print at <strong>100% / Actual Size</strong>; disable “Fit to page” so label alignment remains accurate.</p></article>` : `<article class="badge-size-note"><h2>Current badge sizes</h2><p><strong>Volunteers:</strong> <span id="volunteer-size-summary">Avery 8395-compatible removable adhesive badges, 3⅜ × 2⅓ inches, horizontal, 8 per letter-size sheet.</span></p><p><strong>Children:</strong> <span id="child-size-summary">3 × 4 inch vertical cardstock inserts, arranged 4 per letter-size page.</span></p><p>Always print at <strong>100% / Actual Size</strong>; disable “Fit to page” so badge measurements remain accurate.</p></article>`;
     return `${heading("Event-day printing", "Print badges", isFoodBag ? "Create volunteer badge sheets for this food bag event." : "Create one volunteer badge file or one child badge file. Child badges are grouped efficiently on each page.", actions)}
@@ -1782,13 +1782,13 @@
     "business-card": { label:"Business card", width:3.5, height:2, columns:2, perPage:10, orientation:"horizontal", description:"Business card · 3½ × 2 in · horizontal · 10 per letter page" },
     "large-horizontal": { label:"Large event badge", width:4, height:3, columns:2, perPage:6, orientation:"horizontal", description:"Large event badge · 4 × 3 in · horizontal · 6 per letter page" },
     "vertical-3x4": { label:"Standard holder insert", width:3, height:4, columns:2, perPage:4, orientation:"vertical", description:"Standard holder insert · 3 × 4 in · vertical · 4 per letter page" },
-    "vertical-225x35": { label:"Compact holder insert", width:2.25, height:3.5, columns:3, perPage:9, orientation:"vertical", description:"Compact holder insert · 2¼ × 3½ in · vertical · 9 per letter page" },
+    "vertical-225x35": { label:"Vertical business card", width:2, height:3.5, columns:3, perPage:9, orientation:"vertical", description:"Vertical business card · 2 × 3½ in · up to 9 per letter page" },
     "standard-id": { label:"Standard ID badge", width:2.125, height:3.375, columns:3, perPage:9, orientation:"vertical", description:"Standard ID badge · 2⅛ × 3⅜ in · vertical · 9 per letter page" },
     "photo-card": { label:"Large photo card", width:4, height:6, columns:2, perPage:2, orientation:"vertical", description:"Large photo card · 4 × 6 in · vertical · 2 per letter page" }
   };
 
   function applyBadgeFormat(kind, value) {
-    const format = badgeFormats[value] || badgeFormats[kind === "volunteer" ? "avery-8395" : "vertical-3x4"];
+    const format = badgeFormats[value] || badgeFormats[kind === "volunteer" ? "avery-8395" : "vertical-225x35"];
     const prefix = `--${kind}-badge-`;
     document.body.dataset[`${kind}BadgeSize`] = value;
     document.body.dataset[`${kind}BadgeOrientation`] = format.orientation;
@@ -1802,7 +1802,7 @@
 
   function configureBadgeFormats() {
     document.querySelectorAll("[data-badge-setting]").forEach((select) => {
-      const kind = select.dataset.badgeSetting; const fallback = kind === "volunteer" ? "avery-8395" : "vertical-3x4"; const selected = badgeFormats[select.value] ? select.value : fallback;
+      const kind = select.dataset.badgeSetting; const fallback = kind === "volunteer" ? "avery-8395" : "vertical-225x35"; const selected = badgeFormats[select.value] ? select.value : fallback;
       select.innerHTML = Object.entries(badgeFormats).map(([value, format]) => `<option value="${value}">${format.description}</option>`).join("");
       select.value = selected;
       const label = select.closest("label"); const text = [...label.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
