@@ -373,6 +373,8 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .budget-item { display: grid; grid-template-columns: 40px 1fr 14px 74px; padding: 14px; align-items: center; gap: 9px; background: var(--mist-2); border: 1px solid var(--line); cursor: pointer; }
 .budget-item > span strong, .budget-item > span small { display: block; }
 .budget-item > span small { color: var(--gray); }
+.budget-item:has([name="budget-amount-toys"]) > span small { color: #9b2719; font-weight: 900; line-height: 1.28; }
+.budget-item:has([name="budget-amount-toys"]) > span small::after { content: "FIXED TOY LIMIT — clothing funds cannot be moved to buy a more expensive toy."; display: block; margin-top: 4px; color: #9b2719; font-size: 10px; font-weight: 900; letter-spacing: .015em; }
 .sticky-save { position: sticky; z-index: 3; bottom: 10px; display: flex; padding: 13px 15px; align-items: center; justify-content: space-between; gap: 16px; color: var(--white); background: var(--ink); box-shadow: var(--shadow); }
 .sticky-save span { font-size: 11px; }
 .sticky-save.is-dirty { color: var(--ink); background: #ecfae9; border: 2px solid var(--green); }

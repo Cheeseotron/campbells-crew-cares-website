@@ -172,7 +172,17 @@ function packetBudgetItems(settings = {}, details = {}) {
   return (Array.isArray(settings.budgetItems) ? settings.budgetItems : [])
     .filter((item) => item?.enabled)
     .filter((item) => !(/bra/i.test(`${item.id || ""} ${item.label || ""}`)) || showBra)
-    .map((item) => ({ label: labels[item.id] || item.label || "Item", amount: Number(item.amount) || 0 }));
+    .map((item) => {
+      const isToy = /toy/i.test(`${item.id || ""} ${item.label || ""}`);
+      return {
+        label: labels[item.id] || item.label || "Item",
+        amount: Number(item.amount) || 0,
+        // Toys are intentionally a separate, fixed allowance.  Keeping this
+        // metadata on the packet row lets every print format state the rule,
+        // rather than treating toys as money that can be traded with clothing.
+        fixedCap: isToy
+      };
+    });
 }
 
 function childProfilePdf({ child, household, event }) {
@@ -309,7 +319,7 @@ function drawProfileOverlay(page, values, font, bold) {
     page.drawRectangle({ x: 52, y, width: 507, height: rowHeight, color: paper, borderColor: border, borderWidth: .45 });
     const textY = y + Math.max(5, (rowHeight - 8) / 2);
     const textSize = rowHeight < 20 ? 6.8 : 7.7;
-    draw(budgetRows[index].label, 62, textY, textSize, { maxWidth: 132 });
+    draw(budgetRows[index].fixedCap ? "TOYS — FIXED CAP" : budgetRows[index].label, 62, textY, textSize, { bold: Boolean(budgetRows[index].fixedCap), maxWidth: 132 });
     draw(`$${budgetRows[index].amount}`, 214, textY, textSize, { bold: true, maxWidth: 60 });
     draw("$____________", 295, textY, rowHeight < 20 ? 6.7 : 7.4, { maxWidth: 80 });
     page.drawLine({ start: { x: 397, y: y + rowHeight / 2 }, end: { x: 545, y: y + rowHeight / 2 }, thickness: .45, color: muted });
@@ -318,7 +328,8 @@ function drawProfileOverlay(page, values, font, bold) {
   draw("TOTAL", 62, 93, 7.5, { bold: true });
   draw(`$${values.budgetTotal}`, 214, 93, 8, { bold: true });
   draw("$_______", 295, 93, 7.4, { bold: true });
-  draw("Remaining: $_______", 397, 93, 7.2, { bold: true });
+  const toyBudget = budgetRows.find((item) => item.fixedCap);
+  draw(toyBudget ? `TOYS: FIXED $${toyBudget.amount} MAX - NO TRANSFERS` : "Remaining: $_______", 397, 93, toyBudget ? 6.4 : 7.2, { bold: true, maxWidth: 150 });
   columns.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: 88 }, end: { x, y: 270 }, thickness: .45, color: border }));
 }
 
