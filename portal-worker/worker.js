@@ -250,7 +250,7 @@ function childProfileValues({ child, household, event }) {
   };
 }
 
-function drawProfileOverlay(page, values, font, bold) {
+function drawProfileOverlay(page, values, font, bold, photo = null) {
   const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const fieldPanel = rgb(238 / 255, 243 / 255, 239 / 255); const paper = rgb(251 / 255, 252 / 255, 251 / 255); const border = rgb(0.77, 0.82, 0.79);
   const draw = (text, x, y, size = 9, options = {}) => page.drawText(String(text || ""), { x, y, size, font: options.bold ? bold : font, color: options.muted ? muted : ink, maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 2 });
   const clear = (x, y, width, height, color = fieldPanel) => page.drawRectangle({ x, y, width, height, color });
@@ -258,7 +258,21 @@ function drawProfileOverlay(page, values, font, bold) {
   // not try to patch those individual marks: cover the whole data region and
   // rebuild it on one shared 41-570 point grid so every edge lands together.
   const left = 41; const right = 570; const width = right - left;
-  clear(31, 80, 560, 570, paper);
+  clear(31, 80, 560, 656, paper);
+  // Put the child's name in the title position so a volunteer can identify
+  // this sheet at a glance, even in a tall stack of printed packets.
+  draw("CHILD SHOPPING PROFILE", left, 716, 8.5, { bold: true, muted: true });
+  draw(values.name, left, 681, 25, { bold: true, maxWidth: photo ? 410 : 500 });
+  draw("Child information sheet", left, 659, 10.5, { muted: true });
+  if (photo) {
+    const photoLeft = 507; const photoBottom = 660; const photoSide = 52;
+    // Fit inside the square instead of stretching or bleeding outside the
+    // frame; badge upload cropping already keeps the photo well composed.
+    const scale = Math.min(photoSide / photo.width, photoSide / photo.height);
+    const photoWidth = photo.width * scale; const photoHeight = photo.height * scale;
+    page.drawRectangle({ x: photoLeft - 2, y: photoBottom - 2, width: photoSide + 4, height: photoSide + 4, color: paper, borderColor: rgb(0.09, 0.42, 0.22), borderWidth: 1.5 });
+    page.drawImage(photo, { x: photoLeft + (photoSide - photoWidth) / 2, y: photoBottom + (photoSide - photoHeight) / 2, width: photoWidth, height: photoHeight });
+  }
   // The original template's details panel is wider than the rebuilt grid.
   // Keep this cover exactly on the shared right edge so no colored strip leaks
   // beyond the information box.
@@ -339,13 +353,30 @@ async function templatePdfBytes(env, origin, pathname) {
   return response.arrayBuffer();
 }
 
+async function childPhotoForPdf(env, output, photoKey) {
+  if (!photoKey) return null;
+  try {
+    const photo = await env.PRIVATE_UPLOADS.get(photoKey);
+    if (!photo) return null;
+    const bytes = await photo.arrayBuffer();
+    const type = String(photo.httpMetadata?.contentType || "").toLowerCase();
+    if (type.includes("png")) return output.embedPng(bytes);
+    return output.embedJpg(bytes);
+  } catch {
+    // A packet should still print when a legacy or unsupported image cannot
+    // be embedded. The sheet simply omits the optional photo in that case.
+    return null;
+  }
+}
+
 async function filledProfileDocument(env, origin, records, includeRules = false) {
   const profileBytes = await templatePdfBytes(env, origin, "/assets/packets/CCC_Child_Shopping_Profile.pdf");
   const rulesBytes = includeRules ? await templatePdfBytes(env, origin, "/assets/packets/CCC_Event_Rules_Sheet.pdf") : null;
   const output = await PDFDocument.create(); const font = await output.embedFont(StandardFonts.Helvetica); const bold = await output.embedFont(StandardFonts.HelveticaBold);
   for (const record of records) {
     const source = await PDFDocument.load(profileBytes); const [page] = await output.copyPages(source, [0]); output.addPage(page);
-    drawProfileOverlay(page, childProfileValues(record), font, bold);
+    const photo = await childPhotoForPdf(env, output, record.child.photo_key);
+    drawProfileOverlay(page, childProfileValues(record), font, bold, photo);
     if (rulesBytes) { const rules = await PDFDocument.load(rulesBytes); const [rulesPage] = await output.copyPages(rules, [0]); output.addPage(rulesPage); }
   }
   return output.save();
@@ -890,7 +921,7 @@ async function api(request, env, url, user) {
   const childProfilePdfMatch = url.pathname.match(/^\/portal-api\/organizer\/children\/([^/]+)\/profile\.pdf$/);
   if (childProfilePdfMatch && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
-    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.birth_date, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.event_date, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childProfilePdfMatch[1]).first();
+    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.birth_date, c.photo_key, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.event_date, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childProfilePdfMatch[1]).first();
     if (!child) return json({ error: "That child record was not found." }, 404);
     let details = {}; let application = {}; let settings = {};
     try { details = JSON.parse(child.details_json || "{}"); } catch {}
@@ -904,7 +935,7 @@ async function api(request, env, url, user) {
   const childPacketPdfMatch = url.pathname.match(/^\/portal-api\/organizer\/children\/([^/]+)\/packet\.pdf$/);
   if (childPacketPdfMatch && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
-    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.birth_date, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.event_date, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childPacketPdfMatch[1]).first();
+    const child = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.birth_date, c.photo_key, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.event_date, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE c.id = ?").bind(childPacketPdfMatch[1]).first();
     if (!child) return json({ error: "That child record was not found." }, 404);
     let details = {}; let application = {}; let settings = {};
     try { details = JSON.parse(child.details_json || "{}"); } catch {}
@@ -919,7 +950,7 @@ async function api(request, env, url, user) {
     if (!user) return json({ error: "Sign in required." }, 401);
     const eventId = String(url.searchParams.get("event") || "");
     if (!eventId) return json({ error: "Choose an event before printing packets." }, 400);
-    const { results } = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.birth_date, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.event_date, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE h.event_id = ? AND c.status = 'approved' ORDER BY c.first_name, c.last_name").bind(eventId).all();
+    const { results } = await env.DB.prepare("SELECT c.id, c.first_name, c.last_name, c.birth_date, c.photo_key, c.details_json, h.id AS household_id, h.guardian_name, h.application_json, e.id AS event_id, e.title, e.event_date, e.settings_json FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id JOIN events e ON e.id = h.event_id WHERE h.event_id = ? AND c.status = 'approved' ORDER BY c.first_name, c.last_name").bind(eventId).all();
     if (!results.length) return json({ error: "There are no approved child packets for this event." }, 404);
     const records = results.map((child) => { let details = {}; let application = {}; let settings = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} try { application = JSON.parse(child.application_json || "{}"); } catch {} try { settings = JSON.parse(child.settings_json || "{}"); } catch {} return { child: { ...child, details }, household: { id: child.household_id, guardian_name: child.guardian_name, application }, event: { id: child.event_id, title: child.title, event_date: child.event_date, settings_json: JSON.stringify(settings) } }; });
     const pdf = await filledProfileDocument(env, url.origin, records, true);
