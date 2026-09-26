@@ -1245,8 +1245,9 @@
   }
 
   function organizerBadgesV9() {
-    const volunteerBadges = state.volunteers.filter((item) => item.currentEvent === state.event.title);
-    const childBadges = state.applications.filter((item) => !item.archived && item.eventName === state.event.title).flatMap((household) => household.children.filter((child) => child.decision === "approved").map((child) => ({ child, household })));
+    const lastName = (name) => String(name || "").trim().split(/\s+/).slice(-1)[0] || "";
+    const volunteerBadges = state.volunteers.filter((item) => item.currentEvent === state.event.title).sort((a, b) => lastName(a.name).localeCompare(lastName(b.name)) || a.name.localeCompare(b.name));
+    const childBadges = state.applications.filter((item) => !item.archived && item.eventName === state.event.title).flatMap((household) => household.children.filter((child) => child.decision === "approved").map((child) => ({ child, household }))).sort((a, b) => lastName(a.household.guardian).localeCompare(lastName(b.household.guardian)) || a.household.guardian.localeCompare(b.household.guardian) || a.child.name.localeCompare(b.child.name));
     const isFoodBag = state.event.type === "food-bag";
     const canManagePhotos = ["Executive Owner", "Event Administrator"].includes(previewRole || portalUser);
     const actions = `<div class="heading-actions"><button class="button button--green" type="button" data-print-badges="volunteers">Download volunteer badges</button>${isFoodBag ? "" : `<button class="button button--light" type="button" data-print-badges="children">Download child badges</button>`}</div>`;
