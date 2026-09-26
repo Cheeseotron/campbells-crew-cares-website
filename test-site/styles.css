@@ -364,6 +364,9 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .question-toggle small { color: var(--gray); }
 .budget-header { display: flex; margin: 18px 0; justify-content: space-between; gap: 24px; }
 .budget-header > div { width: 220px; }
+.budget-total-card { display: grid; gap: 4px; padding: 14px 16px; background: #e8f7e8; border-left: 5px solid var(--green-dark); }
+.budget-total-card span, .budget-total-card small { color: var(--gray); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.budget-total-card strong { font-size: 28px; line-height: 1; }
 .budget-header label { display: block; margin-bottom: 7px; font-weight: 800; }
 .budget-header p { max-width: 420px; color: var(--gray); }
 .budget-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }

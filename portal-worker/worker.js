@@ -157,6 +157,12 @@ function pdfLines(value, width = 72) {
   if (line) lines.push(line); return lines.length ? lines : ["Not provided"];
 }
 
+function enabledBudgetTotal(settings = {}) {
+  return (Array.isArray(settings.budgetItems) ? settings.budgetItems : [])
+    .filter((item) => item?.enabled)
+    .reduce((total, item) => total + (Number(item.amount) || 0), 0);
+}
+
 function childProfilePdf({ child, household, event }) {
   const details = child.details || {}; const application = household.application || {}; const settings = eventSettings(event);
   const line = (text, x, y, size = 10, font = "F1") => `BT /${font} ${size} Tf ${x} ${y} Td (${pdfSafeText(text)}) Tj ET`;
@@ -170,7 +176,7 @@ function childProfilePdf({ child, household, event }) {
     line("SIZES", 76, 550, 12, "F2"),
     ...[["SHIRT", details.shirt],["PANTS", details.pants],["SHOES", details.shoes],["UNDERWEAR", details.underwear],["COAT", details.coat]].flatMap(([label, value], index) => [line(label, 76 + index * 93, 526, 8, "F2"), line(value || "Not provided", 76 + index * 93, 509, 11, "F2")]),
     ...wrapped("PREFERENCES", details.preferences, 76, 465), ...wrapped("ACCOMMODATIONS", details.accommodations, 76, 395),
-    "0.90 0.97 0.90 rg", "76 116 460 48 re f", "0.09 0.42 0.22 rg", "76 116 5 48 re f", line(`SHOPPING BUDGET: $${settings.shoppingBudget || "0"}`, 94, 139, 12, "F2"), line("VOLUNTEER SPENDING TOTAL: $________________", 302, 139, 10, "F1"),
+    "0.90 0.97 0.90 rg", "76 116 460 48 re f", "0.09 0.42 0.22 rg", "76 116 5 48 re f", line(`SHOPPING BUDGET: $${enabledBudgetTotal(settings)}`, 94, 139, 12, "F2"), line("VOLUNTEER SPENDING TOTAL: $________________", 302, 139, 10, "F1"),
     line("Campbell's Crew Cares - volunteer packet", 76, 78, 8, "F1")
   ].join("\n");
   const objects = [
@@ -182,10 +188,10 @@ function childProfilePdf({ child, household, event }) {
 }
 
 function childProfilePrintPage({ child, household, event }) {
-  const details = child.details || {}; const application = household.application || {}; const settings = eventSettings(event); const name = `${child.first_name || ""} ${child.last_name || ""}`.trim();
+  const details = child.details || {}; const application = household.application || {}; const settings = eventSettings(event); const name = `${child.first_name || ""} ${child.last_name || ""}`.trim(); const budgetTotal = enabledBudgetTotal(settings);
   const value = (item) => escapeHtml(item || "Not provided");
   const size = (label, item) => `<div class="size"><span>${label}</span><strong>${value(item)}</strong></div>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${value(name)} shopping profile</title><style>@page{size:letter;margin:.45in}*{box-sizing:border-box}body{margin:0;color:#111821;background:#fff;font-family:Arial,sans-serif}.sheet{min-height:9.9in;padding:24px;border:1px solid #cbd3ce;border-top:6px solid #35d32f}.eyebrow{margin:0 0 13px;color:#176b39;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{margin:0;font-size:30px;line-height:1.05}h2{margin:30px 0 11px;font-size:16px}.reference{margin:7px 0 26px;color:#617068;font-size:12px;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.box{padding:15px;background:#f3f7f3}.box span,.size span{display:block;margin-bottom:6px;color:#617068;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.box strong{font-size:14px}.sizes{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.size{padding:12px;background:#f3f7f3}.size strong{font-size:14px}.copy{line-height:1.5}.budget{display:flex;margin-top:32px;padding:16px;justify-content:space-between;gap:20px;background:#e8f7e8;border-left:5px solid #176b39;font-weight:700}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><main class="sheet"><p class="eyebrow">Campbell's Crew Cares · Child Shopping Profile</p><h1>${value(name)}</h1><p class="reference">${value(recipientApplicationReference(household.id))} · ${value(event.title)}</p><div class="grid"><div class="box"><span>Responsible party</span><strong>${value(household.guardian_name)}</strong></div><div class="box"><span>Emergency contact</span><strong>${value(application.emergencyName)} · ${value(application.emergencyPhone)}</strong></div></div><h2>Sizes</h2><div class="sizes">${size("Shirt",details.shirt)}${size("Pants",details.pants)}${size("Shoes",details.shoes)}${size("Underwear",details.underwear)}${size("Coat",details.coat)}</div><h2>Preferences & accommodations</h2><p class="copy"><strong>Preferences:</strong> ${value(details.preferences)}</p><p class="copy"><strong>Accommodations:</strong> ${value(details.accommodations)}</p><div class="budget"><span>Shopping budget: $${value(settings.shoppingBudget || "0")}</span><span>Volunteer spending total: $________________</span></div></main><script>addEventListener('load',()=>setTimeout(()=>print(),180))</script></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${value(name)} shopping profile</title><style>@page{size:letter;margin:.45in}*{box-sizing:border-box}body{margin:0;color:#111821;background:#fff;font-family:Arial,sans-serif}.sheet{min-height:9.9in;padding:24px;border:1px solid #cbd3ce;border-top:6px solid #35d32f}.eyebrow{margin:0 0 13px;color:#176b39;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{margin:0;font-size:30px;line-height:1.05}h2{margin:30px 0 11px;font-size:16px}.reference{margin:7px 0 26px;color:#617068;font-size:12px;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.box{padding:15px;background:#f3f7f3}.box span,.size span{display:block;margin-bottom:6px;color:#617068;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.box strong{font-size:14px}.sizes{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.size{padding:12px;background:#f3f7f3}.size strong{font-size:14px}.copy{line-height:1.5}.budget{display:flex;margin-top:32px;padding:16px;justify-content:space-between;gap:20px;background:#e8f7e8;border-left:5px solid #176b39;font-weight:700}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><main class="sheet"><p class="eyebrow">Campbell's Crew Cares · Child Shopping Profile</p><h1>${value(name)}</h1><p class="reference">${value(recipientApplicationReference(household.id))} · ${value(event.title)}</p><div class="grid"><div class="box"><span>Responsible party</span><strong>${value(household.guardian_name)}</strong></div><div class="box"><span>Emergency contact</span><strong>${value(application.emergencyName)} · ${value(application.emergencyPhone)}</strong></div></div><h2>Sizes</h2><div class="sizes">${size("Shirt",details.shirt)}${size("Pants",details.pants)}${size("Shoes",details.shoes)}${size("Underwear",details.underwear)}${size("Coat",details.coat)}</div><h2>Preferences & accommodations</h2><p class="copy"><strong>Preferences:</strong> ${value(details.preferences)}</p><p class="copy"><strong>Accommodations:</strong> ${value(details.accommodations)}</p><div class="budget"><span>Shopping budget: $${value(budgetTotal)}</span><span>Volunteer spending total: $________________</span></div></main><script>addEventListener('load',()=>setTimeout(()=>print(),180))</script></body></html>`;
 }
 
 function childProfileValues({ child, household, event }) {
@@ -216,7 +222,7 @@ function childProfileValues({ child, household, event }) {
     showBra: Boolean(settings.questions?.braSize) && /^(girl|girls|woman|women)$/i.test(String(details.gender || "").trim()),
     preferences: details.preferences || "None provided", accommodations: details.accommodations || "None provided",
     budgets: { shirt: budgetFor("shirts", "shirt"), pants: budgetFor("pants", "pants / shorts"), underwear: budgetFor("underwear", "bras", "undergarments"), socks: budgetFor("socks", "sock"), shoes: budgetFor("shoes", "shoe"), coat: budgetFor("coats", "coat", "coat / jacket") },
-    budgetTotal: settings.shoppingBudget || enabledBudgets.reduce((total, item) => total + (Number(item.amount) || 0), 0) || "0"
+    budgetTotal: enabledBudgetTotal(settings)
   };
 }
 
