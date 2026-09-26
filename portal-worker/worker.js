@@ -618,7 +618,7 @@ async function sendOrganizerInvitation(env, recipient, name, role, setupUrl) {
 // The complete organizer experience is the established test-site interface.
 // It is served only after the database-backed organizer session above has been
 // verified. Rewriting its local asset links lets it live safely at /organizer.
-async function serveOrganizerPrototype(request, env, url) {
+async function serveOrganizerPrototype(request, env, url, user) {
   const relativePath = url.pathname.replace(/^\/organizer\/?/, "");
   const assetUrl = new URL(request.url);
   assetUrl.pathname = relativePath ? `/${relativePath}` : "/index.html";
@@ -626,7 +626,7 @@ async function serveOrganizerPrototype(request, env, url) {
   const headers = securityHeaders(new Headers(asset.headers));
   if (assetUrl.pathname === "/index.html") {
     const html = (await asset.text())
-      .replace("<html lang=\"en\">", "<html lang=\"en\" data-server-auth=\"true\">")
+      .replace("<html lang=\"en\">", `<html lang="en" data-server-auth="true" data-organizer-role="${escapeHtml(user?.role || "")}">`)
       // Keep CSP's base-uri protection intact; route the prototype's local
       // files explicitly instead of injecting a <base> element.
       .replace('href="styles.css"', 'href="/organizer/styles.css"')
@@ -989,13 +989,50 @@ async function api(request, env, url, user) {
     return json({ id }, 201);
   }
 
+  const eventCloseoutMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)\/closeout$/);
+  if (eventCloseoutMatch && request.method === "PUT") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Executive Owner or Event Administrator permission required." }, 403);
+    const input = await request.json();
+    const existing = await env.DB.prepare("SELECT id, title, event_type, event_date, settings_json FROM events WHERE id = ?").bind(eventCloseoutMatch[1]).first();
+    if (!existing) return json({ error: "Event not found." }, 404);
+    let settings = {}; try { settings = JSON.parse(existing.settings_json || "{}"); } catch {}
+    const safeNumber = (value) => Math.max(0, Math.min(10000000, Number.isFinite(Number(value)) ? Number(value) : 0));
+    const closeout = {
+      eventType: existing.event_type === "food_bag" ? "food-bag" : "shopping",
+      bagsPlanned: safeNumber(input.bagsPlanned), bagsMade: safeNumber(input.bagsMade),
+      childrenRegistered: safeNumber(input.childrenRegistered), childrenAttended: safeNumber(input.childrenAttended),
+      volunteersRegistered: safeNumber(input.volunteersRegistered), volunteersAttended: safeNumber(input.volunteersAttended),
+      volunteerHours: safeNumber(input.volunteerHours), totalSpent: safeNumber(input.totalSpent),
+      notes: String(input.notes || "").trim().slice(0, 5000), closedAt: settings.closeout?.closedAt || new Date().toISOString(), updatedAt: new Date().toISOString()
+    };
+    settings.closeout = closeout; settings.closed = true; settings.volunteerStatus = "closed"; settings.recipientStatus = "closed";
+    await env.DB.prepare("UPDATE events SET status = 'closed', settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(JSON.stringify(settings), existing.id).run();
+    await audit(env, user, existing.settings_json?.includes('"closeout"') ? "event_closeout_updated" : "event_closed", "event", existing.id, existing.id);
+    return json({ report: { id: existing.id, event: existing.title, eventDate: existing.event_date || settings.date || "", eventType: closeout.eventType, status: "Closed out", ...closeout } });
+  }
+
+  const eventReopenMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)\/reopen$/);
+  if (eventReopenMatch && request.method === "POST") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Executive Owner or Event Administrator permission required." }, 403);
+    const existing = await env.DB.prepare("SELECT id, settings_json, status FROM events WHERE id = ?").bind(eventReopenMatch[1]).first();
+    if (!existing) return json({ error: "Event not found." }, 404);
+    if (existing.status !== "closed") return json({ error: "Only a completed event can be reopened." }, 400);
+    let settings = {}; try { settings = JSON.parse(existing.settings_json || "{}"); } catch {}
+    settings.closed = false; settings.volunteerStatus = "closed"; settings.recipientStatus = "closed";
+    await env.DB.prepare("UPDATE events SET status = 'draft', settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(JSON.stringify(settings), existing.id).run();
+    await audit(env, user, "event_reopened", "event", existing.id, existing.id);
+    return json({ id: existing.id, status: "draft" });
+  }
+
   const eventMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)$/);
   if (eventMatch && request.method === "PUT") {
     if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
     const input = await request.json();
-    const existing = await env.DB.prepare("SELECT id FROM events WHERE id = ?").bind(eventMatch[1]).first();
+    const existing = await env.DB.prepare("SELECT id, status FROM events WHERE id = ?").bind(eventMatch[1]).first();
     if (!existing) return json({ error: "Event not found." }, 404);
     const status = ["draft", "open", "closed"].includes(input.status) ? input.status : "draft";
+    if (status === "closed" && existing.status !== "closed") return json({ error: "Use the Finish Event close-out workflow to close an event." }, 400);
+    if (existing.status === "closed" && status !== "closed") return json({ error: "Use the confirmed re-open action to reopen an event." }, 400);
     await env.DB.prepare("UPDATE events SET title = ?, event_date = ?, status = ?, settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
       .bind(String(input.title || "Untitled event").slice(0, 160), input.eventDate || null, status, JSON.stringify(input.settings || {}), eventMatch[1]).run();
     await audit(env, user, "event_updated", "event", eventMatch[1], eventMatch[1]);
@@ -1171,8 +1208,8 @@ async function api(request, env, url, user) {
 
   if (url.pathname === "/portal-api/organizer/reports" && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
-    const { results } = await env.DB.prepare("SELECT e.id, e.title, e.event_type, e.event_date, e.status, COUNT(DISTINCT s.id) AS volunteer_count, COUNT(DISTINCT h.id) AS household_count, COUNT(DISTINCT c.id) AS child_count FROM events e LEFT JOIN volunteer_signups s ON s.event_id = e.id LEFT JOIN recipient_households h ON h.event_id = e.id LEFT JOIN recipient_children c ON c.household_id = h.id GROUP BY e.id ORDER BY e.event_date DESC").all();
-    return json({ reports: results });
+    const { results } = await env.DB.prepare("SELECT e.id, e.title, e.event_type, e.event_date, e.status, e.settings_json, COUNT(DISTINCT s.id) AS volunteer_count, COUNT(DISTINCT h.id) AS household_count, COUNT(DISTINCT c.id) AS child_count FROM events e LEFT JOIN volunteer_signups s ON s.event_id = e.id LEFT JOIN recipient_households h ON h.event_id = e.id LEFT JOIN recipient_children c ON c.household_id = h.id WHERE e.status = 'closed' GROUP BY e.id ORDER BY e.event_date DESC").all();
+    return json({ reports: results.map((event) => { let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {} const closeout = settings.closeout || {}; return { id: event.id, event: event.title, eventDate: event.event_date || settings.date || "", eventType: event.event_type === "food_bag" ? "food-bag" : "shopping", status: "Closed out", bagsPlanned: Number(closeout.bagsPlanned || 0), bagsMade: Number(closeout.bagsMade || 0), childrenRegistered: Number(closeout.childrenRegistered || event.child_count || 0), childrenAttended: Number(closeout.childrenAttended || 0), volunteersRegistered: Number(closeout.volunteersRegistered || event.volunteer_count || 0), volunteersAttended: Number(closeout.volunteersAttended || 0), volunteerHours: Number(closeout.volunteerHours || 0), totalSpent: Number(closeout.totalSpent || 0), notes: String(closeout.notes || ""), closedAt: closeout.closedAt || event.updated_at || "" }; }) });
   }
 
   if (url.pathname === "/portal-api/organizer/users" && request.method === "GET") {
@@ -1369,7 +1406,7 @@ export default {
     if (url.pathname === "/login") return user ? Response.redirect(`${url.origin}/organizer#organizer/dashboard`, 303) : loginPage();
     if (url.pathname === "/organizer" || url.pathname.startsWith("/organizer/")) {
       if (!user) return Response.redirect(`${url.origin}/login`, 303);
-      return serveOrganizerPrototype(request, env, url);
+      return serveOrganizerPrototype(request, env, url, user);
     }
     if (url.pathname === "/volunteer") {
       const events = await publicVolunteerEvents(env);

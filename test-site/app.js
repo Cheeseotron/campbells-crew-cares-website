@@ -3,6 +3,8 @@
 
   const TEST_PIN = "2017";
   const SERVER_AUTH = document.documentElement.dataset.serverAuth === "true";
+  const ORGANIZER_ROLE = document.documentElement.dataset.organizerRole || "";
+  const ORGANIZER_ROLE_LABELS = { executive_owner: "Executive Owner", event_admin: "Event Administrator", read_only: "Read-Only Coordinator", checkin_staff: "Check-In Staff" };
   const LIVE_PUBLIC_RECIPIENT = document.documentElement.dataset.livePublicRecipient === "true";
   const SESSION_KEY = "ccc-test-site-unlocked";
   const STATE_KEY = "ccc-signup-prototype-state-v7";
@@ -262,8 +264,13 @@
   let publicRecipientEventId = sessionStorage.getItem("ccc-public-recipient-event") || "";
   // The live organizer route has already been authenticated by the Worker.
   // It must never fall through to the old in-browser demonstration login.
-  let portalUser = SERVER_AUTH ? "Executive Owner" : (sessionStorage.getItem("ccc-portal-user") || "");
+  let portalUser = SERVER_AUTH ? (ORGANIZER_ROLE_LABELS[ORGANIZER_ROLE] || "Organizer") : (sessionStorage.getItem("ccc-portal-user") || "");
   let previewRole = sessionStorage.getItem("ccc-preview-role") || "";
+
+  function canManageEventLifecycle() {
+    if (SERVER_AUTH) return ["executive_owner", "event_admin"].includes(ORGANIZER_ROLE);
+    return ["Executive Owner", "Event Administrator"].includes(previewRole || portalUser);
+  }
 
   function createRecipientDraft() {
     return {
@@ -399,6 +406,21 @@
     if (!response.ok) throw new Error("The public impact summary could not be loaded.");
     const impact = (await response.json()).impact || {};
     state.publicStats = { families: Number(impact.families_minimum || 0), children: Number(impact.children_minimum || 0), peopleFed: Number(impact.people_fed_minimum || 0), years: Number(impact.years_serving || 9) };
+  }
+
+  async function loadLiveReports() {
+    if (!SERVER_AUTH) return;
+    const response = await fetch("/portal-api/organizer/reports", { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("The completed event records could not be loaded.");
+    state.reports = (await response.json()).reports || [];
+  }
+
+  async function saveEventCloseout(event, closeout) {
+    if (!SERVER_AUTH || !event?.id) return { id: event?.id, event: event?.title, eventDate: event?.date, status: "Closed out", ...closeout };
+    const response = await fetch(`/portal-api/events/${encodeURIComponent(event.id)}/closeout`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(closeout) });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "The event could not be closed.");
+    return payload.report;
   }
 
   async function loadLiveRecipientEvents() {
@@ -1049,7 +1071,7 @@
 
   function renderOrganizerLogin() {
     if (SERVER_AUTH) {
-      portalUser = "Executive Owner";
+      portalUser = ORGANIZER_ROLE_LABELS[ORGANIZER_ROLE] || "Organizer";
       renderOrganizer("dashboard");
       return;
     }
@@ -1262,7 +1284,7 @@
     html = html.replace('Names, shifts and limits', `Total enabled spots: <b data-role-capacity-total>${roleCapacity}</b>`);
     html = html.replace('<h3>Volunteer registration</h3>', '<div class="configuration-heading"><span>Volunteer configuration</span><small>Access, public questions, roles, and capacity</small></div><h3>Volunteer registration</h3>');
     html = html.replace('<h3>Recipient applications</h3>', '<div class="configuration-heading"><span>Recipient configuration</span><small>Access and application questions are managed separately</small></div><h3>Recipient applications</h3>');
-    html += `<article class="finish-event-panel"><div><p class="eyebrow">End-of-event action</p><h2>Finished with this event?</h2><p>Close-out records are preserved in reports, the volunteer directory, and Past Recipients / History.</p></div><button class="button button--danger" type="button" data-finish-event>Finish Event</button></article>`;
+    if (canManageEventLifecycle()) html += `<article class="finish-event-panel"><div><p class="eyebrow">End-of-event action</p><h2>Finished with this event?</h2><p>Close-out records are preserved in reports, the volunteer directory, and Past Recipients / History.</p></div><button class="button button--danger" type="button" data-finish-event>Finish Event</button></article>`;
     setTimeout(()=>{ document.querySelectorAll(".settings-section").forEach((section,index)=>{ if (remembered) section.open=Boolean(remembered[index]); section.addEventListener("toggle",()=>sessionStorage.setItem("ccc-event-sections",JSON.stringify([...document.querySelectorAll(".settings-section")].map((item)=>item.open)))); }); },0);
     return html;
   }
@@ -1305,11 +1327,12 @@
   }
 
   function organizerReportsV8() {
-    const latest = state.reports[0];
+    const reports = state.reports || [];
+    const latest = reports[0];
     const stats = state.publicStats || { families: 0, children: 0, peopleFed: 0, years: 9 };
     const activityLabel = (report) => report.eventType === "food-bag" ? `${report.bagsMade}/${report.bagsPlanned} bags made` : `${report.childrenAttended}/${report.childrenRegistered} children`;
     const latestMetric = latest?.eventType === "food-bag" ? `<article class="metric-card"><span>Latest bags made</span><strong>${latest.bagsMade}/${latest.bagsPlanned}</strong></article>` : `<article class="metric-card"><span>Latest child attendance</span><strong>${latest?.childrenAttended}/${latest?.childrenRegistered}</strong></article>`;
-    return `${heading("Event records", "Reports & history", "Permanent completed-event records and a carefully maintained public impact summary.")}<article class="panel"><div class="panel-header"><div><h2>Public impact summary</h2><p>Use conservative minimums only. These figures appear publicly as “at least” totals, so they do not need to be exact historical counts.</p></div></div><form id="impact-form" class="form-grid"><div class="field"><label>Families helped — minimum known total<input name="families" type="number" min="0" value="${stats.families}"></label></div><div class="field"><label>Children supported — minimum known total<input name="children" type="number" min="0" value="${stats.children}"></label></div><div class="field"><label>People fed — minimum known total<input name="peopleFed" type="number" min="0" value="${stats.peopleFed}"></label></div><div class="field"><label>Years serving — exact<input name="years" type="number" min="0" value="${stats.years}"></label></div><div class="field field--span-2"><small class="field-help">Leave a count at 0 to keep it off the public page. Volunteer totals are intentionally not shown because historical records are incomplete.</small></div><button class="button button--green" type="submit">Save public impact summary</button></form></article><article class="panel"><h2>Completed event records</h2>${state.reports.map((report, index)=>`<div class="report-row"><span><strong>${esc(report.event)}</strong><small>${esc(report.status)} · Permanent record</small></span><b>${activityLabel(report)} · ${report.volunteerHours} hours · $${Number(report.totalSpent).toLocaleString()}</b><button class="button button--small button--ghost" type="button" data-view-report="${index}">View details</button></div>`).join("")}</article>${latest?`<div class="metric-grid">${latestMetric}<article class="metric-card"><span>Latest volunteer hours</span><strong>${latest.volunteerHours}</strong></article><article class="metric-card"><span>Latest spending</span><strong>$${Number(latest.totalSpent).toLocaleString()}</strong></article></div>`:""}`;
+    return `${heading("Event records", "Reports & history", "Permanent completed-event records and a carefully maintained public impact summary.")}<article class="panel"><div class="panel-header"><div><h2>Public impact summary</h2><p>Use conservative minimums only. These figures appear publicly as “at least” totals, so they do not need to be exact historical counts.</p></div></div><form id="impact-form" class="form-grid"><div class="field"><label>Families helped — minimum known total<input name="families" type="number" min="0" value="${stats.families}"></label></div><div class="field"><label>Children supported — minimum known total<input name="children" type="number" min="0" value="${stats.children}"></label></div><div class="field"><label>People fed — minimum known total<input name="peopleFed" type="number" min="0" value="${stats.peopleFed}"></label></div><div class="field"><label>Years serving — exact<input name="years" type="number" min="0" value="${stats.years}"></label></div><div class="field field--span-2"><small class="field-help">Leave a count at 0 to keep it off the public page. Volunteer totals are intentionally not shown because historical records are incomplete.</small></div><button class="button button--green" type="submit">Save public impact summary</button></form></article><article class="panel"><h2>Completed event records</h2>${reports.length ? reports.map((report, index)=>`<div class="report-row"><span><strong>${esc(report.event)}</strong><small>${esc(report.eventDate || "Event date not recorded")} · ${esc(report.status)} · Permanent record</small></span><b>${activityLabel(report)} · ${report.volunteerHours} hours · $${Number(report.totalSpent).toLocaleString()}</b><button class="button button--small button--ghost" type="button" data-view-report="${index}">View details</button></div>`).join("") : `<p class="empty-state">No completed events are on file yet.</p>`}</article>${latest?`<div class="metric-grid">${latestMetric}<article class="metric-card"><span>Latest volunteer hours</span><strong>${latest.volunteerHours}</strong></article><article class="metric-card"><span>Latest spending</span><strong>$${Number(latest.totalSpent).toLocaleString()}</strong></article></div>`:""}`;
   }
 
   function bindOrganizer(subroute) {
@@ -1702,9 +1725,39 @@
     const details = foodBag
       ? [["Bags made", `${Number(report.bagsMade || 0).toLocaleString()} of ${Number(report.bagsPlanned || 0).toLocaleString()}`], ["Volunteers", `${Number(report.volunteersAttended || 0).toLocaleString()} attended of ${Number(report.volunteersRegistered || 0).toLocaleString()} registered`], ["Volunteer hours", Number(report.volunteerHours || 0).toLocaleString()], ["Event spending", `$${Number(report.totalSpent || 0).toLocaleString()}`]]
       : [["Children", `${Number(report.childrenAttended || 0).toLocaleString()} attended of ${Number(report.childrenRegistered || 0).toLocaleString()} registered`], ["Volunteers", `${Number(report.volunteersAttended || 0).toLocaleString()} attended of ${Number(report.volunteersRegistered || 0).toLocaleString()} registered`], ["Volunteer hours", Number(report.volunteerHours || 0).toLocaleString()], ["Event spending", `$${Number(report.totalSpent || 0).toLocaleString()}`]];
-    dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Completed event record</p><h2 id="dialog-title">${esc(report.event || "Event details")}</h2><p class="dialog-subtitle">${esc(report.status || "Closed out")} · Permanent summary</p><div class="detail-grid">${details.map(([label, value]) => `<div class="detail-item"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("")}</div><div class="confirmation-box"><strong>Close-out notes</strong><p>${esc(report.notes || "No close-out notes were recorded.")}</p></div><button class="button button--light" type="button" data-close-dialog>Close</button></div>`;
-    appDialog.showModal(); document.body.classList.add("dialog-open");
+    const management = canManageEventLifecycle() ? `<div class="dialog-actions"><button class="button button--light" type="button" data-edit-closeout>Edit close-out details</button><button class="button button--danger" type="button" data-reopen-event>Re-open event</button></div>` : "";
+    dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Completed event record</p><h2 id="dialog-title">${esc(report.event || "Event details")}</h2><p class="dialog-subtitle">${esc(report.eventDate || "Event date not recorded")} · ${esc(report.status || "Closed out")} · Permanent summary</p><div class="detail-grid">${details.map(([label, value]) => `<div class="detail-item"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("")}</div><div class="confirmation-box"><strong>Close-out notes</strong><p>${esc(report.notes || "No close-out notes were recorded.")}</p></div>${management}<button class="button button--light" type="button" data-close-dialog>Close</button></div>`;
+    if (!appDialog.open) appDialog.showModal(); document.body.classList.add("dialog-open");
     dialogContent.querySelector("[data-close-dialog]").addEventListener("click", closeDialog);
+    dialogContent.querySelector("[data-edit-closeout]")?.addEventListener("click", () => openEditCloseout(report));
+    dialogContent.querySelector("[data-reopen-event]")?.addEventListener("click", () => openReopenEventConfirmation(report));
+  }
+
+  function openEditCloseout(report) {
+    const foodBag = report.eventType === "food-bag";
+    const fields = foodBag
+      ? `<div class="field"><label>Food bags planned<input name="bagsPlanned" type="number" min="0" value="${Number(report.bagsPlanned || 0)}" required></label></div><div class="field"><label>Food bags made<input name="bagsMade" type="number" min="0" value="${Number(report.bagsMade || 0)}" required></label></div>`
+      : `<div class="field"><label>Children registered<input name="childrenRegistered" type="number" min="0" value="${Number(report.childrenRegistered || 0)}" required></label></div><div class="field"><label>Children attended<input name="childrenAttended" type="number" min="0" value="${Number(report.childrenAttended || 0)}" required></label></div>`;
+    dialogContent.innerHTML = `<form class="dialog-body finish-dialog" id="edit-closeout-form"><p class="eyebrow">Completed event record</p><h2 id="dialog-title">Edit close-out details</h2><p>${esc(report.event)} · ${esc(report.eventDate || "Event date not recorded")}</p><div class="form-grid">${fields}<div class="field"><label>Volunteers registered<input name="volunteersRegistered" type="number" min="0" value="${Number(report.volunteersRegistered || 0)}" required></label></div><div class="field"><label>Volunteers attended<input name="volunteersAttended" type="number" min="0" value="${Number(report.volunteersAttended || 0)}" required></label></div><div class="field"><label>Volunteer hours<input name="volunteerHours" type="number" min="0" value="${Number(report.volunteerHours || 0)}" required></label></div><div class="field"><label>Total event spending<input name="totalSpent" type="text" inputmode="decimal" value="$${Number(report.totalSpent || 0).toFixed(2)}" required></label></div><div class="field field--span-2"><label>Close-out notes<textarea name="notes">${esc(report.notes || "")}</textarea></label></div></div><div class="dialog-actions"><button class="button button--light" type="button" data-cancel-edit>Cancel</button><button class="button button--green" type="submit">Save close-out details</button></div></form>`;
+    if (!appDialog.open) appDialog.showModal(); document.body.classList.add("dialog-open");
+    const spending = dialogContent.querySelector('[name="totalSpent"]');
+    spending.addEventListener("focus", () => spending.select());
+    spending.addEventListener("blur", () => { spending.value = `$${currencyValue(spending.value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; });
+    dialogContent.querySelector("[data-cancel-edit]").addEventListener("click", () => openCompletedReport(report));
+    dialogContent.querySelector("#edit-closeout-form").addEventListener("submit", async (event) => {
+      event.preventDefault(); const data = new FormData(event.currentTarget);
+      const closeout = { eventType: report.eventType, bagsPlanned: Number(data.get("bagsPlanned") || 0), bagsMade: Number(data.get("bagsMade") || 0), childrenRegistered: Number(data.get("childrenRegistered") || 0), childrenAttended: Number(data.get("childrenAttended") || 0), volunteersRegistered: Number(data.get("volunteersRegistered") || 0), volunteersAttended: Number(data.get("volunteersAttended") || 0), volunteerHours: Number(data.get("volunteerHours") || 0), totalSpent: currencyValue(data.get("totalSpent")), notes: String(data.get("notes") || "") };
+      try { const saved = await saveEventCloseout({ id: report.id, title: report.event, date: report.eventDate }, closeout); const index = state.reports.findIndex((item) => item.id === report.id); if (index >= 0) state.reports[index] = saved; closeDialog(); renderOrganizer("reports"); toast("Close-out details saved."); } catch (error) { toast(error.message || "The close-out details could not be saved."); }
+    });
+  }
+
+  function openReopenEventConfirmation(report) {
+    dialogContent.innerHTML = `<form class="dialog-body confirm-dialog" id="reopen-event-form"><p class="eyebrow">Confirm re-open</p><h2 id="dialog-title">Re-open ${esc(report.event)}?</h2><p>This removes the event from completed history and returns it to a private draft. Volunteer and recipient signups will remain closed until an authorized organizer intentionally opens them again.</p><label class="question-toggle"><input name="confirm" type="checkbox"><span class="switch-control" aria-hidden="true"></span><span><strong>I understand this event will be re-opened as a private draft.</strong></span></label><div class="dialog-actions"><button class="button button--light" type="button" data-cancel-reopen>Cancel</button><button class="button button--danger" type="submit" disabled>Re-open event</button></div></form>`;
+    if (!appDialog.open) appDialog.showModal(); document.body.classList.add("dialog-open");
+    const form = dialogContent.querySelector("#reopen-event-form"); const submit = form.querySelector('[type="submit"]'); const confirmation = form.elements.confirm;
+    confirmation.addEventListener("change", () => { submit.disabled = !confirmation.checked; });
+    dialogContent.querySelector("[data-cancel-reopen]").addEventListener("click", () => openCompletedReport(report));
+    form.addEventListener("submit", async (event) => { event.preventDefault(); if (!confirmation.checked) return; submit.disabled = true; try { const response = await fetch(`/portal-api/events/${encodeURIComponent(report.id)}/reopen`, { method: "POST" }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The event could not be reopened."); await loadLiveEvents(); await loadLiveReports(); closeDialog(); navigateOrganizer("events"); toast("Event re-opened as a private draft."); } catch (error) { toast(error.message || "The event could not be reopened."); submit.disabled = false; } });
   }
 
   function openFinishEvent() {
@@ -1721,10 +1774,11 @@
       event.preventDefault(); if (Number(slider.value) < 100) return;
       const data = new FormData(event.currentTarget); const num = (key) => key === "totalSpent" ? currencyValue(data.get(key)) : Number(data.get(key) || 0); const finishedTitle = state.event.title;
       const previousStatus = { closed: state.event.closed, volunteerStatus: state.event.volunteerStatus, recipientStatus: state.event.recipientStatus };
+      const closeout = { eventType: "shopping", childrenRegistered: num("childrenRegistered"), childrenAttended: num("childrenAttended"), volunteersRegistered: num("volunteersRegistered"), volunteersAttended: num("volunteersAttended"), volunteerHours: num("volunteerHours"), totalSpent: num("totalSpent"), notes: String(data.get("notes") || "") };
       state.event.volunteerStatus = "closed"; state.event.recipientStatus = "closed"; state.event.closed = true;
-      try { await saveLiveEvent(state.event); }
+      let savedReport; try { savedReport = await saveEventCloseout(state.event, closeout); }
       catch (error) { Object.assign(state.event, previousStatus); toast(error.message || "The event could not be closed. Please try again."); return; }
-      state.reports.unshift({ event: finishedTitle, status: "Closed out", childrenRegistered: num("childrenRegistered"), childrenAttended: num("childrenAttended"), volunteersRegistered: num("volunteersRegistered"), volunteersAttended: num("volunteersAttended"), volunteerHours: num("volunteerHours"), totalSpent: num("totalSpent"), notes: String(data.get("notes") || "") });
+      state.reports.unshift(savedReport);
       state.applications.filter((item) => !item.archived && item.eventName === finishedTitle).forEach((item) => { item.archived = true; });
       state.volunteers.filter((item) => item.currentEvent === finishedTitle).forEach((item) => { item.history = item.history || []; item.history.unshift({ event: finishedTitle, role: item.role, result: item.checkedIn ? "Attended" : (item.attendanceStatus === "excused" ? "Excused absence" : "No-show") }); item.currentEvent = ""; });
       const next = activeEvents()[0]; if (next) state.activeEventId = next.id;
@@ -1746,10 +1800,11 @@
       event.preventDefault(); if (Number(slider.value) < 100) return;
       const data = new FormData(event.currentTarget); const num = (key) => key === "totalSpent" ? currencyValue(data.get(key)) : Number(data.get(key) || 0); const finishedTitle = state.event.title;
       const previousStatus = { closed: state.event.closed, volunteerStatus: state.event.volunteerStatus, recipientStatus: state.event.recipientStatus };
+      const closeout = { eventType: "food-bag", bagsPlanned: num("bagsPlanned"), bagsMade: num("bagsMade"), volunteersRegistered: num("volunteersRegistered"), volunteersAttended: num("volunteersAttended"), volunteerHours: num("volunteerHours"), totalSpent: num("totalSpent"), notes: String(data.get("notes") || "") };
       state.event.volunteerStatus = "closed"; state.event.recipientStatus = "closed"; state.event.closed = true;
-      try { await saveLiveEvent(state.event); }
+      let savedReport; try { savedReport = await saveEventCloseout(state.event, closeout); }
       catch (error) { Object.assign(state.event, previousStatus); toast(error.message || "The event could not be closed. Please try again."); return; }
-      state.reports.unshift({ event: finishedTitle, eventType: "food-bag", status: "Closed out", bagsPlanned: num("bagsPlanned"), bagsMade: num("bagsMade"), volunteersRegistered: num("volunteersRegistered"), volunteersAttended: num("volunteersAttended"), volunteerHours: num("volunteerHours"), totalSpent: num("totalSpent"), notes: String(data.get("notes") || "") });
+      state.reports.unshift(savedReport);
       state.volunteers.filter((item) => item.currentEvent === finishedTitle).forEach((item) => { item.history = item.history || []; item.history.unshift({ event: finishedTitle, role: item.role, result: item.checkedIn ? "Attended" : (item.attendanceStatus === "excused" ? "Excused absence" : "No-show") }); item.currentEvent = ""; });
       const next = activeEvents()[0]; if (next) state.activeEventId = next.id;
       state.activity.unshift({ text: `${finishedTitle} was finished and moved to permanent history.`, time: "Just now" }); saveState(); closeDialog(); toast("Food Bag Event finished. Its record is now in Reports & History."); navigateOrganizer("reports");
@@ -2085,6 +2140,7 @@
         await loadLiveImpact();
         await loadLiveVolunteers();
         await loadLiveApplications();
+        await loadLiveReports();
         await loadLiveUsers();
       } catch (error) {
         main.innerHTML = `<section class="page-content"><article class="content-card"><h1>Organizer records could not load</h1><p>Please refresh the page. No changes were made.</p></article></section>`;
