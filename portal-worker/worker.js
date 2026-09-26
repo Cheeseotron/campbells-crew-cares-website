@@ -261,8 +261,8 @@ function childProfileValues({ child, household, event }) {
 function drawPrintSafeTopBar(page) {
   // The taller band still reaches the very top, while extending farther down
   // the page so printers that trim an edge retain a strong visible accent.
-  page.drawRectangle({ x: 0, y: 774, width: 205, height: 18, color: rgb(0.21, 0.83, 0.18) });
-  page.drawRectangle({ x: 205, y: 774, width: 407, height: 18, color: rgb(0.07, 0.10, 0.13) });
+  page.drawRectangle({ x: 0, y: 772, width: 205, height: 20, color: rgb(0.21, 0.83, 0.18) });
+  page.drawRectangle({ x: 205, y: 772, width: 407, height: 20, color: rgb(0.07, 0.10, 0.13) });
 }
 
 function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = null) {
@@ -277,16 +277,16 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
   clear(31, 80, 560, 656, paper);
   // Rebuild the brand lockup lower on the page so it has comfortable space
   // below the stronger print-safe top band.
-  clear(31, 722, 330, 48, paper);
-  if (brandLogo) page.drawImage(brandLogo, { x: 41, y: 728, width: 30, height: 30 });
-  draw("CAMPBELL'S CREW CARES", 79, 739, 9.3, { bold: true, maxWidth: 220 });
+  clear(31, 710, 350, 62, paper);
+  if (brandLogo) page.drawImage(brandLogo, { x: 41, y: 714, width: 40, height: 40 });
+  draw("CAMPBELL'S CREW CARES", 91, 732, 10.8, { bold: true, maxWidth: 240 });
   // Remove the template's internal "profile" label; the child's name is the
   // useful title for volunteers sorting a stack of sheets.
   clear(390, 740, 180, 28, paper);
-  draw(values.name, left, 696, 25, { bold: true, maxWidth: photo ? 400 : 500 });
-  draw("Child information sheet", left, 672, 10.5, { muted: true });
+  draw("Child information sheet", left, 704, 10.8, { muted: true });
+  draw(values.name, left, 670, 25, { bold: true, maxWidth: photo ? 400 : 500 });
   if (photo) {
-    const photoLeft = 494; const photoBottom = 665; const photoSide = 64;
+    const photoLeft = 491; const photoBottom = 662; const photoSide = 70;
     // Fill, center, and clip the square so every packet uses the same crop
     // treatment as the child badge rather than letterboxing the source image.
     const scale = Math.max(photoSide / photo.width, photoSide / photo.height);
