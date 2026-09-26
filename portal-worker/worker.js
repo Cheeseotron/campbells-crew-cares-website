@@ -304,13 +304,13 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
   page.drawLine({ start: { x: 217, y: 574 }, end: { x: 217, y: 645 }, thickness: .55, color: border });
   page.drawLine({ start: { x: 393, y: 574 }, end: { x: 393, y: 645 }, thickness: .55, color: border });
   page.drawLine({ start: { x: 41, y: 609 }, end: { x: 570, y: 609 }, thickness: .55, color: border });
-  [["CHILD NAME", 51, 629], ["APPLICATION #", 228, 629], ["DATE / EVENT", 404, 629], ["VOLUNTEER", 51, 593], ["AGE / BIRTHDATE", 228, 593], ["EMERGENCY CONTACT", 404, 593]].forEach(([label, x, y]) => draw(label, x, y, 6.3, { bold: true, muted: true }));
-  draw(values.name, 51, 615, 9.3, { bold: true, maxWidth: 130 });
-  draw(values.application, 228, 615, 9.3, { bold: true, maxWidth: 130 });
-  draw(values.event, 404, 615, 8.2, { bold: true, maxWidth: 128 });
-  draw(values.volunteer, 51, 580, 7.7, { maxWidth: 130 });
-  draw(values.age, 228, 580, 7.3, { maxWidth: 130 });
-  draw(values.emergency, 404, 580, 6.6, { maxWidth: 128 });
+  [["CHILD NAME", 51, 629], ["APPLICATION #", 228, 629], ["DATE / EVENT", 404, 629], ["VOLUNTEER", 51, 593], ["AGE / BIRTHDATE", 228, 593], ["EMERGENCY CONTACT", 404, 593]].forEach(([label, x, y]) => draw(label, x, y, 7, { bold: true, muted: true }));
+  draw(values.name, 51, 615, 10.5, { bold: true, maxWidth: 130 });
+  draw(values.application, 228, 615, 10.5, { bold: true, maxWidth: 130 });
+  draw(values.event, 404, 615, 9, { bold: true, maxWidth: 128 });
+  draw(values.volunteer, 51, 580, 8.5, { maxWidth: 130 });
+  draw(values.age, 228, 580, 8.2, { maxWidth: 130 });
+  draw(values.emergency, 404, 580, 7.4, { maxWidth: 128 });
   // Sizes panel: the header, table, and all value cells share the same outer
   // edge as the details, notes, and budget panels. A bra field only exists
   // when that event enabled it and the child's sizing category is applicable.
@@ -320,7 +320,7 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
   const sizeTop = 523; const sizeBottom = 430; const sizeLeft = 52; const sizeRight = 559; const rowMid = 477;
   page.drawRectangle({ x: sizeLeft, y: sizeBottom, width: sizeRight - sizeLeft, height: sizeTop - sizeBottom, borderColor: border, borderWidth: .5 });
   page.drawLine({ start: { x: sizeLeft, y: rowMid }, end: { x: sizeRight, y: rowMid }, thickness: .5, color: border });
-  const drawSizeCell = (label, item, x, y, width) => { draw(label, x + 10, y + 28, 6.8, { bold: true, muted: true }); draw(item, x + 10, y + 12, 8.5, { bold: true, maxWidth: width - 20 }); };
+  const drawSizeCell = (label, item, x, y, width) => { draw(label, x + 10, y + 28, 7.6, { bold: true, muted: true }); draw(item, x + 10, y + 11, 9.5, { bold: true, maxWidth: width - 20 }); };
   if (values.showBra) {
     const four = [52, 179, 306, 433, 559]; const three = [52, 221, 390, 559];
     four.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: rowMid }, end: { x, y: sizeTop }, thickness: .5, color: border }));
