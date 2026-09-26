@@ -7,6 +7,8 @@
   const SESSION_KEY = "ccc-test-site-unlocked";
   const STATE_KEY = "ccc-signup-prototype-state-v7";
   const ACTIVE_EVENT_KEY = "ccc-organizer-active-event";
+  const RECIPIENT_DRAFT_IDLE_MS = 30 * 60 * 1000;
+  const RECIPIENT_DRAFT_WARNING_MS = 5 * 60 * 1000;
   const main = document.querySelector("#main");
   const lockScreen = document.querySelector("#lock-screen");
   const appShell = document.querySelector("#app-shell");
@@ -222,6 +224,9 @@
   let recipientMaxStep = 0;
   let recipientConfirmation = null;
   let recipientDraft = createRecipientDraft();
+  let recipientDraftEventId = "";
+  let recipientLastActivityAt = Date.now();
+  let recipientIdleNoticeTimer = null;
   let checkinType = "recipients";
   let applicationSort = "submitted-newest";
   let volunteerSort = "name-az";
@@ -246,6 +251,94 @@
 
   function saveState() {
     if (!SERVER_AUTH) localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  }
+
+  function recipientDraftKey() { return state.event?.id ? `ccc-recipient-draft:${state.event.id}` : ""; }
+
+  function touchRecipientDraft() {
+    recipientLastActivityAt = Date.now();
+  }
+
+  function clearRecipientDraft() {
+    const key = recipientDraftKey();
+    if (key) sessionStorage.removeItem(key);
+    recipientDraft = createRecipientDraft(); recipientStep = 0; recipientMaxStep = 0; recipientLastActivityAt = Date.now();
+  }
+
+  function prepareRecipientDraftForEvent(eventId) {
+    if (recipientDraftEventId === eventId) return;
+    recipientDraftEventId = eventId;
+    recipientConfirmation = null;
+    recipientDraft = createRecipientDraft();
+    recipientStep = 0;
+    recipientMaxStep = 0;
+    recipientLastActivityAt = Date.now();
+    restoreRecipientDraft();
+  }
+
+  function saveRecipientDraft() {
+    const key = recipientDraftKey();
+    if (!key || recipientConfirmation) return;
+    // Uploaded photos stay in memory for the current application, but are not
+    // copied into browser storage. That keeps the saved draft dependable even
+    // when a household has several large photos.
+    const draft = { ...recipientDraft, children: recipientDraft.children.map(({ photoDataUrl, ...child }) => child) };
+    try { sessionStorage.setItem(key, JSON.stringify({ draft, step: recipientStep, maxStep: recipientMaxStep, lastActivityAt: recipientLastActivityAt })); }
+    catch { /* A draft is a convenience; the active form remains usable if browser storage is unavailable. */ }
+  }
+
+  function restoreRecipientDraft() {
+    const key = recipientDraftKey();
+    if (!key) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(key) || "null");
+      if (!saved?.draft) return;
+      if (Date.now() - Number(saved.lastActivityAt || 0) >= RECIPIENT_DRAFT_IDLE_MS) { sessionStorage.removeItem(key); return; }
+      recipientDraft = { ...createRecipientDraft(), ...saved.draft, children: Array.isArray(saved.draft.children) && saved.draft.children.length ? saved.draft.children : createRecipientDraft().children };
+      recipientStep = Math.max(0, Math.min(4, Number(saved.step) || 0)); recipientMaxStep = Math.max(recipientStep, Number(saved.maxStep) || 0);
+      recipientLastActivityAt = Number(saved.lastActivityAt) || Date.now();
+    } catch { sessionStorage.removeItem(key); }
+  }
+
+  function recipientIdleMessage() {
+    const remaining = Math.max(0, RECIPIENT_DRAFT_IDLE_MS - (Date.now() - recipientLastActivityAt));
+    return `Your progress is saved in this browser. If there is no activity, it will reset in ${Math.ceil(remaining / 60000)} minute${Math.ceil(remaining / 60000) === 1 ? "" : "s"}.`;
+  }
+
+  function updateRecipientIdleNotice() {
+    const notice = document.querySelector("[data-recipient-idle-notice]");
+    if (!notice || recipientConfirmation) return;
+    const elapsed = Date.now() - recipientLastActivityAt;
+    if (elapsed >= RECIPIENT_DRAFT_IDLE_MS) { clearRecipientDraft(); toast("Your saved application expired after 30 minutes of inactivity. Please start again."); renderRecipient(); return; }
+    notice.hidden = elapsed < RECIPIENT_DRAFT_IDLE_MS - RECIPIENT_DRAFT_WARNING_MS;
+    if (!notice.hidden) notice.textContent = recipientIdleMessage();
+  }
+
+  function startRecipientIdleNotice() {
+    if (recipientIdleNoticeTimer) window.clearInterval(recipientIdleNoticeTimer);
+    recipientIdleNoticeTimer = window.setInterval(updateRecipientIdleNotice, 30000);
+    updateRecipientIdleNotice();
+  }
+
+  function saveVisibleRecipientStep() {
+    const form = document.querySelector("#orientation-form, #household-form, #children-form, #emergency-form, #signature-form");
+    if (!form) return;
+    const data = new FormData(form);
+    if (form.id === "orientation-form") { acknowledgments.forEach((item) => { recipientDraft.acknowledgments[item.id] = { checked: data.get(`ack-${item.id}`) === "on" }; }); recipientDraft.agreementSignature = String(data.get("agreementSignature") || "").trim(); }
+    if (form.id === "household-form") saveHousehold(data);
+    if (form.id === "children-form") {
+      recipientDraft.children = recipientDraft.children.map((child, index) => {
+        const next = { ...child };
+        ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "coat"].forEach((key) => {
+          next[key] = String(data.get(`child-${index}-${key}`) || "").trim();
+        });
+        next.name = `${next.firstName} ${next.lastName}`.trim();
+        return next;
+      });
+    }
+    if (form.id === "emergency-form") saveEmergency(data);
+    if (form.id === "signature-form") recipientDraft.finalSignature = String(data.get("finalSignature") || "").trim();
+    touchRecipientDraft(); saveRecipientDraft();
   }
 
   function databaseStatus(event) {
@@ -435,6 +528,10 @@
     clearPrintState();
     let [route, subroute = "dashboard"] = routeParts();
     if (LIVE_PUBLIC_RECIPIENT) route = "recipient";
+    if (route !== "recipient" && recipientIdleNoticeTimer) {
+      window.clearInterval(recipientIdleNoticeTimer);
+      recipientIdleNoticeTimer = null;
+    }
     updateNav(route);
     syncHeaderActiveEvent();
     if (route === "volunteer") renderVolunteer();
@@ -559,6 +656,7 @@
       return;
     }
     state.activeEventId = selectedEvent.id;
+    prepareRecipientDraftForEvent(selectedEvent.id);
     if (!selectedEvent.recipientEnabled) {
       main.innerHTML = `<div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><div class="content-card"><h1>Recipient applications are not part of this event.</h1><p>This event is volunteer-only. Please return to see available assistance opportunities.</p></div></div>`;
       return;
@@ -570,14 +668,18 @@
 
     main.innerHTML = `
       <section class="page-hero page-hero--ink"><div class="page-hero__grid"><div><p class="eyebrow eyebrow--light">Recipient application</p><h1>Before you <span>apply.</span></h1></div><p>This guided application explains how the event works, collects each child's essential sizes and preferences, and gives Campbell's Crew what it needs for a careful review.</p></div></section>
-      <div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><div class="application-layout">${recipientStepsHtml()}<section class="application-panel" id="recipient-panel"></section></div></div>`;
+      <div class="page-content"><a class="back-link" href="#home">← Back to signup home</a><p class="inline-note" data-recipient-idle-notice role="status" hidden></p><div class="application-layout">${recipientStepsHtml()}<section class="application-panel" id="recipient-panel"></section></div></div>`;
     const panel = document.querySelector("#recipient-panel");
-    document.querySelectorAll("[data-recipient-step]").forEach((button) => button.addEventListener("click", () => { if (!button.disabled) { recipientStep = Number(button.dataset.recipientStep); renderRecipient(); } }));
+    panel.addEventListener("input", saveVisibleRecipientStep);
+    panel.addEventListener("change", saveVisibleRecipientStep);
+    panel.addEventListener("pointerdown", touchRecipientDraft);
+    document.querySelectorAll("[data-recipient-step]").forEach((button) => button.addEventListener("click", () => { if (!button.disabled) { saveVisibleRecipientStep(); recipientStep = Number(button.dataset.recipientStep); renderRecipient(); } }));
     if (recipientStep === 0) renderOrientation(panel);
     else if (recipientStep === 1) renderHousehold(panel);
     else if (recipientStep === 2) renderChildren(panel);
     else if (recipientStep === 3) renderEmergency(panel);
     else renderReview(panel);
+    startRecipientIdleNotice();
   }
 
   function renderOrientation(panel) {
@@ -585,7 +687,7 @@
       <p class="eyebrow">Step 1 of 5</p><h2>How the event works.</h2><p>Please review each section carefully and check every item. One signature at the bottom confirms all agreements.</p>
       <div class="video-card"><img src="../assets/images/campbell-story-video-thumbnail.jpg" alt="Campbell speaking in a video"><div class="video-card__content"><strong>Event orientation video</strong><span>Video placeholder · Written instructions are provided below</span></div></div>
       <div class="inline-note"><strong>Why both video and text?</strong> The eventual video will have captions and a transcript. The written explanation will always remain available.</div>
-      <form id="orientation-form"><div class="ack-list">${acknowledgments.map((item) => { const saved = recipientDraft.acknowledgments[item.id] || {}; return `<label class="ack-item"><input type="checkbox" name="ack-${item.id}" ${saved.checked ? "checked" : ""} required><p><strong>${esc(item.title)}.</strong> ${esc(item.text)}</p></label>`; }).join("")}</div><div class="signature-block field"><label for="agreement-signature">Responsible Party full name / electronic signature</label><input id="agreement-signature" name="agreementSignature" value="${esc(recipientDraft.agreementSignature)}" autocomplete="name" required><small>Typing your full name confirms all checked agreements above.</small></div><div class="form-actions"><a class="button button--ghost" href="#home">Cancel</a><button class="button button--green" type="submit">Continue to household <span>→</span></button></div></form>`;
+      <form id="orientation-form"><div class="ack-list">${acknowledgments.map((item) => { const saved = recipientDraft.acknowledgments[item.id] || {}; return `<label class="ack-item"><input type="checkbox" name="ack-${item.id}" ${saved.checked ? "checked" : ""} required><p><strong>${esc(item.title)}.</strong> ${esc(item.text)}</p></label>`; }).join("")}</div><div class="signature-block field"><label for="agreement-signature">Responsible Party full name / electronic signature</label><input id="agreement-signature" name="agreementSignature" value="${esc(recipientDraft.agreementSignature)}" autocomplete="name" required><small>Typing your full name confirms the agreements. You will confirm that name again after entering household information.</small></div><div class="form-actions"><a class="button button--ghost" href="#home">Cancel</a><button class="button button--green" type="submit">Continue to household <span>→</span></button></div></form>`;
     document.querySelector("#orientation-form").addEventListener("submit", (event) => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -594,6 +696,7 @@
       acknowledgments.forEach((item) => { recipientDraft.acknowledgments[item.id] = { checked: data.get(`ack-${item.id}`) === "on" }; });
       recipientDraft.agreementSignature = String(data.get("agreementSignature") || "").trim();
       recipientStep = 1; recipientMaxStep = Math.max(recipientMaxStep, 1);
+      touchRecipientDraft(); saveRecipientDraft();
       renderRecipient();
     });
   }
@@ -612,12 +715,13 @@
         <div class="field"><label for="preferred-contact">Preferred contact</label><select id="preferred-contact" name="preferredContact"><option ${recipientDraft.preferredContact === "Email" ? "selected" : ""}>Email</option><option ${recipientDraft.preferredContact === "Text message" ? "selected" : ""}>Text message</option><option ${recipientDraft.preferredContact === "Phone call" ? "selected" : ""}>Phone call</option></select></div>
         <div class="field field--span-2"><label for="household-notes">Anything important about your family's circumstances? <span>(optional)</span></label><textarea id="household-notes" name="notes">${esc(recipientDraft.notes)}</textarea></div>
       </div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Continue to children <span>→</span></button></div></form>`;
-    document.querySelector("[data-recipient-back]").addEventListener("click", () => { recipientStep = 0; renderRecipient(); });
+    document.querySelector("[data-recipient-back]").addEventListener("click", () => { saveHousehold(new FormData(document.querySelector("#household-form"))); touchRecipientDraft(); saveRecipientDraft(); recipientStep = 0; renderRecipient(); });
     document.querySelector("#household-form").addEventListener("submit", (event) => {
       event.preventDefault();
       if (!event.currentTarget.reportValidity()) return;
       saveHousehold(new FormData(event.currentTarget));
       recipientStep = 2; recipientMaxStep = Math.max(recipientMaxStep, 2);
+      touchRecipientDraft(); saveRecipientDraft();
       renderRecipient();
     });
   }
@@ -633,21 +737,24 @@
     document.querySelector("#add-child").addEventListener("click", async () => {
       try { await syncChildren(); } catch (error) { toast(error.message || "Please choose a valid JPG or PNG photo for every child."); return; }
       recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" });
+      touchRecipientDraft(); saveRecipientDraft();
       renderRecipient();
     });
     document.querySelectorAll("[data-remove-child]").forEach((button) => button.addEventListener("click", async () => {
       try { await syncChildren(); } catch (error) { toast(error.message || "Please choose a valid JPG or PNG photo for every child."); return; }
       recipientDraft.children.splice(Number(button.dataset.removeChild), 1);
       if (!recipientDraft.children.length) recipientDraft.children.push({ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", coat: "", preferences: "", accommodations: "" });
+      touchRecipientDraft(); saveRecipientDraft();
       renderRecipient();
     }));
-    document.querySelector("[data-recipient-back]").addEventListener("click", async () => { try { await syncChildren(); } catch (error) { toast(error.message || "Please choose a valid JPG or PNG photo for every child."); return; } recipientStep = 1; renderRecipient(); });
+    document.querySelector("[data-recipient-back]").addEventListener("click", async () => { try { await syncChildren(); } catch (error) { saveVisibleRecipientStep(); } touchRecipientDraft(); saveRecipientDraft(); recipientStep = 1; renderRecipient(); });
     document.querySelector("#children-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!revealFirstInvalidField(event.currentTarget)) return;
       try { await syncChildren(); }
       catch (error) { toast(error.message || "Please choose a valid JPG or PNG photo for every child."); return; }
       recipientStep = 3; recipientMaxStep = Math.max(recipientMaxStep, 3);
+      touchRecipientDraft(); saveRecipientDraft();
       renderRecipient();
     });
   }
@@ -721,7 +828,7 @@
         <div class="field"><label for="emergency-phone">Emergency contact phone</label><input id="emergency-phone" name="emergencyPhone" type="tel" value="${esc(recipientDraft.emergencyPhone)}" required></div>
         ${codeRequired ? `<div class="field"><label for="recipient-code">Invitation code</label><input id="recipient-code" name="recipientCode" value="${esc(recipientDraft.recipientCode)}" required><small>Prototype testing code: HOPE26</small></div>` : ""}
       </div><div id="code-error" class="validation-summary" hidden>The invitation code does not match this event.</div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Review application <span>→</span></button></div></form>`;
-    document.querySelector("[data-recipient-back]").addEventListener("click", () => { saveEmergency(new FormData(document.querySelector("#emergency-form"))); recipientStep = 2; renderRecipient(); });
+    document.querySelector("[data-recipient-back]").addEventListener("click", () => { saveEmergency(new FormData(document.querySelector("#emergency-form"))); touchRecipientDraft(); saveRecipientDraft(); recipientStep = 2; renderRecipient(); });
     document.querySelector("#emergency-form").addEventListener("submit", (event) => {
       event.preventDefault();
       if (!event.currentTarget.reportValidity()) return;
@@ -732,6 +839,7 @@
         return;
       }
       recipientStep = 4; recipientMaxStep = Math.max(recipientMaxStep, 4);
+      touchRecipientDraft(); saveRecipientDraft();
       renderRecipient();
     });
   }
@@ -752,7 +860,7 @@
         <div class="review-row"><span>Emergency contact</span><strong>${esc(recipientDraft.emergencyName)} · ${esc(recipientDraft.emergencyPhone)}</strong></div>
       </div>
       <form id="signature-form"><div class="signature-box"><div class="field signature-confirmation"><label for="final-signature">Type your full name again to sign this application</label><input id="final-signature" class="virtual-signature" name="finalSignature" value="${esc(recipientDraft.finalSignature)}" autocomplete="name" placeholder="Your full name" required><small>Your typed signature must match the Responsible Party name above.</small></div><label class="checkbox-row"><input type="checkbox" name="authority" required><span>I am the Responsible Party, or I have authority to submit this application for the participating children.</span></label><label class="checkbox-row"><input type="checkbox" name="accuracy" required><span>I certify that this application is complete and accurate and confirm the agreements I checked and signed at the beginning.</span></label></div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Submit application <span>→</span></button></div></form>`;
-    document.querySelector("[data-recipient-back]").addEventListener("click", () => { recipientStep = 3; renderRecipient(); });
+    document.querySelector("[data-recipient-back]").addEventListener("click", () => { saveVisibleRecipientStep(); recipientStep = 3; renderRecipient(); });
     document.querySelector("#signature-form").addEventListener("submit", submitRecipient);
   }
 
@@ -777,14 +885,11 @@
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
     recipientDraft.finalSignature = String(new FormData(form).get("finalSignature") || "").trim();
-    if (normalize(recipientDraft.agreementSignature) !== normalize(recipientDraft.guardian)) {
-      toast("The agreement signature must match the Responsible Party name.");
-      return;
-    }
     if (normalize(recipientDraft.finalSignature) !== normalize(recipientDraft.guardian)) {
-      toast("Please type the Responsible Party’s full name again to sign the application.");
+      toast(`Please type the Responsible Party’s full name exactly as shown above: ${recipientDraft.guardian}.`);
       return;
     }
+    recipientDraft.agreementSignature = recipientDraft.guardian;
     const flags = findApplicationFlags(recipientDraft);
     if (LIVE_PUBLIC_RECIPIENT) {
       try {
@@ -797,6 +902,7 @@
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "Your application could not be submitted.");
         recipientConfirmation = { id: payload.id, guardian: recipientDraft.guardian, eventName: state.event.title, flags: [] };
+        const key = recipientDraftKey(); if (key) sessionStorage.removeItem(key);
         renderRecipient();
       } catch (error) { toast(error.message || "Your application could not be submitted."); }
       return;
@@ -809,6 +915,7 @@
     state.activity.unshift({ text: `${record.guardian} submitted recipient application ${record.id}.`, time: "Just now" });
     saveState();
     recipientConfirmation = record;
+    const key = recipientDraftKey(); if (key) sessionStorage.removeItem(key);
     renderRecipient();
   }
 
