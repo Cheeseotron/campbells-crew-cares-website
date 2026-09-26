@@ -260,9 +260,9 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   // rebuild it on one shared 41-570 point grid so every edge lands together.
   const left = 41; const right = 570; const width = right - left;
   clear(31, 80, 560, 656, paper);
-  // Put the child's name in the title position so a volunteer can identify
-  // this sheet at a glance, even in a tall stack of printed packets.
-  draw("CHILD SHOPPING PROFILE", left, 716, 8.5, { bold: true, muted: true });
+  // Remove the template's internal "profile" label; the child's name is the
+  // useful title for volunteers sorting a stack of sheets.
+  clear(390, 740, 180, 28, paper);
   draw(values.name, left, 681, 25, { bold: true, maxWidth: photo ? 410 : 500 });
   draw("Child information sheet", left, 659, 10.5, { muted: true });
   if (photo) {
