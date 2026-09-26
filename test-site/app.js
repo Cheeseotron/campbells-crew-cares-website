@@ -73,6 +73,23 @@
     { id: "accuracy", title: "Accurate Information and Child-Specific Sizing", text: "I confirm that the contact and family information I provide is accurate and that every clothing size reflects the actual needs of the specific child registered. I will not provide false sizing information to obtain clothing for anyone else." }
   ];
 
+  const EMAIL_TEMPLATE_DEFAULTS = [
+    { id: "vol-confirm", title: "Volunteer signup confirmation", enabled: true, subject: "You're registered: {{event}}", timing: "Immediately after volunteer signup", body: "Hi {{name}},\n\nThank you for volunteering with Campbell's Crew Cares. You are registered for {{event}} as a {{role}}.\n\nDate: {{date}}\nTime: {{time}}\nLocation: {{location}}\n\nWe look forward to seeing you there." },
+    { id: "rec-received", title: "Recipient application received", enabled: true, subject: "Application received: {{event}}", timing: "Immediately after an application is submitted", body: "Hi {{name}},\n\nYour Campbell's Crew Cares application for {{event}} has been received and is awaiting review.\n\nSubmitting an application does not guarantee approval. We will contact you if we need more information or when there is an update." },
+    { id: "approved", title: "Child approved", enabled: true, subject: "Approved: {{event}}", timing: "When a child is approved", body: "Hi {{name}},\n\n{{child}} has been approved for {{event}}.\n\nDate: {{date}}\nTime: {{time}}\nLocation: {{location}}\n\nWe look forward to seeing you there." },
+    { id: "declined", title: "Child declined", enabled: true, subject: "An update on {{child}}’s application", timing: "When a child is declined", body: "Hi {{name}},\n\nThank you for applying for {{event}}. After careful review, we are unable to offer {{child}} a place in this event.\n\nReason from the Campbell's Crew Cares team:\n{{reason}}\n\nWe appreciate your understanding and hope you will consider future Campbell's Crew Cares opportunities." },
+    { id: "waitlisted", title: "Child waitlisted", enabled: true, subject: "Waitlist update: {{event}}", timing: "When a child is waitlisted", body: "Hi {{name}},\n\n{{child}} has been placed on the waitlist for {{event}}. We will contact you if a place becomes available." },
+    { id: "event-reminder", title: "Event reminder", enabled: true, subject: "Reminder: {{event}} is coming up", timing: "Send manually when you are ready", body: "Hi {{name}},\n\nThis is a reminder about {{event}}.\n\nDate: {{date}}\nTime: {{time}}\nLocation: {{location}}\n\nThank you,\nCampbell's Crew Cares" }
+  ];
+
+  function emailTemplatesFor(event) {
+    const saved = Array.isArray(event?.emailTemplates) ? event.emailTemplates : [];
+    const byId = new Map(saved.map((template) => [template.id, template]));
+    const templates = EMAIL_TEMPLATE_DEFAULTS.map((template) => ({ ...template, ...(byId.get(template.id) || {}) }));
+    if (event) event.emailTemplates = templates;
+    return templates;
+  }
+
   function createDefaultState() {
     return {
       event: {
@@ -1156,9 +1173,13 @@
 
   function organizerEmails() {
     const isFoodBag = state.event.type === "food-bag";
-    const templates = isFoodBag ? state.event.emailTemplates.filter((template) => !/recipient|application/i.test(template.title)) : state.event.emailTemplates;
-    const audienceOptions = isFoodBag ? `<option>All registered volunteers</option><option>Everyone registered for this event</option>` : `<option>All registered volunteers</option><option>All approved recipient households</option><option>Shoppers only</option><option>Everyone registered for this event</option>`;
-    return `${heading("Communications", "Email center", "Automatic confirmations, scheduled reminders and targeted event updates.", `<button class="button button--green" type="button" data-demo-action="new-email">New blast email</button>`)}<div class="email-layout"><section><h2>Automated messages</h2>${templates.map((template) => `<article class="email-card"><label class="switch"><input type="checkbox" data-email-toggle="${esc(template.id)}" ${template.enabled ? "checked" : ""}><span></span></label><div><strong>${esc(template.title)}</strong><small>${esc(template.timing)}</small><p>Subject: ${esc(template.subject)}</p></div><button class="button button--small button--ghost" type="button" data-email-edit="${esc(template.id)}">Edit draft</button></article>`).join("")}</section><section class="panel"><h2>Send a blast email</h2><p>Demonstration only—nothing will actually be sent.</p><form id="blast-form"><div class="field"><label for="blast-audience">Audience</label><select id="blast-audience" name="audience">${audienceOptions}</select></div><div class="field"><label for="blast-subject">Subject</label><input id="blast-subject" name="subject" value="Important update for ${esc(state.event.title)}" required></div><div class="field"><label for="blast-message">Message</label><textarea id="blast-message" name="message" rows="8" required>Date: ${esc(state.event.date)}&#10;Time: ${esc(state.event.time)}&#10;Location: ${esc(state.event.location)}&#10;&#10;Please arrive a few minutes early so we can begin on time.</textarea></div><div class="form-actions"><button class="button button--light" type="button" data-demo-action="test-email">Send test</button><button class="button button--green" type="submit">Review & queue email →</button></div></form></section></div>`;
+    const templates = emailTemplatesFor(state.event).filter((template) => !isFoodBag || !["rec-received", "approved", "declined", "waitlisted"].includes(template.id));
+    const recipientCount = state.applications.filter((item) => item.eventName === state.event.title && (item.status === "approved" || item.children?.some((child) => child.decision === "approved"))).length;
+    const signupCount = state.volunteers.filter((item) => item.currentEvent === state.event.title).length;
+    return `${heading("Communications", "Email center", "Manage live automatic emails, prepare event announcements, and collect the right contact list fast.", `<button class="button button--green" type="button" data-compose-blast>Compose event email</button>`)}
+      <article class="panel email-sender"><div><p class="eyebrow">Sending address</p><h2>Submissions@campbellscrew.com</h2><p>Automatic confirmations and decision notices are sent from this address.</p></div><div><strong>Recommended inbox setup</strong><p>Turn on forwarding only for messages that arrive from outside Campbell's Crew Cares. Keep automated sent-mail notices out of your main inbox.</p><a href="https://support.google.com/mail/answer/10957" target="_blank" rel="noopener noreferrer">Set up a Gmail filter and forwarding rule ↗</a></div></article>
+      <section class="email-audience panel"><div><p class="eyebrow">Quick contact lists</p><h2>Get the email list you need</h2><p>Downloads a simple CSV that you can paste into BCC or upload to your email tool.</p></div><div class="email-list-actions"><button class="button button--light" type="button" data-export-email-list="all-volunteers">All volunteers</button><button class="button button--light" type="button" data-export-email-list="signed-volunteers">Signed up volunteers (${signupCount})</button>${isFoodBag ? "" : `<button class="button button--light" type="button" data-export-email-list="approved-applications">Approved applications (${recipientCount})</button>`}</div></section>
+      <div class="email-layout"><section><div class="section-heading-inline"><div><p class="eyebrow">Automatic messages</p><h2>Live email rules</h2></div><p>Toggle, preview, or edit each email.</p></div>${templates.map((template) => `<article class="email-card"><label class="switch"><input type="checkbox" data-email-toggle="${esc(template.id)}" ${template.enabled ? "checked" : ""}><span></span></label><div><strong>${esc(template.title)}</strong><small>${esc(template.timing)}</small><p>Subject: ${esc(template.subject)}</p></div><div class="email-card-actions"><button class="button button--small button--ghost" type="button" data-email-preview="${esc(template.id)}">Preview</button><button class="button button--small button--ghost" type="button" data-email-edit="${esc(template.id)}">Edit</button></div></article>`).join("")}</section><section class="panel email-blast-panel"><p class="eyebrow">Event announcement</p><h2>Send a blast email</h2><p>Pick a saved audience, write the message, then review the recipient count before sending.</p><button class="button button--green" type="button" data-compose-blast>Compose event email →</button><p class="field-help">For privacy, recipient addresses should always be sent using BCC.</p></section></div>`;
   }
 
   function organizerReports() {
@@ -1392,11 +1413,12 @@
     }));
     document.querySelectorAll("[data-email-toggle]").forEach((input) => input.addEventListener("change", () => {
       const template = state.event.emailTemplates.find((item) => item.id === input.dataset.emailToggle);
-      if (template) { template.enabled = input.checked; saveState(); toast(`${template.title} ${input.checked ? "enabled" : "disabled"}.`); }
+      if (template) { template.enabled = input.checked; saveState(); if (SERVER_AUTH) saveLiveEvent(state.event).catch(() => toast("The change could not be saved. Please try again.")); toast(`${template.title} ${input.checked ? "enabled" : "disabled"}.`); }
     }));
     document.querySelectorAll("[data-email-edit]").forEach((button) => button.addEventListener("click", () => openEmailDraft(button.dataset.emailEdit)));
-    const blast = document.querySelector("#blast-form");
-    if (blast) blast.addEventListener("submit", (event) => { event.preventDefault(); state.activity.unshift({ text: `A demonstration blast email was queued for ${new FormData(blast).get("audience")}.`, time: "Just now" }); saveState(); toast("Email reviewed and queued in demo mode—nothing was sent."); });
+    document.querySelectorAll("[data-email-preview]").forEach((button) => button.addEventListener("click", () => openEmailPreview(button.dataset.emailPreview)));
+    document.querySelectorAll("[data-export-email-list]").forEach((button) => button.addEventListener("click", () => exportEmailList(button.dataset.exportEmailList)));
+    document.querySelectorAll("[data-compose-blast]").forEach((button) => button.addEventListener("click", openBlastComposer));
     const report = document.querySelector("#report-form");
     if (report) report.addEventListener("submit", (event) => {
       event.preventDefault(); const data = new FormData(report); const number = (key) => Number(data.get(key) || 0);
@@ -1557,7 +1579,44 @@
     if (!template) return;
     dialogContent.innerHTML = `<form class="dialog-body" id="email-draft-form"><p class="eyebrow">Automatic email draft</p><h2 id="dialog-title">${esc(template.title)}</h2><div class="field"><label>Subject<input name="subject" value="${esc(template.subject)}" required></label></div><div class="field"><label>Message<textarea name="body" rows="10" required>${esc(template.body || `Hello {{first_name}},\n\nYour submission for ${state.event.title} was received.\n\nDate: ${state.event.date}\nTime: ${state.event.time}\nLocation: ${state.event.location}\n\nPlease arrive a few minutes early so we can begin on time.`)}</textarea></label></div><p class="field-help">Placeholders such as {{first_name}} will be filled automatically in production.</p><button class="button button--green" type="submit">Save draft →</button></form>`;
     appDialog.showModal(); document.body.classList.add("dialog-open");
-    dialogContent.querySelector("#email-draft-form").addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); template.subject = String(data.get("subject")); template.body = String(data.get("body")); saveState(); closeDialog(); toast("Email draft saved."); renderOrganizer("emails"); });
+    dialogContent.querySelector("#email-draft-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); template.subject = String(data.get("subject")); template.body = String(data.get("body")); saveState(); try { if (SERVER_AUTH) await saveLiveEvent(state.event); closeDialog(); toast("Email draft saved."); renderOrganizer("emails"); } catch { toast("The draft could not be saved. Please try again."); } });
+  }
+
+  function emailPreviewText(template) {
+    const details = { "{{name}}": "Jordan", "{{child}}": "Alex", "{{role}}": "Shopper", "{{event}}": state.event.title, "{{date}}": state.event.date, "{{time}}": state.event.time, "{{location}}": state.event.location, "{{reason}}": "This is a sample reason shown only in the preview." };
+    return String(template.body || "").replace(/{{[^}]+}}/g, (token) => details[token] || token);
+  }
+
+  function openEmailPreview(id) {
+    const template = state.event.emailTemplates.find((item) => item.id === id); if (!template) return;
+    dialogContent.innerHTML = `<div class="dialog-body email-preview"><p class="eyebrow">Preview — sample information</p><h2 id="dialog-title">${esc(template.title)}</h2><div class="email-preview-message"><strong>Subject: ${esc(emailPreviewText({ body: template.subject }))}</strong><pre>${esc(emailPreviewText(template))}</pre></div><button class="button button--light" type="button" data-close-dialog>Close</button></div>`;
+    appDialog.showModal(); document.body.classList.add("dialog-open"); dialogContent.querySelector("[data-close-dialog]").addEventListener("click", closeDialog);
+  }
+
+  function emailListRecords(kind) {
+    if (kind === "all-volunteers") return state.volunteers;
+    if (kind === "signed-volunteers") return state.volunteers.filter((item) => item.currentEvent === state.event.title);
+    return state.applications.filter((item) => item.eventName === state.event.title && (item.status === "approved" || item.children?.some((child) => child.decision === "approved"))).map((item) => ({ name: item.guardian, email: item.email }));
+  }
+
+  function exportEmailList(kind) {
+    const labels = { "all-volunteers": "all-volunteers", "signed-volunteers": "signed-up-volunteers", "approved-applications": "approved-applications" };
+    const records = emailListRecords(kind).filter((item) => hasCompleteEmailAddress(item.email));
+    const csv = ["Name,Email", ...records.map((item) => `"${String(item.name || "").replaceAll('"', '""')}","${String(item.email).replaceAll('"', '""')}"`)].join("\n");
+    const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); link.download = `${labels[kind] || "email-list"}.csv`; link.click(); URL.revokeObjectURL(link.href); toast(`${records.length} email address${records.length === 1 ? "" : "es"} downloaded.`);
+  }
+
+  function openBlastComposer() {
+    const approved = emailListRecords("approved-applications").length; const signed = emailListRecords("signed-volunteers").length;
+    dialogContent.innerHTML = `<form class="dialog-body" id="blast-form"><p class="eyebrow">Event announcement</p><h2 id="dialog-title">Compose event email</h2><div class="field"><label>Audience<select name="audience"><option value="signed-volunteers">Signed up volunteers (${signed})</option><option value="all-volunteers">All volunteers (${state.volunteers.length})</option>${state.event.type === "food-bag" ? "" : `<option value="approved-applications">Approved applications (${approved})</option>`}</select></label></div><div class="field"><label>Subject<input name="subject" value="Important update for ${esc(state.event.title)}" required></label></div><div class="field"><label>Message<textarea name="message" rows="9" required>Hi {{name}},\n\nDate: ${esc(state.event.date)}\nTime: ${esc(state.event.time)}\nLocation: ${esc(state.event.location)}\n\nThank you,\nCampbell's Crew Cares</textarea></label></div><p class="field-help">Recipients are sent as individual messages, so their addresses stay private.</p><div class="dialog-actions"><button class="button button--light" type="button" data-close-dialog>Cancel</button><button class="button button--green" type="submit">Review recipients →</button></div></form>`;
+    appDialog.showModal(); document.body.classList.add("dialog-open"); dialogContent.querySelector("[data-close-dialog]").addEventListener("click", closeDialog);
+    dialogContent.querySelector("#blast-form").addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const records = emailListRecords(String(data.get("audience"))).filter((item) => hasCompleteEmailAddress(item.email)); openBlastConfirmation({ audience: String(data.get("audience")), subject: String(data.get("subject")), message: String(data.get("message")), count: records.length }); });
+  }
+
+  function openBlastConfirmation(message) {
+    dialogContent.innerHTML = `<div class="dialog-body confirm-dialog"><p class="eyebrow">Confirm event email</p><h2 id="dialog-title">Send to ${message.count} people?</h2><p>This sends individual emails from Submissions@campbellscrew.com. Recipient addresses will stay private.</p><div class="confirmation-box"><strong>${esc(message.subject)}</strong><p>${esc(message.message).replace(/\n/g, "<br>")}</p></div><div class="dialog-actions"><button class="button button--light" type="button" data-close-dialog>Go back</button><button class="button button--green" type="button" data-send-blast>Send ${message.count} emails</button></div></div>`;
+    dialogContent.querySelector("[data-close-dialog]").addEventListener("click", openBlastComposer);
+    dialogContent.querySelector("[data-send-blast]").addEventListener("click", async (event) => { event.currentTarget.disabled = true; event.currentTarget.textContent = "Sending…"; try { const response = await fetch("/portal-api/organizer/emails/blast", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventId: state.event.id, audience: message.audience, subject: message.subject, body: message.message }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The email could not be sent."); closeDialog(); toast(`${payload.sent} email${payload.sent === 1 ? "" : "s"} sent.`); } catch (error) { toast(error.message || "The email could not be sent."); event.currentTarget.disabled = false; event.currentTarget.textContent = `Send ${message.count} emails`; } });
   }
 
   function openAddVolunteer() {

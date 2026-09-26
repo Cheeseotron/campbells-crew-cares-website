@@ -349,18 +349,29 @@ function eventEmailDetails(event) {
   return { date: emailLine(event.event_date || settings.date || "To be announced"), time: emailLine(settings.time || "To be announced"), location: emailLine(settings.location || "To be announced"), address: emailLine(settings.address || "") };
 }
 
+function eventEmailTemplate(event, id, fallback, values = {}) {
+  const templates = eventSettings(event)?.emailTemplates || [];
+  const saved = templates.find((template) => template.id === id);
+  if (saved?.enabled === false) return null;
+  const details = eventEmailDetails(event);
+  const replacements = { "{{name}}": values.name || "there", "{{child}}": values.child || "", "{{role}}": values.role || "", "{{reason}}": values.reason || "", "{{event}}": event.title || "", "{{date}}": details.date, "{{time}}": details.time, "{{location}}": details.location };
+  const fill = (value) => String(value || "").replace(/{{name}}|{{child}}|{{role}}|{{reason}}|{{event}}|{{date}}|{{time}}|{{location}}/g, (token) => replacements[token] || "");
+  return { subject: emailLine(fill(saved?.subject || fallback.subject)), body: fill(saved?.body || fallback.body) };
+}
+
 async function sendPasswordResetEmail(env, recipient, resetUrl) {
   await sendEmail(env, recipient, "Reset your Campbell's Crew organizer password", `A password reset was requested for your Campbell's Crew organizer account.\n\nSet a new password using this secure link:\n${resetUrl}\n\nThis link expires in seven days. If you did not request this, you can ignore this email.`);
 }
 
 async function sendVolunteerConfirmation(env, recipient, name, role, event) {
   const details = eventEmailDetails(event);
-  await sendEmail(env, recipient, `You're registered: ${emailLine(event.title)}`, `Hi ${emailLine(name)},\n\nThank you for volunteering with Campbell's Crew Cares. You are registered for:\n\n${emailLine(event.title)}\nRole: ${emailLine(role)}\nDate: ${details.date}\nTime: ${details.time}\nLocation: ${details.location}${details.address ? `\nAddress: ${details.address}` : ""}\n\nWe look forward to seeing you there.`);
+  const message = eventEmailTemplate(event, "vol-confirm", { subject: `You're registered: {{event}}`, body: `Hi {{name}},\n\nThank you for volunteering with Campbell's Crew Cares. You are registered for {{event}} as a {{role}}.\n\nDate: {{date}}\nTime: {{time}}\nLocation: {{location}}${details.address ? `\nAddress: ${details.address}` : ""}\n\nWe look forward to seeing you there.` }, { name, role });
+  if (message) await sendEmail(env, recipient, message.subject, message.body);
 }
 
 async function sendRecipientConfirmation(env, recipient, guardianName, event) {
-  const details = eventEmailDetails(event);
-  await sendEmail(env, recipient, `Application received: ${emailLine(event.title)}`, `Hi ${emailLine(guardianName)},\n\nYour Campbell's Crew Cares application for ${emailLine(event.title)} has been received and is now awaiting review.\n\nEvent date: ${details.date}\n\nSubmitting an application does not guarantee approval. We will contact you if we need more information or when there is an update.`);
+  const message = eventEmailTemplate(event, "rec-received", { subject: "Application received: {{event}}", body: "Hi {{name}},\n\nYour Campbell's Crew Cares application for {{event}} has been received and is now awaiting review.\n\nSubmitting an application does not guarantee approval. We will contact you if we need more information or when there is an update." }, { name: guardianName });
+  if (message) await sendEmail(env, recipient, message.subject, message.body);
 }
 
 async function sendRecipientDecisionEmail(env, recipient, guardianName, childName, decision, event, decisionNote = "") {
@@ -370,9 +381,10 @@ async function sendRecipientDecisionEmail(env, recipient, guardianName, childNam
     declined: { subject: `An update on ${emailLine(childName)}’s application`, body: `Thank you for taking the time to apply for ${emailLine(event.title)}. After careful review, we are unable to offer ${emailLine(childName)} a place in this event.\n\nReason provided by the Campbell's Crew Cares team:\n${emailLine(decisionNote)}\n\nWe understand this may be disappointing. We appreciate your understanding and hope you will consider future Campbell's Crew Cares opportunities.` },
     waitlisted: { subject: `Waitlist update: ${emailLine(event.title)}`, body: `${emailLine(childName)} has been placed on the waitlist for ${emailLine(event.title)}.\n\nWe will contact you if a place becomes available. Please do not make event plans until you receive a separate approval message.` }
   };
-  const message = messages[decision];
+  const fallback = messages[decision];
+  const message = fallback ? eventEmailTemplate(event, decision, fallback, { name: guardianName, child: childName, reason: decisionNote }) : null;
   if (!message) return;
-  await sendEmail(env, recipient, message.subject, `Hi ${emailLine(guardianName)},\n\n${message.body}`);
+  await sendEmail(env, recipient, message.subject, message.body);
 }
 
 async function sendOrganizerInvitation(env, recipient, name, role, setupUrl) {
@@ -672,6 +684,26 @@ async function api(request, env, url, user) {
     try { await sendRecipientConfirmation(env, input.email, input.guardianName, result.event); await audit(env, null, "recipient_receipt_sent", "recipient_household", result.id, result.event.id); }
     catch (error) { console.error("Recipient application receipt delivery failed", error); emailSent = false; await audit(env, null, "recipient_receipt_failed", "recipient_household", result.id, result.event.id); }
     return json({ id: result.id, emailSent, message: emailSent ? "Your application has been received for review. A receipt email is on its way." : "Your application has been received for review, but we could not send the receipt email." }, 201);
+  }
+  if (url.pathname === "/portal-api/organizer/emails/blast" && request.method === "POST") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
+    const input = await request.json();
+    if (!input.eventId || !["all-volunteers", "signed-volunteers", "approved-applications"].includes(input.audience)) return json({ error: "Choose a valid audience." }, 400);
+    const subject = emailLine(input.subject || ""); const body = String(input.body || "").trim();
+    if (!subject || !body) return json({ error: "A subject and message are required." }, 400);
+    const event = await env.DB.prepare("SELECT id, title, event_date, settings_json FROM events WHERE id = ?").bind(input.eventId).first();
+    if (!event) return json({ error: "Event not found." }, 404);
+    let results = [];
+    if (input.audience === "all-volunteers") ({ results } = await env.DB.prepare("SELECT DISTINCT name, email FROM volunteer_profiles WHERE email <> ''").all());
+    else if (input.audience === "signed-volunteers") ({ results } = await env.DB.prepare("SELECT DISTINCT v.name, v.email FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id WHERE s.event_id = ? AND v.email <> ''").bind(event.id).all());
+    else ({ results } = await env.DB.prepare("SELECT guardian_name AS name, email FROM recipient_households WHERE event_id = ? AND status = 'approved' AND email <> ''").bind(event.id).all());
+    const recipients = results.filter((item) => isValidEmailAddress(item.email)).slice(0, 250);
+    const details = eventEmailDetails(event);
+    const fill = (value, name) => String(value).replace(/{{name}}/g, emailLine(name || "there")).replace(/{{event}}/g, emailLine(event.title)).replace(/{{date}}/g, details.date).replace(/{{time}}/g, details.time).replace(/{{location}}/g, details.location);
+    let sent = 0; let failed = 0;
+    for (const recipient of recipients) { try { await sendEmail(env, recipient.email, fill(subject, recipient.name), fill(body, recipient.name)); sent += 1; } catch (error) { console.error("Blast email delivery failed", recipient.email, error); failed += 1; } }
+    await audit(env, user, "email_blast_sent", "event", event.id, event.id, { audience: input.audience, sent, failed });
+    return json({ sent, failed, total: recipients.length });
   }
   if (url.pathname === "/portal-api/me" && request.method === "GET") return user ? json({ user }) : json({ user: null }, 401);
 
