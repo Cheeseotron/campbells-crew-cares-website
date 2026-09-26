@@ -339,12 +339,15 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   for (let index = 0; index < budgetRows.length; index += 1) {
     const y = firstRowBottom - index * rowHeight;
     page.drawRectangle({ x: 52, y, width: 507, height: rowHeight, color: paper, borderColor: border, borderWidth: .45 });
-    const textY = y + Math.max(5, (rowHeight - 8) / 2);
-    const textSize = rowHeight < 20 ? 6.8 : 7.7;
+    // Keep every handwritten entry baseline aligned across the row. The
+    // notes line used to sit on the row midpoint, which made it look like a
+    // stray divider rather than the matching writing line for Amount Spent.
+    const textY = y + Math.max(5.8, (rowHeight - 8.8) / 2);
+    const textSize = rowHeight < 20 ? 7.6 : 8.5;
     draw(budgetRows[index].fixedCap ? "TOYS — FIXED CAP" : budgetRows[index].label, 62, textY, textSize, { bold: Boolean(budgetRows[index].fixedCap), maxWidth: 132 });
     draw(`$${budgetRows[index].amount}`, 214, textY, textSize, { bold: true, maxWidth: 60 });
-    draw("$____________", 295, textY, rowHeight < 20 ? 6.7 : 7.4, { maxWidth: 80 });
-    page.drawLine({ start: { x: 397, y: y + rowHeight / 2 }, end: { x: 545, y: y + rowHeight / 2 }, thickness: .45, color: muted });
+    draw("$____________", 295, textY, rowHeight < 20 ? 7.4 : 8.1, { maxWidth: 80 });
+    page.drawLine({ start: { x: 397, y: textY + 1.7 }, end: { x: 545, y: textY + 1.7 }, thickness: .45, color: muted });
   }
   page.drawRectangle({ x: 52, y: 113, width: 507, height: 15, color: rgb(0.88, 0.95, 0.89), borderColor: border, borderWidth: .45 });
   draw("TOTAL", 62, 118, 7.5, { bold: true });
@@ -356,7 +359,7 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   // Keep the closeout checklist on the child's own sheet, right below the
   // spending tracker where it is most useful at the register.
   clear(41, 24, 529, 86, paper);
-  draw("BEFORE CHECKOUT CHECKLIST", 52, 100, 7.2, { bold: true, color: rgb(0.03, 0.47, 0.23) });
+  draw("BEFORE CHECKOUT CHECKLIST", 52, 100, 8, { bold: true, color: rgb(0.03, 0.47, 0.23) });
   const checkoutItems = [
     "Categories fulfilled",
     "Within a few dollars of total",
@@ -366,9 +369,9 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
     "CCC questions cleared"
   ];
   checkoutItems.forEach((item, index) => {
-    const column = index % 3; const row = Math.floor(index / 3); const x = 52 + column * 169; const y = 87 - row * 13;
-    page.drawRectangle({ x, y: y - 1, width: 6.5, height: 6.5, borderColor: muted, borderWidth: .6 });
-    draw(item, x + 10, y, 6, { maxWidth: 151 });
+    const column = index % 3; const row = Math.floor(index / 3); const x = 52 + column * 169; const y = 86 - row * 14;
+    page.drawRectangle({ x, y: y - 1, width: 7.5, height: 7.5, borderColor: muted, borderWidth: .6 });
+    draw(item, x + 11.5, y, 6.8, { maxWidth: 150 });
   });
   page.drawLine({ start: { x: 41, y: 49 }, end: { x: 570, y: 49 }, thickness: .55, color: border });
   draw(`Event date: ${values.eventDate}`, 41, 34, 7.5, { muted: true });
