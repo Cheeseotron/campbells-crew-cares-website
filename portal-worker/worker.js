@@ -358,6 +358,24 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   draw(`Event date: ${values.eventDate}`, 41, 34, 7.5, { muted: true });
 }
 
+function drawRulesOverlay(page, event, font, bold) {
+  const settings = eventSettings(event); const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const mist = rgb(238 / 255, 245 / 255, 239 / 255); const line = rgb(0.77, 0.82, 0.79);
+  const draw = (text, x, y, size = 8, options = {}) => page.drawText(String(text), { x, y, size, font: options.bold ? bold : font, color: options.muted ? muted : ink, maxWidth: options.maxWidth });
+  const items = Array.isArray(settings.budgetItems) ? settings.budgetItems : [];
+  const toy = items.find((item) => item?.enabled && /toy/i.test(`${item.id || ""} ${item.label || ""}`));
+  const bra = items.find((item) => item?.enabled && /bra/i.test(`${item.id || ""} ${item.label || ""}`));
+  // This dedicated panel is intentionally the one dynamic part of the rules
+  // page. Only active special-item rules appear, so volunteers cannot mistake
+  // an optional item from another event as permission for this child.
+  page.drawRectangle({ x: 54, y: 70, width: 504, height: 89, color: mist, borderColor: line, borderWidth: .7 });
+  draw("Event-specific approvals", 68, 138, 13, { bold: true });
+  draw("Only items printed on a child's shopping sheet are approved.", 68, 121, 8.7, { bold: true });
+  let y = 103;
+  if (toy) { draw(`TOYS - FIXED $${Number(toy.amount) || 0} MAXIMUM. Do not use clothing funds or savings for a more expensive toy.`, 68, y, 7.2, { bold: true, maxWidth: 475 }); y -= 18; }
+  if (bra) { draw("BRAS - only for Girls/Women who truly need them, and only when Bra Size and a Bra budget are printed on that child's sheet.", 68, y, 6.6, { bold: true, maxWidth: 475 }); }
+  if (!toy && !bra) draw("No additional special-item approvals are active for this event.", 68, y, 8, { muted: true });
+}
+
 async function templatePdfBytes(env, origin, pathname) {
   const response = await env.ASSETS.fetch(new Request(new URL(pathname, origin)));
   if (!response.ok) throw new Error(`The packet template could not be loaded (${response.status}).`);
@@ -388,7 +406,7 @@ async function filledProfileDocument(env, origin, records, includeRules = false)
     const source = await PDFDocument.load(profileBytes); const [page] = await output.copyPages(source, [0]); output.addPage(page);
     const photo = await childPhotoForPdf(env, output, record.child.photo_key);
     drawProfileOverlay(page, childProfileValues(record), font, bold, photo);
-    if (rulesBytes) { const rules = await PDFDocument.load(rulesBytes); const [rulesPage] = await output.copyPages(rules, [0]); output.addPage(rulesPage); }
+    if (rulesBytes) { const rules = await PDFDocument.load(rulesBytes); const [rulesPage] = await output.copyPages(rules, [0]); output.addPage(rulesPage); drawRulesOverlay(rulesPage, record.event, font, bold); }
   }
   return output.save();
 }
