@@ -237,6 +237,7 @@ function childProfileValues({ child, household, event }) {
     // The profile has a compact single-line Date / Event field.  The complete
     // event title follows on the rules page, while this keeps the date legible.
     event: shortEventDate || event.title || "Event",
+    eventDate: shortEventDate || "Date not set",
     volunteer: "Assigned at check-in",
     age: details.age || child.age || (age !== "" ? `${age} years · ${birthDate}` : birthDate || "Not provided"),
     emergency: [application.emergencyName, application.emergencyPhone].filter(Boolean).join(" · ") || "Not provided",
@@ -345,6 +346,10 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   const toyBudget = budgetRows.find((item) => item.fixedCap);
   draw(toyBudget ? `TOYS: FIXED $${toyBudget.amount} MAX - NO TRANSFERS` : "Remaining: $_______", 397, 93, toyBudget ? 6.4 : 7.2, { bold: true, maxWidth: 150 });
   columns.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: 88 }, end: { x, y: 270 }, thickness: .45, color: border }));
+  // Replace the generic template footer with the actual event date, which is
+  // much more useful when assembled packets are separated at the check-in table.
+  clear(41, 54, 260, 18, paper);
+  draw(`Event date: ${values.eventDate}`, 41, 61, 7.5, { muted: true });
 }
 
 async function templatePdfBytes(env, origin, pathname) {
