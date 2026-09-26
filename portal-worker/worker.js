@@ -261,8 +261,8 @@ function childProfileValues({ child, household, event }) {
 function drawPrintSafeTopBar(page) {
   // The taller band still reaches the very top, while extending farther down
   // the page so printers that trim an edge retain a strong visible accent.
-  page.drawRectangle({ x: 0, y: 770, width: 205, height: 22, color: rgb(0.21, 0.83, 0.18) });
-  page.drawRectangle({ x: 205, y: 770, width: 407, height: 22, color: rgb(0.07, 0.10, 0.13) });
+  page.drawRectangle({ x: 0, y: 774, width: 205, height: 18, color: rgb(0.21, 0.83, 0.18) });
+  page.drawRectangle({ x: 205, y: 774, width: 407, height: 18, color: rgb(0.07, 0.10, 0.13) });
 }
 
 function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = null) {
@@ -385,12 +385,12 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
     ...(toyBudget ? ["Did not spend more than the fixed toy limit."] : [])
   ];
   checkoutItems.forEach((item, index) => {
-    const column = index % 3; const row = Math.floor(index / 3); const x = 52 + column * 169; const y = 84 - row * 19;
+    const column = index % 3; const row = Math.floor(index / 3); const x = 52 + column * 169; const y = 84 - row * 23;
     page.drawRectangle({ x, y: y - 1, width: 8, height: 8, borderColor: muted, borderWidth: .6 });
-    draw(item, x + 12, y, 8.2, { maxWidth: 151, lineHeight: 9.3 });
+    draw(item, x + 12, y, 8.6, { maxWidth: 151, lineHeight: 9.8 });
   });
-  draw("Need help? Ask a CCC representative before checkout.", 52, 45, 7.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
-  page.drawLine({ start: { x: 52, y: 43 }, end: { x: 295, y: 43 }, thickness: .55, color: rgb(0.03, 0.47, 0.23) });
+  draw("Need help? Ask a CCC representative before checkout.", 348, 45, 7.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
+  page.drawLine({ start: { x: 348, y: 43 }, end: { x: 570, y: 43 }, thickness: .55, color: rgb(0.03, 0.47, 0.23) });
   page.drawLine({ start: { x: 41, y: 34 }, end: { x: 570, y: 34 }, thickness: .55, color: border });
   draw(`Event date: ${values.eventDate}`, 41, 20, 7.5, { muted: true });
 }
@@ -483,8 +483,10 @@ async function childPhotoForPdf(env, output, photoKey) {
 
 async function brandLogoForPdf(env, origin, output) {
   try {
-    const bytes = await templatePdfBytes(env, origin, "/assets/images/ccc-logo.png");
-    return output.embedPng(bytes);
+    // Brand imagery is served by the main site, not the portal asset bundle.
+    const response = await fetch(new URL("/assets/images/ccc-logo.png", origin));
+    if (!response.ok) return null;
+    return output.embedPng(await response.arrayBuffer());
   } catch {
     // The packet remains printable if the brand image cannot be loaded.
     return null;
