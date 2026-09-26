@@ -367,13 +367,13 @@ function drawRulesOverlay(page, event, font, bold) {
   // This dedicated panel is intentionally the one dynamic part of the rules
   // page. Only active special-item rules appear, so volunteers cannot mistake
   // an optional item from another event as permission for this child.
-  page.drawRectangle({ x: 54, y: 70, width: 504, height: 89, color: mist, borderColor: line, borderWidth: .7 });
-  draw("Event-specific approvals", 68, 138, 13, { bold: true });
-  draw("Only items printed on a child's shopping sheet are approved.", 68, 121, 8.7, { bold: true });
-  let y = 103;
-  if (toy) { draw(`TOYS - FIXED $${Number(toy.amount) || 0} MAXIMUM. Do not use clothing funds or savings for a more expensive toy.`, 68, y, 7.2, { bold: true, maxWidth: 475 }); y -= 18; }
-  if (bra) { draw("BRAS - only for Girls/Women who truly need them, and only when Bra Size and a Bra budget are printed on that child's sheet.", 68, y, 6.6, { bold: true, maxWidth: 475 }); }
-  if (!toy && !bra) draw("No additional special-item approvals are active for this event.", 68, y, 8, { muted: true });
+  page.drawRectangle({ x: 42, y: 135, width: 528, height: 85, color: mist, borderColor: line, borderWidth: .7 });
+  draw("Event-specific approvals", 58, 198, 11, { bold: true });
+  draw("Only items printed on a child's shopping sheet are approved.", 58, 181, 8.5, { bold: true });
+  let y = 163;
+  if (toy) { draw(`TOYS - FIXED $${Number(toy.amount) || 0} MAX. Clothing money cannot be used for toys; toy money may be used for clothing.`, 58, y, 7.2, { bold: true, maxWidth: 495 }); y -= 16; }
+  if (bra) { draw("BRAS - only for Girls/Women who truly need them, and only when both Bra Size and a Bra budget are printed on the child's sheet.", 58, y, 6.8, { bold: true, maxWidth: 495 }); }
+  if (!toy && !bra) draw("No additional special-item approvals are active for this event.", 58, y, 8, { muted: true });
 }
 
 async function templatePdfBytes(env, origin, pathname) {
