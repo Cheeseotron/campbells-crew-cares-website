@@ -915,6 +915,10 @@ async function audit(env, actor, action, targetType, targetId, eventId = null, m
 async function api(request, env, url, user) {
   if (url.pathname === "/portal-api/health") return json({ ready: true, mode: env.PORTAL_MODE || "closed", emailDelivery: "not_configured" });
   if (url.pathname === "/portal-api/public/events" && request.method === "GET") return json({ events: await activeEvents(env), mode: env.PORTAL_MODE || "closed" });
+  if (url.pathname === "/portal-api/public/impact" && request.method === "GET") {
+    const impact = await env.DB.prepare("SELECT families_minimum, children_minimum, years_serving FROM public_impact WHERE id = 1").first();
+    return json({ impact: impact || { families_minimum: 0, children_minimum: 0, years_serving: 9 } });
+  }
 
   if (url.pathname === "/portal-api/public/volunteer-signups" && request.method === "POST") {
     const input = await request.json();
@@ -956,6 +960,17 @@ async function api(request, env, url, user) {
     return json({ sent, failed, total: recipients.length });
   }
   if (url.pathname === "/portal-api/me" && request.method === "GET") return user ? json({ user }) : json({ user: null }, 401);
+
+  if (url.pathname === "/portal-api/organizer/impact" && request.method === "PUT") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
+    const input = await request.json();
+    const safeNumber = (value, fallback = 0) => Math.max(0, Math.min(10000000, Number.isFinite(Number(value)) ? Math.floor(Number(value)) : fallback));
+    const families = safeNumber(input.familiesMinimum); const children = safeNumber(input.childrenMinimum); const years = safeNumber(input.yearsServing, 9);
+    await env.DB.prepare("INSERT INTO public_impact (id, families_minimum, children_minimum, years_serving, updated_at) VALUES (1, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET families_minimum = excluded.families_minimum, children_minimum = excluded.children_minimum, years_serving = excluded.years_serving, updated_at = CURRENT_TIMESTAMP")
+      .bind(families, children, years).run();
+    await audit(env, user, "public_impact_updated", "public_impact", "1", null, { families, children, years });
+    return json({ impact: { families_minimum: families, children_minimum: children, years_serving: years } });
+  }
 
   if (url.pathname === "/portal-api/events" && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);

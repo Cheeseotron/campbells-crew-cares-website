@@ -389,6 +389,13 @@
     state = prepareEventCollection({ ...createLiveState(), events, activeEventId });
   }
 
+  async function loadLiveImpact() {
+    const response = await fetch("/portal-api/public/impact", { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("The public impact summary could not be loaded.");
+    const impact = (await response.json()).impact || {};
+    state.publicStats = { families: Number(impact.families_minimum || 0), children: Number(impact.children_minimum || 0), years: Number(impact.years_serving || 9) };
+  }
+
   async function loadLiveRecipientEvents() {
     const response = await fetch("/portal-api/public/events", { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error("Recipient events could not be loaded.");
@@ -1294,10 +1301,10 @@
 
   function organizerReportsV8() {
     const latest = state.reports[0];
-    const stats = state.publicStats || { families: 640, children: 1280, volunteers: 910, years: 9 };
+    const stats = state.publicStats || { families: 0, children: 0, years: 9 };
     const activityLabel = (report) => report.eventType === "food-bag" ? `${report.bagsMade}/${report.bagsPlanned} bags made` : `${report.childrenAttended}/${report.childrenRegistered} children`;
     const latestMetric = latest?.eventType === "food-bag" ? `<article class="metric-card"><span>Latest bags made</span><strong>${latest.bagsMade}/${latest.bagsPlanned}</strong></article>` : `<article class="metric-card"><span>Latest child attendance</span><strong>${latest?.childrenAttended}/${latest?.childrenRegistered}</strong></article>`;
-    return `${heading("Event records", "Reports & history", "Permanent completed-event records and editable public impact totals.")}<article class="panel"><div class="panel-header"><div><h2>Public impact statistics</h2><p>Edit the totals shown on the public Campbell's Crew Cares website.</p></div></div><form id="impact-form" class="form-grid"><div class="field"><label>Families served<input name="families" type="number" value="${stats.families}"></label></div><div class="field"><label>Children served<input name="children" type="number" value="${stats.children}"></label></div><div class="field"><label>Volunteers engaged<input name="volunteers" type="number" value="${stats.volunteers}"></label></div><div class="field"><label>Years serving<input name="years" type="number" value="${stats.years}"></label></div><button class="button button--green" type="submit">Save public totals</button></form></article><article class="panel"><h2>Completed event records</h2>${state.reports.map((report, index)=>`<div class="report-row"><span><strong>${esc(report.event)}</strong><small>${esc(report.status)} · Permanent record</small></span><b>${activityLabel(report)} · ${report.volunteerHours} hours · $${Number(report.totalSpent).toLocaleString()}</b><button class="button button--small button--ghost" type="button" data-view-report="${index}">View details</button></div>`).join("")}</article>${latest?`<div class="metric-grid">${latestMetric}<article class="metric-card"><span>Latest volunteer hours</span><strong>${latest.volunteerHours}</strong></article><article class="metric-card"><span>Latest spending</span><strong>$${Number(latest.totalSpent).toLocaleString()}</strong></article></div>`:""}`;
+    return `${heading("Event records", "Reports & history", "Permanent completed-event records and a carefully maintained public impact summary.")}<article class="panel"><div class="panel-header"><div><h2>Public impact summary</h2><p>Use conservative minimums only. These figures appear publicly as “at least” totals, so they do not need to be exact historical counts.</p></div></div><form id="impact-form" class="form-grid"><div class="field"><label>Families helped — minimum known total<input name="families" type="number" min="0" value="${stats.families}"></label></div><div class="field"><label>Children supported — minimum known total<input name="children" type="number" min="0" value="${stats.children}"></label></div><div class="field"><label>Years serving — exact<input name="years" type="number" min="0" value="${stats.years}"></label></div><div class="field field--span-2"><small class="field-help">Leave a count at 0 to keep it off the public page. Volunteer totals are intentionally not shown because historical records are incomplete.</small></div><button class="button button--green" type="submit">Save public impact summary</button></form></article><article class="panel"><h2>Completed event records</h2>${state.reports.map((report, index)=>`<div class="report-row"><span><strong>${esc(report.event)}</strong><small>${esc(report.status)} · Permanent record</small></span><b>${activityLabel(report)} · ${report.volunteerHours} hours · $${Number(report.totalSpent).toLocaleString()}</b><button class="button button--small button--ghost" type="button" data-view-report="${index}">View details</button></div>`).join("")}</article>${latest?`<div class="metric-grid">${latestMetric}<article class="metric-card"><span>Latest volunteer hours</span><strong>${latest.volunteerHours}</strong></article><article class="metric-card"><span>Latest spending</span><strong>$${Number(latest.totalSpent).toLocaleString()}</strong></article></div>`:""}`;
   }
 
   function bindOrganizer(subroute) {
@@ -1530,7 +1537,17 @@
     document.querySelectorAll("[data-create-event]").forEach((button) => button.addEventListener("click", openCreateEvent));
     document.querySelectorAll("[data-active-event]").forEach((select) => select.addEventListener("change", () => { if (setActiveEvent(select.value)) renderRoute(); }));
     const impactForm = document.querySelector("#impact-form");
-    if (impactForm) impactForm.addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); state.publicStats = Object.fromEntries(["families","children","volunteers","years"].map((key)=>[key,Number(data.get(key)||0)])); saveState(); toast("Public impact totals saved in this demonstration browser."); });
+    if (impactForm) impactForm.addEventListener("submit", async (event) => {
+      event.preventDefault(); const data = new FormData(event.currentTarget);
+      const values = { families: Math.max(0, Number(data.get("families") || 0)), children: Math.max(0, Number(data.get("children") || 0)), years: Math.max(0, Number(data.get("years") || 0)) };
+      try {
+        if (SERVER_AUTH) {
+          const response = await fetch("/portal-api/organizer/impact", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ familiesMinimum: values.families, childrenMinimum: values.children, yearsServing: values.years }) });
+          const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The public impact summary could not be saved.");
+        }
+        state.publicStats = values; saveState(); toast("Public impact summary saved.");
+      } catch (error) { toast(error.message || "The public impact summary could not be saved."); }
+    });
     const addVolunteer = document.querySelector("[data-add-volunteer]");
     if (addVolunteer) addVolunteer.addEventListener("click", openAddVolunteer);
     configureBadgeFormats();
@@ -2037,6 +2054,7 @@
     if (SERVER_AUTH) {
       try {
         await loadLiveEvents();
+        await loadLiveImpact();
         await loadLiveVolunteers();
         await loadLiveApplications();
         await loadLiveUsers();
