@@ -163,6 +163,18 @@ function enabledBudgetTotal(settings = {}) {
     .reduce((total, item) => total + (Number(item.amount) || 0), 0);
 }
 
+function packetBudgetItems(settings = {}, details = {}) {
+  const showBra = Boolean(settings.questions?.braSize) && /^(girl|girls|woman|women)$/i.test(String(details.gender || "").trim());
+  const labels = {
+    shirts: "Shirt / blouse / dress", pants: "Pants / shorts", underwear: "Undergarments",
+    socks: "Socks", shoes: "Shoes", coats: "Coat / jacket", bras: "Bra", toys: "Toys"
+  };
+  return (Array.isArray(settings.budgetItems) ? settings.budgetItems : [])
+    .filter((item) => item?.enabled)
+    .filter((item) => !(/bra/i.test(`${item.id || ""} ${item.label || ""}`)) || showBra)
+    .map((item) => ({ label: labels[item.id] || item.label || "Item", amount: Number(item.amount) || 0 }));
+}
+
 function childProfilePdf({ child, household, event }) {
   const details = child.details || {}; const application = household.application || {}; const settings = eventSettings(event);
   const line = (text, x, y, size = 10, font = "F1") => `BT /${font} ${size} Tf ${x} ${y} Td (${pdfSafeText(text)}) Tj ET`;
@@ -202,6 +214,7 @@ function childProfileValues({ child, household, event }) {
   let age = "";
   if (parsedBirthDate && !Number.isNaN(parsedBirthDate.valueOf())) { age = today.getFullYear() - parsedBirthDate.getFullYear(); const birthdayThisYear = new Date(today.getFullYear(), parsedBirthDate.getMonth(), parsedBirthDate.getDate()); if (today < birthdayThisYear) age -= 1; }
   const enabledBudgets = Array.isArray(settings.budgetItems) ? settings.budgetItems.filter((item) => item?.enabled) : [];
+  const budgetItems = packetBudgetItems(settings, details);
   const budgetFor = (...names) => enabledBudgets.filter((item) => names.includes(String(item.label || "").toLowerCase())).reduce((total, item) => total + (Number(item.amount) || 0), 0);
   const eventDate = event.event_date ? String(event.event_date) : "";
   const parsedEventDate = eventDate ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(eventDate) ? `${eventDate}T12:00:00` : eventDate) : null;
@@ -221,8 +234,9 @@ function childProfileValues({ child, household, event }) {
     underwear: details.underwear || "Not provided", socks: details.socks || "Not provided", bra: details.bra || "Not provided", coat: details.coat || "Not provided",
     showBra: Boolean(settings.questions?.braSize) && /^(girl|girls|woman|women)$/i.test(String(details.gender || "").trim()),
     preferences: details.preferences || "None provided", accommodations: details.accommodations || "None provided",
-    budgets: { shirt: budgetFor("shirts", "shirt"), pants: budgetFor("pants", "pants / shorts"), underwear: budgetFor("underwear", "bras", "undergarments"), socks: budgetFor("socks", "sock"), shoes: budgetFor("shoes", "shoe"), coat: budgetFor("coats", "coat", "coat / jacket") },
-    budgetTotal: enabledBudgetTotal(settings)
+    budgets: { shirt: budgetFor("shirts", "shirt"), pants: budgetFor("pants", "pants / shorts"), underwear: budgetFor("underwear", "undergarments"), socks: budgetFor("socks", "sock"), shoes: budgetFor("shoes", "shoe"), coat: budgetFor("coats", "coat", "coat / jacket") },
+    budgetItems,
+    budgetTotal: budgetItems.reduce((total, item) => total + item.amount, 0)
   };
 }
 
@@ -285,16 +299,17 @@ function drawProfileOverlay(page, values, font, bold) {
   draw("Budget and optional spending tracker", 53, 280, 13, { bold: true });
   page.drawRectangle({ x: 52, y: 247, width: 507, height: 23, color: rgb(0.07, 0.10, 0.13) });
   ["ESSENTIAL", "BUDGET", "AMOUNT SPENT", "ITEM / NOTES"].forEach((label, index) => draw(label, columns[index] + 10, 255, 6.8, { bold: true, muted: true }));
-  const budgetLabels = ["Shirt / blouse / dress", "Pants / shorts", "Undergarments", "Socks", "Shoes", "Coat / jacket"];
-  const budgetRows = [values.budgets.shirt, values.budgets.pants, values.budgets.underwear, values.budgets.socks, values.budgets.shoes, values.budgets.coat];
-  const rowHeight = 24; const firstRowBottom = 223;
-  for (let index = 0; index < 6; index += 1) {
+  const budgetRows = values.budgetItems || [];
+  const rowHeight = 144 / Math.max(6, budgetRows.length); const firstRowBottom = 247 - rowHeight;
+  for (let index = 0; index < budgetRows.length; index += 1) {
     const y = firstRowBottom - index * rowHeight;
     page.drawRectangle({ x: 52, y, width: 507, height: rowHeight, color: paper, borderColor: border, borderWidth: .45 });
-    draw(budgetLabels[index], 62, y + 8, 7.7, { maxWidth: 132 });
-    draw(`$${budgetRows[index] || 0}`, 214, y + 8, 8, { bold: true, maxWidth: 60 });
-    draw("$____________", 295, y + 8, 7.4, { maxWidth: 80 });
-    page.drawLine({ start: { x: 397, y: y + 10 }, end: { x: 545, y: y + 10 }, thickness: .45, color: muted });
+    const textY = y + Math.max(5, (rowHeight - 8) / 2);
+    const textSize = rowHeight < 20 ? 6.8 : 7.7;
+    draw(budgetRows[index].label, 62, textY, textSize, { maxWidth: 132 });
+    draw(`$${budgetRows[index].amount}`, 214, textY, textSize, { bold: true, maxWidth: 60 });
+    draw("$____________", 295, textY, rowHeight < 20 ? 6.7 : 7.4, { maxWidth: 80 });
+    page.drawLine({ start: { x: 397, y: y + rowHeight / 2 }, end: { x: 545, y: y + rowHeight / 2 }, thickness: .45, color: muted });
   }
   page.drawRectangle({ x: 52, y: 88, width: 507, height: 15, color: rgb(0.88, 0.95, 0.89), borderColor: border, borderWidth: .45 });
   draw("TOTAL", 62, 93, 7.5, { bold: true });
