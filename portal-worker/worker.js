@@ -249,7 +249,10 @@ function drawProfileOverlay(page, values, font, bold) {
   // rebuild it on one shared 41-570 point grid so every edge lands together.
   const left = 41; const right = 570; const width = right - left;
   clear(31, 80, 560, 570, paper);
-  clear(41, 574, 550, 71);
+  // The original template's details panel is wider than the rebuilt grid.
+  // Keep this cover exactly on the shared right edge so no colored strip leaks
+  // beyond the information box.
+  clear(left, 574, width, 71);
   page.drawRectangle({ x: left, y: 574, width, height: 71, color: fieldPanel, borderColor: border, borderWidth: .55 });
   page.drawLine({ start: { x: 217, y: 574 }, end: { x: 217, y: 645 }, thickness: .55, color: border });
   page.drawLine({ start: { x: 393, y: 574 }, end: { x: 393, y: 645 }, thickness: .55, color: border });
