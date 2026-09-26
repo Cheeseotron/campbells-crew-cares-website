@@ -283,8 +283,8 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
   // Remove the template's internal "profile" label; the child's name is the
   // useful title for volunteers sorting a stack of sheets.
   clear(390, 740, 180, 28, paper);
-  draw("Child information sheet", left, 704, 10.8, { muted: true });
   draw(values.name, left, 670, 25, { bold: true, maxWidth: photo ? 400 : 500 });
+  draw("Child information sheet", left, 652, 10.8, { muted: true });
   if (photo) {
     const photoLeft = 491; const photoBottom = 662; const photoSide = 70;
     // Fill, center, and clip the square so every packet uses the same crop
