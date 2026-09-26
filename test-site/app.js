@@ -302,7 +302,9 @@
 
   function recipientIdleMessage() {
     const remaining = Math.max(0, RECIPIENT_DRAFT_IDLE_MS - (Date.now() - recipientLastActivityAt));
-    return `Your progress is saved in this browser. If there is no activity, it will reset in ${Math.ceil(remaining / 60000)} minute${Math.ceil(remaining / 60000) === 1 ? "" : "s"}.`;
+    const minutes = Math.ceil(remaining / 60000);
+    if (remaining > RECIPIENT_DRAFT_WARNING_MS) return "Your progress is saved in this browser for up to 30 minutes of inactivity.";
+    return `You have been inactive for a while. Continue within ${minutes} minute${minutes === 1 ? "" : "s"} or this application will reset.`;
   }
 
   function updateRecipientIdleNotice() {
@@ -310,8 +312,8 @@
     if (!notice || recipientConfirmation) return;
     const elapsed = Date.now() - recipientLastActivityAt;
     if (elapsed >= RECIPIENT_DRAFT_IDLE_MS) { clearRecipientDraft(); toast("Your saved application expired after 30 minutes of inactivity. Please start again."); renderRecipient(); return; }
-    notice.hidden = elapsed < RECIPIENT_DRAFT_IDLE_MS - RECIPIENT_DRAFT_WARNING_MS;
-    if (!notice.hidden) notice.textContent = recipientIdleMessage();
+    notice.hidden = false;
+    notice.textContent = recipientIdleMessage();
   }
 
   function startRecipientIdleNotice() {
@@ -672,7 +674,7 @@
     const panel = document.querySelector("#recipient-panel");
     panel.addEventListener("input", saveVisibleRecipientStep);
     panel.addEventListener("change", saveVisibleRecipientStep);
-    panel.addEventListener("pointerdown", touchRecipientDraft);
+    panel.addEventListener("pointerdown", () => { touchRecipientDraft(); saveRecipientDraft(); });
     document.querySelectorAll("[data-recipient-step]").forEach((button) => button.addEventListener("click", () => { if (!button.disabled) { saveVisibleRecipientStep(); recipientStep = Number(button.dataset.recipientStep); renderRecipient(); } }));
     if (recipientStep === 0) renderOrientation(panel);
     else if (recipientStep === 1) renderHousehold(panel);
