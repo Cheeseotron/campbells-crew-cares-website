@@ -784,6 +784,13 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   body[data-print-badge] .badge-card--recipient { width:var(--child-badge-width, 3in); height:var(--child-badge-height, 4in); aspect-ratio:auto; margin:0; break-after:auto; }
   body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-grid--children { grid-template-columns:repeat(4,2in); gap:0; justify-content:center; align-content:center; width:8.5in; min-height:11in; padding:2in .25in; }
   body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:2in; height:3.5in; }
+  body[data-print-badge][data-child-badge-size="business-card"] .badge-grid--children { grid-template-columns:repeat(2,3.5in); gap:0; justify-content:center; align-content:center; width:8.5in; min-height:11in; padding:.5in .75in; }
+  body[data-print-badge][data-child-badge-size="avery-8395"] .badge-grid--children { grid-template-columns:repeat(2,3.375in); gap:0; justify-content:center; align-content:center; width:8.5in; min-height:11in; padding:.833in .875in; }
+  body[data-print-badge][data-child-badge-orientation="horizontal"] .badge-card--recipient { align-items:flex-start; justify-content:center; padding:24px 16px 12px 106px; text-align:left; }
+  body[data-print-badge][data-child-badge-orientation="horizontal"] .badge-card--recipient .badge-photo { position:absolute; top:42px; left:16px; width:72px; height:72px; min-width:72px; min-height:72px; }
+  body[data-print-badge][data-child-badge-orientation="horizontal"] .badge-card--recipient .badge-logo { position:absolute; top:17px; left:18px; width:28px; height:28px; }
+  body[data-print-badge][data-child-badge-orientation="horizontal"] .badge-card--recipient > span { font-size:8px; }
+  body[data-print-badge][data-child-badge-orientation="horizontal"] .badge-card--recipient > strong { font-size:17px; }
   body[data-print-badge] .badge-card button { display:none!important; }
   body[data-print-badge] .badge-photo-upload { display:none!important; }
   body[data-print-bag-guide] .organizer-main > *:not(#event-form), body[data-print-bag-guide] .event-context, body[data-print-bag-guide] .settings-section:not(:has(.bag-packing-guide)), body[data-print-bag-guide] .bag-plan-intro, body[data-print-bag-guide] .bag-plan-table, body[data-print-bag-guide] .bag-plan-actions, body[data-print-bag-guide] .sticky-save { display:none!important; }
