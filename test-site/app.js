@@ -380,7 +380,7 @@
     const payload = await response.json();
     const events = (payload.events || []).map((record) => {
       const settings = record.settings && typeof record.settings === "object" ? record.settings : {};
-      return { ...settings, id: record.id, title: record.title, date: record.event_date || settings.date || "", type: record.event_type === "food_bag" ? "food-bag" : "shopping", closed: record.status === "closed", volunteerStatus: settings.volunteerStatus || (record.status === "open" ? "open" : "closed"), recipientStatus: settings.recipientStatus || "closed", roles: Array.isArray(settings.roles) ? settings.roles : [], questions: settings.questions || {}, budgetItems: Array.isArray(settings.budgetItems) ? settings.budgetItems : [], bagItems: Array.isArray(settings.bagItems) ? settings.bagItems : [], activity: undefined };
+      return { ...settings, id: record.id, title: record.title, date: record.event_date || settings.date || "", type: record.event_type === "food_bag" ? "food-bag" : "shopping", closed: record.status === "closed", volunteerStatus: settings.volunteerStatus || (record.status === "open" ? "open" : "closed"), recipientStatus: settings.recipientStatus || "closed", roles: Array.isArray(settings.roles) ? settings.roles : [], questions: { braSize: false, ...(settings.questions || {}) }, budgetItems: Array.isArray(settings.budgetItems) ? settings.budgetItems : [], bagItems: Array.isArray(settings.bagItems) ? settings.bagItems : [], activity: undefined };
     });
     const rememberedEventId = localStorage.getItem(ACTIVE_EVENT_KEY);
     const activeEventId = events.some((event) => event.id === rememberedEventId && !event.closed)
@@ -395,7 +395,7 @@
     const payload = await response.json();
     const events = (payload.events || []).filter((record) => record.event_type === "shopping" && ["open", "code"].includes(record.settings?.recipientStatus)).map((record) => ({
       id: record.id, title: record.title, date: record.event_date || record.settings?.date || "", time: record.settings?.time || "", location: record.settings?.location || "", type: "shopping", closed: false,
-      volunteerEnabled: false, recipientEnabled: true, volunteerStatus: "closed", recipientStatus: record.settings?.recipientStatus || "closed", recipientCode: "", questions: record.settings?.questions || {}, roles: [], bagItems: [], budgetItems: [], activity: undefined
+      volunteerEnabled: false, recipientEnabled: true, volunteerStatus: "closed", recipientStatus: record.settings?.recipientStatus || "closed", recipientCode: "", questions: { braSize: false, ...(record.settings?.questions || {}) }, roles: [], bagItems: [], budgetItems: [], activity: undefined
     }));
     state = prepareEventCollection({ ...createLiveState(), events, activeEventId: events[0]?.id || "" });
   }
@@ -840,7 +840,9 @@
     const data = new FormData(form);
     recipientDraft.children = await Promise.all(recipientDraft.children.map(async (child, index) => {
       const next = {};
-      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "bra", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); }); const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || "");
+      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "bra", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); });
+      if (!state.event.questions?.braSize || !braSizeApplies(next.gender)) next.bra = "";
+      const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || "");
       if (photo?.files[0]) next.photoDataUrl = await photoDataUrl(photo.files[0]);
       else next.photoDataUrl = child.photoDataUrl || "";
       if (!next.photoDataUrl) throw new Error(`Please add a JPG or PNG photo for ${next.firstName || `Child ${index + 1}`}.`);

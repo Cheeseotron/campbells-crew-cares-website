@@ -213,7 +213,7 @@ function childProfileValues({ child, household, event }) {
     emergency: [application.emergencyName, application.emergencyPhone].filter(Boolean).join(" · ") || "Not provided",
     shirt: details.shirt || "Not provided", pants: details.pants || "Not provided", shoes: details.shoes || "Not provided",
     underwear: details.underwear || "Not provided", socks: details.socks || "Not provided", bra: details.bra || "Not provided", coat: details.coat || "Not provided",
-    showBra: Boolean(settings.questions?.braSize) && /girl|women|female/i.test(String(details.gender || "")),
+    showBra: Boolean(settings.questions?.braSize) && /^(girl|girls|woman|women)$/i.test(String(details.gender || "").trim()),
     preferences: details.preferences || "None provided", accommodations: details.accommodations || "None provided",
     budgets: { shirt: budgetFor("shirts", "shirt"), pants: budgetFor("pants", "pants / shorts"), underwear: budgetFor("underwear", "bras", "undergarments"), socks: budgetFor("socks", "sock"), shoes: budgetFor("shoes", "shoe"), coat: budgetFor("coats", "coat", "coat / jacket") },
     budgetTotal: settings.shoppingBudget || enabledBudgets.reduce((total, item) => total + (Number(item.amount) || 0), 0) || "0"
@@ -694,8 +694,11 @@ async function registerRecipient(env, input, codeGranted = false) {
       photoKey = `children/${householdId}/${childId}.jpg`;
       await env.PRIVATE_UPLOADS.put(photoKey, photo.bytes, { httpMetadata: { contentType: photo.contentType }, customMetadata: { householdId, childId } });
     }
+    const details = child.details && typeof child.details === "object" ? { ...child.details } : {};
+    const braApplicable = Boolean(settings.questions?.braSize) && /^(girl|girls|woman|women)$/i.test(String(details.gender || "").trim());
+    if (!braApplicable) delete details.bra;
     await env.DB.prepare("INSERT INTO recipient_children (id, household_id, first_name, last_name, birth_date, details_json) VALUES (?, ?, ?, ?, ?, ?)")
-      .bind(childId, householdId, String(child.firstName).slice(0, 80), String(child.lastName).slice(0, 80), child.birthDate || null, JSON.stringify(child.details || {})).run();
+      .bind(childId, householdId, String(child.firstName).slice(0, 80), String(child.lastName).slice(0, 80), child.birthDate || null, JSON.stringify(details)).run();
     if (photoKey) await env.DB.prepare("UPDATE recipient_children SET photo_key = ? WHERE id = ?").bind(photoKey, childId).run();
   }
   await audit(env, null, "recipient_application_submitted", "recipient_household", householdId, event.id);
