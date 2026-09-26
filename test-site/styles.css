@@ -833,6 +833,8 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   /* Borders reliably print even when a printer disables background graphics. */
   body[data-print-badge] .badge-topbar { display:flex!important; z-index:4!important; }
   body[data-print-badge] .badge-topbar i { border-top-width:13px!important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body[data-print-badge][data-print-badge-group="volunteers"] .badge-topbar i:first-child { flex:0 0 62%!important; width:62%!important; border-top-color:#2bd62b!important; }
+  body[data-print-badge][data-print-badge-group="volunteers"] .badge-topbar i:last-child { flex:0 0 38%!important; width:38%!important; border-top-color:#111821!important; }
   /* The Avery child layout intentionally lets the round logo overlap the
      top accent. Keep it above that accent in print so the bar never masks
      the top half of the logo. */
