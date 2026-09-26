@@ -1599,9 +1599,13 @@
     return String(template.body || "").replace(/{{[^}]+}}/g, (token) => details[token] || token);
   }
 
+  function emailPreviewBody(text) {
+    return esc(String(text || "")).split(/\n{2,}/).filter(Boolean).map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`).join("");
+  }
+
   function openEmailPreview(id) {
     const template = state.event.emailTemplates.find((item) => item.id === id); if (!template) return;
-    dialogContent.innerHTML = `<div class="dialog-body email-preview"><p class="eyebrow">Preview — sample information</p><h2 id="dialog-title">${esc(template.title)}</h2><div class="email-preview-message"><strong>Subject: ${esc(emailPreviewText({ body: template.subject }))}</strong><pre>${esc(emailPreviewText(template))}</pre></div><button class="button button--light" type="button" data-close-dialog>Close</button></div>`;
+    dialogContent.innerHTML = `<div class="dialog-body email-preview"><p class="eyebrow">Preview — sample information</p><h2 id="dialog-title">${esc(template.title)}</h2><div class="email-preview-message"><div class="email-preview-brand"><img src="/assets/images/ccc-logo.png" alt="Campbell's Crew Cares"><div><strong>Campbell's Crew Cares</strong><span>Community care in action</span></div></div><div class="email-preview-content"><p class="email-preview-subject">${esc(emailPreviewText({ body: template.subject }))}</p>${emailPreviewBody(emailPreviewText(template))}</div><div class="email-preview-footer">Campbell's Crew Cares · Questions? Reply to this email.</div></div><button class="button button--light" type="button" data-close-dialog>Close</button></div>`;
     appDialog.showModal(); document.body.classList.add("dialog-open"); dialogContent.querySelector("[data-close-dialog]").addEventListener("click", closeDialog);
   }
 

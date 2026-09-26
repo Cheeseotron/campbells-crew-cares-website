@@ -357,6 +357,11 @@ function emailLine(value) {
   return String(value || "").replace(/[\r\n]+/g, " ").trim();
 }
 
+function brandedEmailHtml(subject, body) {
+  const paragraphs = String(body || "").split(/\r?\n\r?\n/).filter(Boolean).map((paragraph) => `<p style="margin:0 0 18px;color:#111821;font:16px/1.55 Arial,sans-serif;overflow-wrap:anywhere">${escapeHtml(paragraph).replace(/\r?\n/g, "<br>")}</p>`).join("");
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#eef3ef"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:#eef3ef"><tr><td align="center" style="padding:28px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ffffff"><tr><td style="height:7px;background:#35d32f;font-size:0;line-height:0">&nbsp;</td></tr><tr><td style="padding:20px 26px;background:#111821"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:14px"><img src="https://campbellscrew.com/assets/images/ccc-logo.png" width="52" height="52" alt="Campbell's Crew Cares" style="display:block;border:0;border-radius:50%;background:#fff"></td><td><div style="color:#fff;font:700 14px Arial,sans-serif;letter-spacing:.7px;text-transform:uppercase">Campbell's Crew Cares</div><div style="padding-top:4px;color:#b9c8bf;font:12px Arial,sans-serif">Community care in action</div></td></tr></table></td></tr><tr><td style="padding:30px 30px 14px"><h1 style="margin:0 0 22px;color:#176b39;font:700 24px/1.2 Arial,sans-serif">${escapeHtml(subject)}</h1>${paragraphs}</td></tr><tr><td style="padding:18px 30px;background:#f2f7f2;border-top:1px solid #d2d9d4;color:#617068;font:12px/1.45 Arial,sans-serif">Campbell's Crew Cares<br>Questions? Reply directly to this email.</td></tr></table></td></tr></table></body></html>`;
+}
+
 async function sendEmail(env, recipient, subject, body) {
   const credential = await env.DB.prepare("SELECT encrypted_refresh_token FROM email_oauth_credentials WHERE id = 1").first();
   if (!credential || !env.GOOGLE_OAUTH_CLIENT_ID || !env.GOOGLE_OAUTH_CLIENT_SECRET) throw new Error("Email delivery has not been connected yet.");
@@ -366,7 +371,9 @@ async function sendEmail(env, recipient, subject, body) {
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_OAUTH_CLIENT_ID, client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET, refresh_token: refreshToken, grant_type: "refresh_token" }) });
   const token = await tokenResponse.json();
   if (!tokenResponse.ok || !token.access_token) throw new Error("Google email authorization needs to be reconnected.");
-  const message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\nSubject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${String(body || "").replace(/\r?\n/g, "\r\n")}`;
+  const boundary = `ccc-${crypto.randomUUID()}`;
+  const plainText = String(body || "").replace(/\r?\n/g, "\r\n");
+  const message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\nSubject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n--${boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${plainText}\r\n\r\n--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${brandedEmailHtml(subject, body)}\r\n\r\n--${boundary}--`;
   const sent = await fetch(`https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(EMAIL_SENDER)}/messages/send`, { method: "POST", headers: { Authorization: `Bearer ${token.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw: base64Url(new TextEncoder().encode(message)) }) });
   if (!sent.ok) throw new Error("Google could not send the email.");
 }

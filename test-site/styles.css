@@ -519,6 +519,17 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .dialog-close { position: sticky; z-index: 2; float: right; top: 14px; right: 14px; display: grid; width: 42px; height: 42px; place-items: center; color: var(--white); background: var(--ink); border: 0; cursor: pointer; font-size: 26px; }
 .dialog-body { padding: 38px; }
 .dialog-body h2 { margin: 0 50px 10px 0; font-family: "Arial Black", Impact, sans-serif; font-size: 38px; letter-spacing: -.04em; line-height: .95; text-transform: uppercase; }
+.email-preview { overflow-x: hidden; }
+.email-preview-message { width: 100%; overflow: hidden; border: 1px solid var(--line); background: var(--white); }
+.email-preview-brand { display: flex; min-height: 82px; padding: 15px 20px; align-items: center; gap: 12px; color: var(--white); background: linear-gradient(90deg, var(--ink) 0 72%, var(--green) 72% 100%); }
+.email-preview-brand img { width: 48px; height: 48px; padding: 2px; object-fit: contain; border-radius: 50%; background: var(--white); }
+.email-preview-brand strong, .email-preview-brand span { display: block; }
+.email-preview-brand strong { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+.email-preview-brand span { margin-top: 3px; color: #c6d1cb; font-size: 11px; }
+.email-preview-content { padding: 24px 26px 20px; }
+.email-preview-content p { margin: 0 0 15px; color: var(--ink); line-height: 1.55; overflow-wrap: anywhere; }
+.email-preview-content .email-preview-subject { margin-bottom: 21px; padding-bottom: 14px; border-bottom: 1px solid var(--line); color: var(--green-dark); font-size: 17px; font-weight: 800; }
+.email-preview-footer { padding: 13px 20px; color: var(--gray); background: var(--mist-2); font-size: 11px; overflow-wrap: anywhere; }
 .dialog-subtitle { color: var(--gray); }
 .dialog-section { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--line); }
 .dialog-section h3 { margin-bottom: 13px; font-size: 15px; }
