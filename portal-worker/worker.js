@@ -415,10 +415,10 @@ function drawRulesOverlay(page, event, font, bold) {
     draw("CLOTHING-ONLY EVENT - NO TOYS OR ACCESSORIES", 58, 592, 10.8, { bold: true, maxWidth: 480 });
     draw("This event is restricted to clothing only. Do not purchase toys or accessories. Purchase only clothes from the categories listed on the child's information sheet.", 58, 576, 8.6, { maxWidth: 494 });
   }
-  // This uses absolute page coordinates. The card is still fully generated
-  // at runtime, so its bra or clothing-only copy remains toggle-aware.
-  page.drawSvgPath("M46 310 L293 310 C295.2 310 297 311.8 297 314 L297 370 C297 372.2 295.2 374 293 374 L46 374 C43.8 374 42 372.2 42 370 L42 314 C42 311.8 43.8 310 46 310 Z", { color: pale, borderColor: line, borderWidth: .8 });
-  page.drawSvgPath("M57 340 L79 340 C80.7 340 82 341.3 82 343 L82 359 C82 360.7 80.7 362 79 362 L57 362 C55.3 362 54 360.7 54 359 L54 343 C54 341.3 55.3 340 57 340 Z", { color: green });
+  // A solid cover is deliberately used here: it reliably masks the template
+  // beneath it before the event-aware bra or clothing-only copy is drawn.
+  page.drawRectangle({ x: 42, y: 310, width: 255, height: 64, color: pale, borderColor: line, borderWidth: .8 });
+  page.drawRectangle({ x: 54, y: 340, width: 28, height: 22, color: green });
   draw("03", 61, 347, 8, { bold: true, color: rgb(1, 1, 1) });
   if (bra) {
     draw("Bras are limited and specific", 92, 361, 10, { bold: true, maxWidth: 190 });
