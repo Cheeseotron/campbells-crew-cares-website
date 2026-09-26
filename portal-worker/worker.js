@@ -353,6 +353,7 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   const toyBudget = budgetRows.find((item) => item.fixedCap);
   draw(toyBudget ? `TOYS: FIXED $${toyBudget.amount} MAX - NO TRANSFERS` : "Remaining: $_______", 397, 93, toyBudget ? 6.4 : 7.2, { bold: true, maxWidth: 150 });
   columns.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: 88 }, end: { x, y: 270 }, thickness: .45, color: border }));
+  draw("Before checkout: complete the checklist on the Volunteer Quick Guide.", 52, 66, 7.2, { bold: true, color: rgb(0.03, 0.47, 0.23), maxWidth: 420 });
   // Keep the event date in the existing footer row. This replaces both the
   // old generic label and the first attempt's extra line above the footer.
   clear(41, 24, 260, 50, paper);
@@ -386,6 +387,23 @@ function drawRulesOverlay(page, event, font, bold) {
     draw("Bras are not approved", 92, 361, 10, { bold: true, maxWidth: 190 });
     draw("Do not purchase bras for this event. Only the clothing categories and items printed on the child's information sheet are permitted.", 92, 345, 6.9, { maxWidth: 190 });
   }
+  // Replace the generic closeout sentence with a practical, event-aware
+  // checklist. The toy confirmation exists only when toys are enabled.
+  page.drawRectangle({ x: 42, y: 224, width: 528, height: 70, color: ink });
+  draw("BEFORE CHECKOUT", 58, 278, 10.5, { bold: true, color: rgb(1, 1, 1) });
+  const checklist = [
+    "Each printed category has been successfully fulfilled.",
+    "Total spending is within a few dollars of the total budget.",
+    "Everything is appropriately sized and modest.",
+    "No pajamas, hair accessories, jewelry, or other non-essential items.",
+    ...(toy ? [`Toy spending did not exceed the fixed $${Number(toy.amount) || 0} limit.`] : []),
+    "Any question was cleared with a CCC representative."
+  ];
+  checklist.forEach((item, index) => {
+    const column = index % 2; const row = Math.floor(index / 2); const x = 58 + column * 257; const y = 260 - row * 13;
+    page.drawRectangle({ x, y: y - 1, width: 7, height: 7, borderColor: rgb(1, 1, 1), borderWidth: .65 });
+    draw(item, x + 12, y, 5.8, { color: rgb(1, 1, 1), maxWidth: 235, lineHeight: 7 });
+  });
   // This dedicated panel is intentionally the one dynamic part of the rules
   // page. Only active special-item rules appear, so volunteers cannot mistake
   // an optional item from another event as permission for this child.
