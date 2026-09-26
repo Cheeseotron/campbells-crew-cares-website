@@ -258,7 +258,7 @@ function childProfileValues({ child, household, event }) {
 
 function drawProfileOverlay(page, values, font, bold, photo = null) {
   const ink = rgb(0.07, 0.10, 0.13); const muted = rgb(0.26, 0.33, 0.29); const fieldPanel = rgb(238 / 255, 243 / 255, 239 / 255); const paper = rgb(251 / 255, 252 / 255, 251 / 255); const border = rgb(0.77, 0.82, 0.79);
-  const draw = (text, x, y, size = 9, options = {}) => page.drawText(String(text || ""), { x, y, size, font: options.bold ? bold : font, color: options.muted ? muted : ink, maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 2 });
+  const draw = (text, x, y, size = 9, options = {}) => page.drawText(String(text || ""), { x, y, size, font: options.bold ? bold : font, color: options.color || (options.muted ? muted : ink), maxWidth: options.maxWidth, lineHeight: options.lineHeight || size + 2 });
   const clear = (x, y, width, height, color = fieldPanel) => page.drawRectangle({ x, y, width, height, color });
   // The supplied template has several overlapping panel edges and labels.  Do
   // not try to patch those individual marks: cover the whole data region and
@@ -331,7 +331,7 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   page.drawRectangle({ x: left, y: headerBottom, width, height: budgetTop - headerBottom, color: fieldPanel, borderColor: border, borderWidth: .55 });
   draw("Budget and optional spending tracker", 53, 280, 13, { bold: true });
   page.drawRectangle({ x: 52, y: 247, width: 507, height: 23, color: rgb(0.07, 0.10, 0.13) });
-  ["ESSENTIAL", "BUDGET", "AMOUNT SPENT", "ITEM / NOTES"].forEach((label, index) => draw(label, columns[index] + 10, 255, 6.8, { bold: true, muted: true }));
+  ["ESSENTIAL", "BUDGET", "AMOUNT SPENT", "ITEM / NOTES"].forEach((label, index) => draw(label, columns[index] + 10, 255, 7, { bold: true, color: rgb(0.94, 0.98, 0.95) }));
   const budgetRows = values.budgetItems || [];
   const rowHeight = 144 / Math.max(6, budgetRows.length); const firstRowBottom = 247 - rowHeight;
   for (let index = 0; index < budgetRows.length; index += 1) {
