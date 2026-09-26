@@ -276,6 +276,11 @@
     return ["Executive Owner", "Event Administrator"].includes(previewRole || portalUser);
   }
 
+  function canDeleteEvents() {
+    if (SERVER_AUTH) return ORGANIZER_ROLE === "executive_owner";
+    return (previewRole || portalUser) === "Executive Owner";
+  }
+
   function createRecipientDraft() {
     return {
       acknowledgments: {}, agreementSignature: "", finalSignature: "", guardian: "", email: "", phone: "", address: "", city: "", zip: "", referral: "", preferredContact: "Email", notes: "",
@@ -1729,12 +1734,13 @@
     const details = foodBag
       ? [["Bags made", `${Number(report.bagsMade || 0).toLocaleString()} of ${Number(report.bagsPlanned || 0).toLocaleString()}`], ["Volunteers", `${Number(report.volunteersAttended || 0).toLocaleString()} attended of ${Number(report.volunteersRegistered || 0).toLocaleString()} registered`], ["Volunteer hours", Number(report.volunteerHours || 0).toLocaleString()], ["Event spending", `$${Number(report.totalSpent || 0).toLocaleString()}`]]
       : [["Children", `${Number(report.childrenAttended || 0).toLocaleString()} attended of ${Number(report.childrenRegistered || 0).toLocaleString()} registered`], ["Volunteers", `${Number(report.volunteersAttended || 0).toLocaleString()} attended of ${Number(report.volunteersRegistered || 0).toLocaleString()} registered`], ["Volunteer hours", Number(report.volunteerHours || 0).toLocaleString()], ["Event spending", `$${Number(report.totalSpent || 0).toLocaleString()}`]];
-    const management = canManageEventLifecycle() ? `<div class="dialog-actions"><button class="button button--light" type="button" data-edit-closeout>Edit close-out details</button><button class="button button--danger" type="button" data-reopen-event>Re-open event</button></div>` : "";
+    const management = canManageEventLifecycle() ? `<div class="dialog-actions"><button class="button button--light" type="button" data-edit-closeout>Edit close-out details</button><button class="button button--danger" type="button" data-reopen-event>Re-open event</button>${canDeleteEvents() ? `<button class="button button--danger" type="button" data-delete-event>Delete event</button>` : ""}</div>` : "";
     dialogContent.innerHTML = `<div class="dialog-body"><p class="eyebrow">Completed event record</p><h2 id="dialog-title">${esc(report.event || "Event details")}</h2><p class="dialog-subtitle">${esc(report.eventDate || "Event date not recorded")} · ${esc(report.status || "Closed out")} · Permanent summary</p><div class="detail-grid">${details.map(([label, value]) => `<div class="detail-item"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("")}</div><div class="confirmation-box"><strong>Close-out notes</strong><p>${esc(report.notes || "No close-out notes were recorded.")}</p></div>${management}<button class="button button--light" type="button" data-close-dialog>Close</button></div>`;
     if (!appDialog.open) appDialog.showModal(); document.body.classList.add("dialog-open");
     dialogContent.querySelector("[data-close-dialog]").addEventListener("click", closeDialog);
     dialogContent.querySelector("[data-edit-closeout]")?.addEventListener("click", () => openEditCloseout(report));
     dialogContent.querySelector("[data-reopen-event]")?.addEventListener("click", () => openReopenEventConfirmation(report));
+    dialogContent.querySelector("[data-delete-event]")?.addEventListener("click", () => openDeleteEventConfirmation(report));
   }
 
   function openEditCloseout(report) {
@@ -1763,6 +1769,15 @@
     confirmation.addEventListener("change", () => { submit.disabled = !confirmation.checked; });
     dialogContent.querySelector("[data-cancel-reopen]").addEventListener("click", () => openCompletedReport(report));
     form.addEventListener("submit", async (event) => { event.preventDefault(); if (!confirmation.checked) return; submit.disabled = true; try { const response = await fetch(`/portal-api/events/${encodeURIComponent(report.id)}/reopen`, { method: "POST" }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The event could not be reopened."); await loadLiveEvents(); await loadLiveReports(); closeDialog(); navigateOrganizer("events"); toast("Event re-opened as a private draft."); } catch (error) { toast(error.message || "The event could not be reopened."); submit.disabled = false; } });
+  }
+
+  function openDeleteEventConfirmation(report) {
+    dialogContent.innerHTML = `<form class="dialog-body confirm-dialog" id="delete-event-form"><p class="eyebrow">Executive Owner action</p><h2 id="dialog-title">Delete ${esc(report.event)}?</h2><p>This permanently removes this event, its completed record, related volunteer signups, recipient applications, and stored child photos. This cannot be undone.</p><label class="question-toggle"><input name="confirm" type="checkbox"><span class="switch-control" aria-hidden="true"></span><span><strong>I understand this permanently deletes the event and its related records.</strong></span></label><div class="dialog-actions"><button class="button button--light" type="button" data-cancel-delete>Cancel</button><button class="button button--danger" type="submit" disabled>Delete event permanently</button></div></form>`;
+    if (!appDialog.open) appDialog.showModal(); document.body.classList.add("dialog-open");
+    const form = dialogContent.querySelector("#delete-event-form"); const confirmation = form.elements.confirm; const submit = form.querySelector('[type="submit"]');
+    confirmation.addEventListener("change", () => { submit.disabled = !confirmation.checked; });
+    dialogContent.querySelector("[data-cancel-delete]").addEventListener("click", () => openCompletedReport(report));
+    form.addEventListener("submit", async (event) => { event.preventDefault(); if (!confirmation.checked) return; submit.disabled = true; try { const response = await fetch(`/portal-api/events/${encodeURIComponent(report.id)}`, { method: "DELETE" }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The event could not be deleted."); await loadLiveEvents(); await loadLiveReports(); await loadLiveVolunteers(); await loadLiveApplications(); closeDialog(); navigateOrganizer("reports"); toast("Event permanently deleted."); } catch (error) { toast(error.message || "The event could not be deleted."); submit.disabled = false; } });
   }
 
   function openFinishEvent() {

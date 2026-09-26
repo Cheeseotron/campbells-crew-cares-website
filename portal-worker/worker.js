@@ -1039,6 +1039,24 @@ async function api(request, env, url, user) {
     return json({ id: eventMatch[1] });
   }
 
+  if (eventMatch && request.method === "DELETE") {
+    if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Only the Executive Owner account can delete an event." }, 403);
+    const existing = await env.DB.prepare("SELECT id, title FROM events WHERE id = ?").bind(eventMatch[1]).first();
+    if (!existing) return json({ error: "Event not found." }, 404);
+    const { results: children } = await env.DB.prepare("SELECT c.photo_key FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id WHERE h.event_id = ?").bind(existing.id).all();
+    await audit(env, user, "event_deleted", "event", existing.id, existing.id, { title: existing.title });
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM recipient_children WHERE household_id IN (SELECT id FROM recipient_households WHERE event_id = ?)").bind(existing.id),
+      env.DB.prepare("DELETE FROM recipient_households WHERE event_id = ?").bind(existing.id),
+      env.DB.prepare("DELETE FROM volunteer_signups WHERE event_id = ?").bind(existing.id),
+      env.DB.prepare("DELETE FROM email_jobs WHERE event_id = ?").bind(existing.id),
+      env.DB.prepare("UPDATE audit_log SET event_id = NULL WHERE event_id = ?").bind(existing.id),
+      env.DB.prepare("DELETE FROM events WHERE id = ?").bind(existing.id)
+    ]);
+    await Promise.all(children.filter((child) => child.photo_key).map((child) => env.PRIVATE_UPLOADS.delete(child.photo_key)));
+    return json({ id: existing.id });
+  }
+
   if (url.pathname === "/portal-api/organizer/volunteers" && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
     const { results } = await env.DB.prepare("SELECT s.id, s.event_id, s.role, s.status, s.notes, s.created_at, v.name, v.email, v.phone, e.title AS event_title FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id JOIN events e ON e.id = s.event_id ORDER BY s.created_at DESC").all();
