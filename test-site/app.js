@@ -1240,9 +1240,14 @@
     if (eventClosed) {
       return `${heading("Event management", "No active event", "The finished event is safely stored in Reports & History and is no longer editable.", `<button class="button button--green" type="button" data-create-event>Create New Event</button>`)}<article class="panel no-active-event"><p class="eyebrow">Ready for what’s next</p><h2>Create your next event</h2><p>Start a fresh event workspace with new dates, signup settings, volunteer roles, budgets, applications, and check-in lists. Closed events remain read-only in historical records.</p><button class="button button--green" type="button" data-create-event>Create New Event</button></article>`;
     }
+    const roleCapacity = (state.event.roles || []).filter((role) => role.enabled).reduce((total, role) => total + Math.max(0, Number(role.capacity) || 0), 0);
+    state.event.volunteerCapacity = roleCapacity;
     const remembered = JSON.parse(sessionStorage.getItem("ccc-event-sections") || "null");
     let html = organizerEvents().replace('Event setup', 'Event Management').replace('<a class="button button--light" href="#volunteer">Preview volunteer page</a>', '<div class="heading-actions"><button class="button button--green" type="button" data-create-event>+ Add event</button><a class="button button--light" href="#volunteer">Preview volunteer page</a></div>');
     html = html.replace('<details class="settings-section" open>', '<details class="settings-section">');
+    html = html.replaceAll('Date, place and overall capacity', 'Date and location');
+    html = html.replace(/<div class="field"><label for="vol-capacity">[\s\S]*?<\/div>/, '');
+    html = html.replace('Names, shifts and limits', `Total enabled spots: <b data-role-capacity-total>${roleCapacity}</b>`);
     html = html.replace('<h3>Volunteer registration</h3>', '<div class="configuration-heading"><span>Volunteer configuration</span><small>Access, public questions, roles, and capacity</small></div><h3>Volunteer registration</h3>');
     html = html.replace('<h3>Recipient applications</h3>', '<div class="configuration-heading"><span>Recipient configuration</span><small>Access and application questions are managed separately</small></div><h3>Recipient applications</h3>');
     html += `<article class="finish-event-panel"><div><p class="eyebrow">End-of-event action</p><h2>Finished with this event?</h2><p>Close-out records are preserved in reports, the volunteer directory, and Past Recipients / History.</p></div><button class="button button--danger" type="button" data-finish-event>Finish Event</button></article>`;
@@ -1315,7 +1320,6 @@
         const data = new FormData(event.currentTarget);
         ["title", "date", "time", "location", "address", "volunteerStatus", "volunteerCode"].forEach((key) => { state.event[key] = String(data.get(key) || "").trim(); });
         if (state.event.type !== "food-bag") ["recipientStatus", "recipientCode"].forEach((key) => { state.event[key] = String(data.get(key) || "").trim(); });
-        ["volunteerCapacity"].forEach((key) => { state.event[key] = Number(data.get(key)); });
         if (state.event.type !== "food-bag") ["recipientCapacity"].forEach((key) => { state.event[key] = Number(data.get(key)); });
         state.event.roles.forEach((role) => {
           role.enabled = data.has(`role-enabled-${role.id}`);
@@ -1323,6 +1327,7 @@
           role.shift = String(data.get(`role-shift-${role.id}`) || role.shift).trim();
           role.capacity = Number(data.get(`role-capacity-${role.id}`) || 0);
         });
+        state.event.volunteerCapacity = state.event.roles.filter((role) => role.enabled).reduce((total, role) => total + Math.max(0, Number(role.capacity) || 0), 0);
         Object.keys(state.event.questions).forEach((key) => { state.event.questions[key] = data.has(`question-${key}`); });
         if (state.event.type === "food-bag") {
           state.event.bagGoal = Number(data.get("bagGoal") || 0);
@@ -1352,6 +1357,16 @@
         }, 0);
         document.querySelectorAll("[data-budget-total]").forEach((target) => { target.textContent = `$${total}`; });
       }));
+      const refreshRoleCapacity = () => {
+        const total = [...document.querySelectorAll('[name^="role-capacity-"]')].reduce((sum, input) => {
+          const roleId = input.name.replace("role-capacity-", "");
+          const enabled = document.querySelector(`[name="role-enabled-${roleId}"]`)?.checked;
+          return sum + (enabled ? Math.max(0, Number(input.value) || 0) : 0);
+        }, 0);
+        document.querySelectorAll("[data-role-capacity-total]").forEach((target) => { target.textContent = String(total); });
+      };
+      document.querySelectorAll('[name^="role-capacity-"]').forEach((input) => input.addEventListener("input", refreshRoleCapacity));
+      document.querySelectorAll('[name^="role-enabled-"]').forEach((input) => input.addEventListener("change", refreshRoleCapacity));
       const refreshBagTotals = () => {
         const goal = Number(document.querySelector("#bag-goal")?.value || 0);
         (state.event.bagItems || []).forEach((item) => { const total = document.querySelector(`[data-bag-total="${item.id}"]`); const quantity = Number(document.querySelector(`[name="bag-item-quantity-${item.id}"]`)?.value || 0); if (total) total.textContent = String(goal * quantity); });
