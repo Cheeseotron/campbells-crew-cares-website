@@ -422,6 +422,14 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .packet-document > span { color: var(--green-dark); font-size: 11px; font-weight: 800; }
 .packet-document strong, .packet-document small { display: block; }
 .packet-document small { margin-top: 3px; color: var(--gray); font-size: 12px; }
+.packet-downloads { display: flex; padding: 16px 20px; align-items: center; gap: 24px; }
+.packet-downloads > div:first-child { flex: 0 0 205px; }
+.packet-downloads > div:first-child .eyebrow,
+.packet-downloads > div:first-child p:not(.eyebrow) { display: none; }
+.packet-downloads > div:first-child h2 { margin: 0; font-size: 19px; line-height: 1.15; }
+.packet-downloads .packet-document-list { flex: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.packet-downloads .packet-document { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; min-height: 62px; padding: 10px 12px; }
+.packet-downloads .packet-document small { display: none; }
 .packet-profile h2, .packet-rules h2 { margin-bottom: 5px; }
 .packet-profile__reference { margin-top: 0; color: var(--gray); font-weight: 700; }
 .packet-profile h3 { margin: 22px 0 9px; font-size: 15px; }
@@ -629,6 +637,9 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
   .directory-card summary, .checkin-row, .report-row, .user-row { grid-template-columns: 1fr; }
   .application-row > div:last-child { justify-items: start; }
   .template-panel { grid-template-columns: 1fr; }
+  .packet-downloads { display: grid; gap: 14px; }
+  .packet-downloads > div:first-child { flex: auto; }
+  .packet-downloads .packet-document-list { grid-template-columns: 1fr; }
   .guide-items { grid-template-columns: 1fr 1fr; }
   .email-card { grid-template-columns: auto 1fr; }
   .email-card .button { grid-column: 2; }
