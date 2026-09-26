@@ -415,8 +415,10 @@ function drawRulesOverlay(page, event, font, bold) {
     draw("CLOTHING-ONLY EVENT - NO TOYS OR ACCESSORIES", 58, 592, 10.8, { bold: true, maxWidth: 480 });
     draw("This event is restricted to clothing only. Do not purchase toys or accessories. Purchase only clothes from the categories listed on the child's information sheet.", 58, 576, 8.6, { maxWidth: 494 });
   }
-  page.drawRectangle({ x: 42, y: 310, width: 255, height: 64, color: pale, borderColor: line, borderWidth: .8 });
-  page.drawRectangle({ x: 54, y: 340, width: 28, height: 22, color: green });
+  // Match the static guidance cards: this event-specific card is drawn at
+  // runtime, so it needs its own rounded outer and number treatments.
+  page.drawSvgPath("M4 0 L251 0 C253.2 0 255 1.8 255 4 L255 60 C255 62.2 253.2 64 251 64 L4 64 C1.8 64 0 62.2 0 60 L0 4 C0 1.8 1.8 0 4 0 Z", { x: 42, y: 310, color: pale, borderColor: line, borderWidth: .8 });
+  page.drawSvgPath("M3 0 L25 0 C26.7 0 28 1.3 28 3 L28 19 C28 20.7 26.7 22 25 22 L3 22 C1.3 22 0 20.7 0 19 L0 3 C0 1.3 1.3 0 3 0 Z", { x: 54, y: 340, color: green });
   draw("03", 61, 347, 8, { bold: true, color: rgb(1, 1, 1) });
   if (bra) {
     draw("Bras are limited and specific", 92, 361, 10, { bold: true, maxWidth: 190 });
