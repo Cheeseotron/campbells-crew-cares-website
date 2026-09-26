@@ -605,7 +605,10 @@ async function registerVolunteerDirectory(env, input) {
 }
 
 async function sendVolunteerDirectoryConfirmation(env, recipient, name) {
-  await sendEmail(env, recipient, "You're in the Campbell's Crew Volunteer Directory", `Hi ${emailLine(name)},\n\nThanks for joining the Campbell's Crew Cares Volunteer Directory.\n\nWe will email you whenever future volunteer spots open. You can also find new opportunities right here on the Campbell's Crew website.\n\nWe look forward to having you on the crew.`);
+  const event = await env.DB.prepare("SELECT title, event_date, settings_json FROM events ORDER BY updated_at DESC LIMIT 1").first();
+  const fallback = { subject: "You're in the Campbell's Crew Volunteer Directory", body: "Hi {{name}},\n\nThanks for joining the Campbell's Crew Cares Volunteer Directory.\n\nWe will email you whenever future volunteer spots open. You can also find new opportunities right here on the Campbell's Crew website.\n\nWe look forward to having you on the crew." };
+  const message = event ? eventEmailTemplate(event, "directory-confirm", fallback, { name }) : { subject: fallback.subject, body: fallback.body.replace("{{name}}", emailLine(name)) };
+  if (message) await sendEmail(env, recipient, message.subject, message.body);
 }
 
 async function registerVolunteer(env, input, codeGranted = false) {
