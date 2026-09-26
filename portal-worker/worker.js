@@ -319,8 +319,8 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
     [["UNDERWEAR", values.underwear], ["SOCKS", values.socks], ["COAT / JACKET", values.coat]].forEach(([label, item], index) => drawSizeCell(label, item, columns[index], sizeBottom, columns[index + 1] - columns[index]));
   }
   // Preferences are redrawn to remove the template's inset left/right edges.
-  page.drawRectangle({ x: left, y: 317, width, height: 91, color: paper, borderColor: border, borderWidth: .55 });
-  page.drawLine({ start: { x: 305, y: 317 }, end: { x: 305, y: 408 }, thickness: .55, color: border });
+  page.drawRectangle({ x: left, y: 330, width, height: 78, color: paper, borderColor: border, borderWidth: .55 });
+  page.drawLine({ start: { x: 305, y: 330 }, end: { x: 305, y: 408 }, thickness: .55, color: border });
   draw("Preferences, likes, colors, and styles", 53, 389, 8, { bold: true });
   draw("Accommodations and helpful notes", 317, 389, 8, { bold: true });
   draw(values.preferences, 53, 365, 7.7, { maxWidth: 240, lineHeight: 10 });
@@ -353,10 +353,23 @@ function drawProfileOverlay(page, values, font, bold, photo = null) {
   const toyBudget = budgetRows.find((item) => item.fixedCap);
   draw(toyBudget ? `TOYS: FIXED $${toyBudget.amount} MAX - NO TRANSFERS` : "Remaining: $_______", 397, 93, toyBudget ? 6.4 : 7.2, { bold: true, maxWidth: 150 });
   columns.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: 88 }, end: { x, y: 270 }, thickness: .45, color: border }));
-  draw("Before checkout: complete the checklist on the Volunteer Quick Guide.", 52, 66, 7.2, { bold: true, color: rgb(0.03, 0.47, 0.23), maxWidth: 420 });
-  // Keep the event date in the existing footer row. This replaces both the
-  // old generic label and the first attempt's extra line above the footer.
-  clear(41, 24, 260, 50, paper);
+  // Keep the closeout checklist on the child's own sheet, right below the
+  // spending tracker where it is most useful at the register.
+  clear(41, 24, 529, 62, paper);
+  draw("BEFORE CHECKOUT CHECKLIST", 52, 77, 6.3, { bold: true, color: rgb(0.03, 0.47, 0.23) });
+  const checkoutItems = [
+    "Categories fulfilled",
+    "Within a few dollars of total",
+    "Sizes appropriate and modest",
+    "No non-essential items",
+    ...(toyBudget ? ["Toy limit not exceeded"] : []),
+    "CCC questions cleared"
+  ];
+  checkoutItems.forEach((item, index) => {
+    const column = index % 3; const row = Math.floor(index / 3); const x = 52 + column * 169; const y = 66 - row * 10;
+    page.drawRectangle({ x, y: y - 1, width: 5.5, height: 5.5, borderColor: muted, borderWidth: .5 });
+    draw(item, x + 9, y, 5.3, { maxWidth: 153 });
+  });
   page.drawLine({ start: { x: 41, y: 49 }, end: { x: 570, y: 49 }, thickness: .55, color: border });
   draw(`Event date: ${values.eventDate}`, 41, 34, 7.5, { muted: true });
 }
@@ -384,8 +397,8 @@ function drawRulesOverlay(page, event, font, bold) {
     draw("Bras are limited and specific", 92, 361, 10, { bold: true, maxWidth: 190 });
     draw("Bras are only for Girls/Women who truly need them, and only when both a bra size and bra budget are printed. Otherwise, they are not approved.", 92, 345, 6.9, { maxWidth: 190 });
   } else {
-    draw("Bras are not approved", 92, 361, 10, { bold: true, maxWidth: 190 });
-    draw("Do not purchase bras for this event. Only the clothing categories and items printed on the child's information sheet are permitted.", 92, 345, 6.9, { maxWidth: 190 });
+    draw("Essential clothing only", 92, 361, 10, { bold: true, maxWidth: 190 });
+    draw("Shirts, pants, socks, underwear, shoes, and other printed categories are permitted. If a category is not shown on the child's sheet, it is not allowed for this event.", 92, 345, 6.5, { maxWidth: 190 });
   }
   // Replace the generic closeout sentence with a practical, event-aware
   // checklist. The toy confirmation exists only when toys are enabled.
