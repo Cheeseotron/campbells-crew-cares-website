@@ -147,6 +147,14 @@ async function servePortalAsset(request, env, url) {
   return new Response(asset.body, { status: asset.status, headers });
 }
 
+function publicStoryPhotos(event, story) {
+  const photos = Array.isArray(story?.photos) ? story.photos.slice(0, 12) : [];
+  return photos.map((photo, index) => (typeof photo?.key === "string" && photo.key.startsWith(`public-event-stories/${event.id}/`)) ? {
+    url: `/portal-api/public/event-stories/${encodeURIComponent(event.id)}/photos/${index}`,
+    alt: String(photo.alt || event.title || "Campbell's Crew Cares event photo").slice(0, 220)
+  } : null).filter(Boolean);
+}
+
 function pdfSafeText(value) {
   return String(value || "").normalize("NFKD").replace(/[^\x20-\x7E]/g, "").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)").trim();
 }
@@ -917,8 +925,21 @@ async function api(request, env, url, user) {
   if (url.pathname === "/portal-api/public/events" && request.method === "GET") return json({ events: await activeEvents(env), mode: env.PORTAL_MODE || "closed" });
   if (url.pathname === "/portal-api/public/event-stories" && request.method === "GET") {
     const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date, settings_json FROM events WHERE status = 'closed' ORDER BY event_date DESC").all();
-    const stories = results.map((event) => { let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {} const story = settings.publicStory || {}; const closeout = settings.closeout || {}; return { id: event.id, title: story.title || event.title, recap: story.recap || "", eventDate: event.event_date || settings.date || "", eventType: event.event_type, outcome: event.event_type === "food_bag" ? Number(closeout.bagsMade || 0) : Number(closeout.childrenAttended || 0), published: story.published === true }; }).filter((story) => story.published);
+    const stories = results.map((event) => { let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {} const story = settings.publicStory || {}; const closeout = settings.closeout || {}; return { id: event.id, title: story.title || event.title, recap: story.recap || "", eventDate: event.event_date || settings.date || "", eventType: event.event_type, outcome: event.event_type === "food_bag" ? Number(closeout.bagsMade || 0) : Number(closeout.childrenAttended || 0), photos: publicStoryPhotos(event, story), published: story.published === true }; }).filter((story) => story.published);
     return json({ stories });
+  }
+  const publicStoryPhotoMatch = url.pathname.match(/^\/portal-api\/public\/event-stories\/([^/]+)\/photos\/(\d+)$/);
+  if (publicStoryPhotoMatch && request.method === "GET") {
+    const event = await env.DB.prepare("SELECT id, title, status, settings_json FROM events WHERE id = ? AND status = 'closed'").bind(publicStoryPhotoMatch[1]).first();
+    if (!event) return json({ error: "Photo not found." }, 404);
+    let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {}
+    if (settings.publicStory?.published !== true) return json({ error: "Photo not found." }, 404);
+    const index = Number(publicStoryPhotoMatch[2]);
+    const key = settings.publicStory?.photos?.[index]?.key;
+    if (typeof key !== "string" || !key.startsWith(`public-event-stories/${event.id}/`)) return json({ error: "Photo not found." }, 404);
+    const object = await env.PRIVATE_UPLOADS.get(key);
+    if (!object) return json({ error: "Photo not found." }, 404);
+    return new Response(object.body, { headers: { "Content-Type": object.httpMetadata?.contentType || "image/jpeg", "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" } });
   }
   if (url.pathname === "/portal-api/public/impact" && request.method === "GET") {
     const impact = await env.DB.prepare("SELECT families_minimum, children_minimum, people_fed_minimum, years_serving FROM public_impact WHERE id = 1").first();
@@ -1011,19 +1032,41 @@ async function api(request, env, url, user) {
       notes: String(input.notes || "").trim().slice(0, 5000), closedAt: settings.closeout?.closedAt || new Date().toISOString(), updatedAt: new Date().toISOString()
     };
     settings.closeout = closeout; settings.closed = true; settings.volunteerStatus = "closed"; settings.recipientStatus = "closed";
-    if (!settings.publicStory) settings.publicStory = { title: existing.title, recap: "", published: false, updatedAt: new Date().toISOString() };
+    if (!settings.publicStory) settings.publicStory = { title: existing.title, recap: "", photos: [], published: false, updatedAt: new Date().toISOString() };
     await env.DB.prepare("UPDATE events SET status = 'closed', settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(JSON.stringify(settings), existing.id).run();
     await audit(env, user, existing.settings_json?.includes('"closeout"') ? "event_closeout_updated" : "event_closed", "event", existing.id, existing.id);
     return json({ report: { id: existing.id, event: existing.title, eventDate: existing.event_date || settings.date || "", eventType: closeout.eventType, status: "Closed out", ...closeout } });
   }
 
   const eventStoryMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)\/public-story$/);
+  const eventStoryPhotoMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)\/public-story\/photos$/);
+  if (eventStoryPhotoMatch && request.method === "POST") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Executive Owner or Event Administrator permission required." }, 403);
+    const input = await request.json(); const existing = await env.DB.prepare("SELECT id, title, settings_json FROM events WHERE id = ? AND status = 'closed'").bind(eventStoryPhotoMatch[1]).first();
+    if (!existing) return json({ error: "Completed event not found." }, 404);
+    const photo = photoFromDataUrl(input.photoDataUrl);
+    if (!photo) return json({ error: "Please choose a JPG or PNG photo smaller than 1 MB." }, 400);
+    let settings = {}; try { settings = JSON.parse(existing.settings_json || "{}"); } catch {}
+    const story = settings.publicStory || { title: existing.title, recap: "", published: false };
+    const photos = Array.isArray(story.photos) ? story.photos.slice(0, 12) : [];
+    if (photos.length >= 12) return json({ error: "An event story can include up to 12 photos." }, 400);
+    const extension = photo.contentType === "image/png" ? "png" : photo.contentType === "image/webp" ? "webp" : "jpg";
+    const key = `public-event-stories/${existing.id}/${randomId("photo")}.${extension}`;
+    await env.PRIVATE_UPLOADS.put(key, photo.bytes, { httpMetadata: { contentType: photo.contentType }, customMetadata: { eventId: existing.id, visibility: "public-story" } });
+    story.photos = [...photos, { key, alt: String(input.alt || existing.title).trim().slice(0, 220) }]; story.updatedAt = new Date().toISOString(); settings.publicStory = story;
+    await env.DB.prepare("UPDATE events SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(JSON.stringify(settings), existing.id).run();
+    await audit(env, user, "public_event_story_photo_added", "event", existing.id, existing.id);
+    return json({ story });
+  }
   if (eventStoryMatch && request.method === "PUT") {
     if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Executive Owner or Event Administrator permission required." }, 403);
     const input = await request.json(); const existing = await env.DB.prepare("SELECT id, title, settings_json FROM events WHERE id = ? AND status = 'closed'").bind(eventStoryMatch[1]).first();
     if (!existing) return json({ error: "Completed event not found." }, 404);
     let settings = {}; try { settings = JSON.parse(existing.settings_json || "{}"); } catch {}
-    settings.publicStory = { title: String(input.title || existing.title).trim().slice(0, 160), recap: String(input.recap || "").trim().slice(0, 2000), published: input.published === true, updatedAt: new Date().toISOString() };
+    const currentStory = settings.publicStory || {};
+    const photos = Array.isArray(currentStory.photos) ? currentStory.photos.slice(0, 12) : [];
+    if (input.published === true && !photos.length) return json({ error: "Add at least one event photo before publishing this story." }, 400);
+    settings.publicStory = { title: String(input.title || existing.title).trim().slice(0, 160), recap: String(input.recap || "").trim().slice(0, 2000), photos, published: input.published === true, updatedAt: new Date().toISOString() };
     await env.DB.prepare("UPDATE events SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(JSON.stringify(settings), existing.id).run();
     await audit(env, user, settings.publicStory.published ? "public_event_story_published" : "public_event_story_saved", "event", existing.id, existing.id);
     return json({ story: settings.publicStory });
@@ -1059,7 +1102,7 @@ async function api(request, env, url, user) {
 
   if (eventMatch && request.method === "DELETE") {
     if (!user || !OWNER_ROLES.has(user.role)) return json({ error: "Only the Executive Owner account can delete an event." }, 403);
-    const existing = await env.DB.prepare("SELECT id, title FROM events WHERE id = ?").bind(eventMatch[1]).first();
+    const existing = await env.DB.prepare("SELECT id, title, settings_json FROM events WHERE id = ?").bind(eventMatch[1]).first();
     if (!existing) return json({ error: "Event not found." }, 404);
     const { results: children } = await env.DB.prepare("SELECT c.photo_key FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id WHERE h.event_id = ?").bind(existing.id).all();
     await audit(env, user, "event_deleted", "event", existing.id, existing.id, { title: existing.title });
@@ -1071,7 +1114,9 @@ async function api(request, env, url, user) {
       env.DB.prepare("UPDATE audit_log SET event_id = NULL WHERE event_id = ?").bind(existing.id),
       env.DB.prepare("DELETE FROM events WHERE id = ?").bind(existing.id)
     ]);
-    await Promise.all(children.filter((child) => child.photo_key).map((child) => env.PRIVATE_UPLOADS.delete(child.photo_key)));
+    let settings = {}; try { settings = JSON.parse(existing.settings_json || "{}"); } catch {}
+    const storyPhotos = Array.isArray(settings.publicStory?.photos) ? settings.publicStory.photos : [];
+    await Promise.all([...children.filter((child) => child.photo_key).map((child) => child.photo_key), ...storyPhotos.map((photo) => photo?.key).filter(Boolean)].map((key) => env.PRIVATE_UPLOADS.delete(key)));
     return json({ id: existing.id });
   }
 
