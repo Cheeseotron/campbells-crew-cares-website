@@ -925,7 +925,7 @@ async function api(request, env, url, user) {
   if (url.pathname === "/portal-api/public/events" && request.method === "GET") return json({ events: await activeEvents(env), mode: env.PORTAL_MODE || "closed" });
   if (url.pathname === "/portal-api/public/event-stories" && request.method === "GET") {
     const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date, settings_json FROM events WHERE status = 'closed' ORDER BY event_date DESC").all();
-    const stories = results.map((event) => { let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {} const story = settings.publicStory || {}; const closeout = settings.closeout || {}; return { id: event.id, title: story.title || event.title, recap: story.recap || "", eventDate: event.event_date || settings.date || "", eventType: event.event_type, outcome: event.event_type === "food_bag" ? Number(closeout.bagsMade || 0) : Number(closeout.childrenAttended || 0), photos: publicStoryPhotos(event, story), published: story.published === true }; }).filter((story) => story.published);
+    const stories = results.map((event) => { let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {} const story = settings.publicStory || {}; const closeout = settings.closeout || {}; const outcome = event.event_type === "food_bag" ? Number(closeout.bagsMade || 0) : Number(closeout.childrenAttended || 0); return { id: event.id, title: story.title || event.title, recap: story.recap || "", impactLine: String(story.impactLine || (event.event_type === "food_bag" ? `${outcome.toLocaleString()} food bags prepared` : `${outcome.toLocaleString()} children supported`)).slice(0, 180), eventDate: event.event_date || settings.date || "", eventType: event.event_type, outcome, photos: publicStoryPhotos(event, story), published: story.published === true }; }).filter((story) => story.published);
     return json({ stories });
   }
   const publicStoryPhotoMatch = url.pathname.match(/^\/portal-api\/public\/event-stories\/([^/]+)\/photos\/(\d+)$/);
@@ -1032,7 +1032,7 @@ async function api(request, env, url, user) {
       notes: String(input.notes || "").trim().slice(0, 5000), closedAt: settings.closeout?.closedAt || new Date().toISOString(), updatedAt: new Date().toISOString()
     };
     settings.closeout = closeout; settings.closed = true; settings.volunteerStatus = "closed"; settings.recipientStatus = "closed";
-    if (!settings.publicStory) settings.publicStory = { title: existing.title, recap: "", photos: [], published: false, updatedAt: new Date().toISOString() };
+    if (!settings.publicStory) settings.publicStory = { title: existing.title, recap: "", impactLine: "", photos: [], published: false, updatedAt: new Date().toISOString() };
     await env.DB.prepare("UPDATE events SET status = 'closed', settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(JSON.stringify(settings), existing.id).run();
     await audit(env, user, existing.settings_json?.includes('"closeout"') ? "event_closeout_updated" : "event_closed", "event", existing.id, existing.id);
     return json({ report: { id: existing.id, event: existing.title, eventDate: existing.event_date || settings.date || "", eventType: closeout.eventType, status: "Closed out", ...closeout } });
@@ -1047,7 +1047,7 @@ async function api(request, env, url, user) {
     const photo = photoFromDataUrl(input.photoDataUrl);
     if (!photo) return json({ error: "Please choose a JPG or PNG photo smaller than 1 MB." }, 400);
     let settings = {}; try { settings = JSON.parse(existing.settings_json || "{}"); } catch {}
-    const story = settings.publicStory || { title: existing.title, recap: "", published: false };
+    const story = settings.publicStory || { title: existing.title, recap: "", impactLine: "", published: false };
     const photos = Array.isArray(story.photos) ? story.photos.slice(0, 12) : [];
     if (photos.length >= 12) return json({ error: "An event story can include up to 12 photos." }, 400);
     const extension = photo.contentType === "image/png" ? "png" : photo.contentType === "image/webp" ? "webp" : "jpg";
@@ -1066,7 +1066,7 @@ async function api(request, env, url, user) {
     const currentStory = settings.publicStory || {};
     const photos = Array.isArray(currentStory.photos) ? currentStory.photos.slice(0, 12) : [];
     if (input.published === true && !photos.length) return json({ error: "Add at least one event photo before publishing this story." }, 400);
-    settings.publicStory = { title: String(input.title || existing.title).trim().slice(0, 160), recap: String(input.recap || "").trim().slice(0, 2000), photos, published: input.published === true, updatedAt: new Date().toISOString() };
+    settings.publicStory = { title: String(input.title || existing.title).trim().slice(0, 160), recap: String(input.recap || "").trim().slice(0, 2000), impactLine: String(input.impactLine || "").trim().slice(0, 180), photos, published: input.published === true, updatedAt: new Date().toISOString() };
     await env.DB.prepare("UPDATE events SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(JSON.stringify(settings), existing.id).run();
     await audit(env, user, settings.publicStory.published ? "public_event_story_published" : "public_event_story_saved", "event", existing.id, existing.id);
     return json({ story: settings.publicStory });

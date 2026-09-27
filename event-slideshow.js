@@ -24,7 +24,7 @@ function storyYear(value) {
 }
 
 function impactLine(story) {
-  return story.eventType === 'food_bag' ? `${Number(story.outcome || 0).toLocaleString()} food bags prepared` : `${Number(story.outcome || 0).toLocaleString()} children supported`;
+  return story.impactLine || (story.eventType === 'food_bag' ? `${Number(story.outcome || 0).toLocaleString()} food bags prepared` : `${Number(story.outcome || 0).toLocaleString()} children supported`);
 }
 
 function showFeaturedStory(story) {
