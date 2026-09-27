@@ -1040,6 +1040,18 @@ async function api(request, env, url, user) {
 
   const eventStoryMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)\/public-story$/);
   const eventStoryPhotoMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)\/public-story\/photos$/);
+  const organizerStoryPhotoMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)\/public-story\/photos\/(\d+)$/);
+  if (organizerStoryPhotoMatch && request.method === "GET") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Executive Owner or Event Administrator permission required." }, 403);
+    const event = await env.DB.prepare("SELECT id, settings_json FROM events WHERE id = ? AND status = 'closed'").bind(organizerStoryPhotoMatch[1]).first();
+    if (!event) return json({ error: "Photo not found." }, 404);
+    let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {}
+    const key = settings.publicStory?.photos?.[Number(organizerStoryPhotoMatch[2])]?.key;
+    if (typeof key !== "string" || !key.startsWith(`public-event-stories/${event.id}/`)) return json({ error: "Photo not found." }, 404);
+    const object = await env.PRIVATE_UPLOADS.get(key);
+    if (!object) return json({ error: "Photo not found." }, 404);
+    return new Response(object.body, { headers: securityHeaders(new Headers({ "Content-Type": object.httpMetadata?.contentType || "image/jpeg" })) });
+  }
   if (eventStoryPhotoMatch && request.method === "POST") {
     if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Executive Owner or Event Administrator permission required." }, 403);
     const input = await request.json(); const existing = await env.DB.prepare("SELECT id, title, settings_json FROM events WHERE id = ? AND status = 'closed'").bind(eventStoryPhotoMatch[1]).first();

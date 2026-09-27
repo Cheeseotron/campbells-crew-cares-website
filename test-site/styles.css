@@ -548,6 +548,10 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .detail-item { padding: 14px; background: var(--mist-2); }
 .detail-item span { display: block; margin-bottom: 5px; color: var(--gray); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+.story-photo-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; }
+.story-photo-list img { width: 74px; height: 58px; object-fit: cover; border: 1px solid var(--line); background: var(--mist-2); }
+.story-photo-add { min-width: 112px; }
+.story-photo-add.is-plus { min-width: 58px; width: 58px; font-size: 24px; line-height: 1; }
 .toast-region { position: fixed; z-index: 1000; right: 22px; bottom: 84px; display: grid; gap: 10px; width: min(360px, calc(100% - 44px)); }
 .toast { padding: 16px 18px; color: var(--white); background: var(--ink); border-left: 5px solid var(--green); box-shadow: var(--shadow); font-size: 13px; line-height: 1.45; animation: toast-in .2s ease-out; }
 @keyframes toast-in { from { transform: translateY(12px); opacity: 0; } }
