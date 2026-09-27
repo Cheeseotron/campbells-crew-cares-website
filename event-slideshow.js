@@ -44,8 +44,10 @@ document.querySelectorAll('[data-event-slideshow]').forEach((slideshow) => {
     stories.slice().reverse().forEach((story) => {
       const article = document.createElement('article');
       article.className = 'archive-event';
-      const date = story.eventDate ? new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${story.eventDate}T00:00:00Z`)) : '';
-      const year = story.eventDate ? new Date(`${story.eventDate}T00:00:00Z`).getUTCFullYear() : 'Recent';
+      const parsedDate = new Date(story.eventDate);
+      const validDate = !Number.isNaN(parsedDate.getTime());
+      const date = validDate ? new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }).format(parsedDate) : String(story.eventDate || '');
+      const year = validDate ? parsedDate.getUTCFullYear() : (String(story.eventDate || '').match(/\d{4}/)?.[0] || 'Recent');
       const impact = story.eventType === 'food_bag' ? `${Number(story.outcome || 0).toLocaleString()} food bags prepared` : `${Number(story.outcome || 0).toLocaleString()} children supported`;
       article.innerHTML = `<div class="archive-event__year">${year}</div><div class="archive-event__copy"><p class="eyebrow">${impact}</p><h3></h3><p></p><small></small></div>`;
       article.querySelector('h3').textContent = story.title;
