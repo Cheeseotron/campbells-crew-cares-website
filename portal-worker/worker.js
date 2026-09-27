@@ -915,6 +915,11 @@ async function audit(env, actor, action, targetType, targetId, eventId = null, m
 async function api(request, env, url, user) {
   if (url.pathname === "/portal-api/health") return json({ ready: true, mode: env.PORTAL_MODE || "closed", emailDelivery: "not_configured" });
   if (url.pathname === "/portal-api/public/events" && request.method === "GET") return json({ events: await activeEvents(env), mode: env.PORTAL_MODE || "closed" });
+  if (url.pathname === "/portal-api/public/event-stories" && request.method === "GET") {
+    const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date, settings_json FROM events WHERE status = 'closed' ORDER BY event_date DESC").all();
+    const stories = results.map((event) => { let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {} const story = settings.publicStory || {}; const closeout = settings.closeout || {}; return { id: event.id, title: story.title || event.title, recap: story.recap || "", eventDate: event.event_date || settings.date || "", eventType: event.event_type, outcome: event.event_type === "food_bag" ? Number(closeout.bagsMade || 0) : Number(closeout.childrenAttended || 0), published: story.published === true }; }).filter((story) => story.published);
+    return json({ stories });
+  }
   if (url.pathname === "/portal-api/public/impact" && request.method === "GET") {
     const impact = await env.DB.prepare("SELECT families_minimum, children_minimum, people_fed_minimum, years_serving FROM public_impact WHERE id = 1").first();
     return json({ impact: impact || { families_minimum: 0, children_minimum: 0, people_fed_minimum: 0, years_serving: 9 } });
@@ -1006,9 +1011,22 @@ async function api(request, env, url, user) {
       notes: String(input.notes || "").trim().slice(0, 5000), closedAt: settings.closeout?.closedAt || new Date().toISOString(), updatedAt: new Date().toISOString()
     };
     settings.closeout = closeout; settings.closed = true; settings.volunteerStatus = "closed"; settings.recipientStatus = "closed";
+    if (!settings.publicStory) settings.publicStory = { title: existing.title, recap: "", published: false, updatedAt: new Date().toISOString() };
     await env.DB.prepare("UPDATE events SET status = 'closed', settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(JSON.stringify(settings), existing.id).run();
     await audit(env, user, existing.settings_json?.includes('"closeout"') ? "event_closeout_updated" : "event_closed", "event", existing.id, existing.id);
     return json({ report: { id: existing.id, event: existing.title, eventDate: existing.event_date || settings.date || "", eventType: closeout.eventType, status: "Closed out", ...closeout } });
+  }
+
+  const eventStoryMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)\/public-story$/);
+  if (eventStoryMatch && request.method === "PUT") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Executive Owner or Event Administrator permission required." }, 403);
+    const input = await request.json(); const existing = await env.DB.prepare("SELECT id, title, settings_json FROM events WHERE id = ? AND status = 'closed'").bind(eventStoryMatch[1]).first();
+    if (!existing) return json({ error: "Completed event not found." }, 404);
+    let settings = {}; try { settings = JSON.parse(existing.settings_json || "{}"); } catch {}
+    settings.publicStory = { title: String(input.title || existing.title).trim().slice(0, 160), recap: String(input.recap || "").trim().slice(0, 2000), published: input.published === true, updatedAt: new Date().toISOString() };
+    await env.DB.prepare("UPDATE events SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(JSON.stringify(settings), existing.id).run();
+    await audit(env, user, settings.publicStory.published ? "public_event_story_published" : "public_event_story_saved", "event", existing.id, existing.id);
+    return json({ story: settings.publicStory });
   }
 
   const eventReopenMatch = url.pathname.match(/^\/portal-api\/events\/([^/]+)\/reopen$/);
@@ -1227,7 +1245,7 @@ async function api(request, env, url, user) {
   if (url.pathname === "/portal-api/organizer/reports" && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
     const { results } = await env.DB.prepare("SELECT e.id, e.title, e.event_type, e.event_date, e.status, e.settings_json, COUNT(DISTINCT s.id) AS volunteer_count, COUNT(DISTINCT CASE WHEN s.status = 'checked_in' THEN s.id END) AS checkedin_volunteer_count, COUNT(DISTINCT h.id) AS household_count, COUNT(DISTINCT c.id) AS child_count FROM events e LEFT JOIN volunteer_signups s ON s.event_id = e.id LEFT JOIN recipient_households h ON h.event_id = e.id LEFT JOIN recipient_children c ON c.household_id = h.id WHERE e.status = 'closed' GROUP BY e.id ORDER BY e.event_date DESC").all();
-    return json({ reports: results.map((event) => { let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {} const hasSavedCloseout = Object.prototype.hasOwnProperty.call(settings, "closeout"); const closeout = settings.closeout || {}; return { id: event.id, event: event.title, eventDate: event.event_date || settings.date || "", eventType: event.event_type === "food_bag" ? "food-bag" : "shopping", status: "Closed out", bagsPlanned: Number(hasSavedCloseout ? closeout.bagsPlanned ?? 0 : settings.bagGoal ?? 0), bagsMade: Number(closeout.bagsMade ?? 0), childrenRegistered: Number(hasSavedCloseout ? closeout.childrenRegistered ?? 0 : event.child_count ?? 0), childrenAttended: Number(closeout.childrenAttended ?? 0), volunteersRegistered: Number(hasSavedCloseout ? closeout.volunteersRegistered ?? 0 : event.volunteer_count ?? 0), volunteersAttended: Number(hasSavedCloseout ? closeout.volunteersAttended ?? 0 : event.checkedin_volunteer_count ?? 0), volunteerHours: Number(closeout.volunteerHours ?? 0), totalSpent: Number(closeout.totalSpent ?? 0), notes: String(closeout.notes || ""), closedAt: closeout.closedAt || event.updated_at || "" }; }) });
+    return json({ reports: results.map((event) => { let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {} const hasSavedCloseout = Object.prototype.hasOwnProperty.call(settings, "closeout"); const closeout = settings.closeout || {}; return { id: event.id, event: event.title, eventDate: event.event_date || settings.date || "", eventType: event.event_type === "food_bag" ? "food-bag" : "shopping", status: "Closed out", publicStory: settings.publicStory || null, bagsPlanned: Number(hasSavedCloseout ? closeout.bagsPlanned ?? 0 : settings.bagGoal ?? 0), bagsMade: Number(closeout.bagsMade ?? 0), childrenRegistered: Number(hasSavedCloseout ? closeout.childrenRegistered ?? 0 : event.child_count ?? 0), childrenAttended: Number(closeout.childrenAttended ?? 0), volunteersRegistered: Number(hasSavedCloseout ? closeout.volunteersRegistered ?? 0 : event.volunteer_count ?? 0), volunteersAttended: Number(hasSavedCloseout ? closeout.volunteersAttended ?? 0 : event.checkedin_volunteer_count ?? 0), volunteerHours: Number(closeout.volunteerHours ?? 0), totalSpent: Number(closeout.totalSpent ?? 0), notes: String(closeout.notes || ""), closedAt: closeout.closedAt || event.updated_at || "" }; }) });
   }
 
   if (url.pathname === "/portal-api/organizer/users" && request.method === "GET") {
