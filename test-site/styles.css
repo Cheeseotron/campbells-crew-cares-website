@@ -758,7 +758,7 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-section-heading p { margin:0; color:var(--muted); }
 .badge-grid--volunteers { grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); }
 .badge-card--volunteer { --badge-background:linear-gradient(125deg,rgba(43,214,43,.18),rgba(43,214,43,0) 48%),radial-gradient(circle,rgba(23,107,57,.11) 0 1.15px,transparent 1.45px),#fbfefb; position:relative; isolation:isolate; overflow:hidden; width:min(100%, var(--volunteer-badge-width, 330px)); min-height:0; aspect-ratio:var(--volunteer-badge-ratio, 3.375 / 2.333); padding:20px 24px 17px; flex-direction:row; justify-content:flex-start; text-align:left; gap:18px; border:0; background:var(--badge-background); background-size:auto,15px 15px,auto; box-shadow:none; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-.badge-topbar { position:absolute!important; z-index:4!important; top:0; right:0; left:0; height:20px; overflow:hidden; pointer-events:none; }
+.badge-topbar { position:absolute!important; z-index:4!important; top:0; right:0; left:0; height:28px; overflow:hidden; pointer-events:none; }
 .badge-topbar i { position:absolute; top:0; bottom:0; display:block; }
 .badge-topbar i:first-child { left:0; width:62%; background:#2bd62b; }
 .badge-topbar i:last-child { right:0; width:38%; background:#111821; }
