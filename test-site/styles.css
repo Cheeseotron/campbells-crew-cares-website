@@ -831,7 +831,7 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   /* Child inserts are trimmed by hand, so each card gets a visible guide at
      its true edge. This sits above the bleed background without changing any
      measured card dimensions or the page layout. */
-  body[data-print-badge][data-print-badge-group="children"] .badge-card--recipient::after { content:""; position:absolute; z-index:3; inset:0; border:1px solid #111821; pointer-events:none; }
+  body[data-print-badge][data-print-badge-group="children"] .badge-card--recipient::after { content:""; position:absolute; z-index:3; inset:0; border:1px solid #111821; transform:translate(-.05in,-.05in); pointer-events:none; }
   body[data-print-badge] .badge-card--volunteer { width:var(--volunteer-badge-width, 3.375in); height:var(--volunteer-badge-height, 2.333in); aspect-ratio:auto; margin:0; }
   body[data-print-badge][data-volunteer-badge-size="horizontal-35"] .badge-card--volunteer { width:3.5in; height:2.25in; }
   body[data-print-badge] .badge-card--recipient { width:var(--child-badge-width, 3in); height:var(--child-badge-height, 4in); aspect-ratio:auto; margin:0; break-after:auto; }
