@@ -739,6 +739,8 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .upcoming-status { display:flex; flex-direction:column; align-items:flex-end; gap:12px; min-width:260px; }
 .directory-actions { display:flex; justify-content:flex-end; margin:-8px 0 16px; }
 .heading-actions { display:flex; justify-content:flex-end; align-items:center; gap:10px; flex-wrap:wrap; }
+.badge-section-actions { align-items:end; }
+.badge-section-actions .field { min-width:280px; max-width:430px; }
 .email-sender { display:grid; grid-template-columns:2fr 1fr; gap:30px; border-left:6px solid var(--green); }
 .badge-settings { display:grid; grid-template-columns:minmax(260px,1fr) minmax(260px,1fr); align-items:end; gap:18px 28px; }
 .badge-settings .field { min-width:280px; }
