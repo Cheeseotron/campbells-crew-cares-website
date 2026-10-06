@@ -824,13 +824,18 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
 }
 
 @media print {
-  body[data-print-badge] .badge-settings, body[data-print-badge] .section-title, body[data-print-badge] .badge-section-heading, body[data-print-badge] .badge-size-note { display:none!important; }
+  body[data-print-badge] .badge-settings, body[data-print-badge] .section-title, body[data-print-badge] .badge-section-heading, body[data-print-badge] .badge-print-section__header, body[data-print-badge] .badge-size-note { display:none!important; }
+  body[data-print-badge] .badge-print-section { margin:0; padding:0; border:0; }
   body[data-print-badge] .badge-grid { display:none; }
   body[data-print-badge][data-print-badge-group="volunteers"] .badge-grid--volunteers { display:grid; grid-template-columns:repeat(var(--volunteer-badge-columns, 2), var(--volunteer-badge-width, 3.375in)); gap:.1in; justify-content:center; align-content:start; }
   /* Avery 5395: exact two-column, four-row label geometry.  These are the
      physical start points on the sheet, not generic centering values. */
   body[data-print-badge][data-print-badge-group="volunteers"][data-volunteer-badge-size="avery-8395"] .badge-grid--volunteers { grid-template-columns:repeat(2,3.375in); grid-auto-rows:2.333333in; column-gap:.375in; row-gap:.166667in; justify-content:start; align-content:start; width:8.5in; min-height:11in; padding:.583333in .6875in; }
   body[data-print-badge][data-print-badge-group="children"] .badge-grid--children { display:grid; grid-template-columns:repeat(var(--child-badge-columns, 2), var(--child-badge-width, 3in)); gap:0; justify-content:start; align-content:start; }
+  /* Avery 8471: 10 perforated business cards in a 2 × 5 grid. The physical
+     card slots begin .75in from the left and .5in from the top of US Letter. */
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-grid--children,
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-grid--children { grid-template-columns:repeat(2,3.5in); grid-auto-rows:2in; gap:0; justify-content:start; align-content:start; width:8.5in; min-height:11in; padding:.5in .75in; }
   body[data-print-badge] .badge-card { display:none; break-inside:avoid; box-sizing:border-box; }
   body[data-print-badge] .badge-card.is-badge-print-target, body[data-print-badge] .badge-card.badge-print-copy { display:flex; }
   /* Give Avery sheets a small visual bleed. The printable background and top
@@ -840,17 +845,25 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   body[data-print-badge] .badge-card--volunteer, body[data-print-badge] .badge-card--recipient { overflow:visible; background:transparent; }
   body[data-print-badge] .badge-card--volunteer::before, body[data-print-badge] .badge-card--recipient::before { content:""; position:absolute; z-index:0; inset:-.05in; background:var(--badge-background); -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   body[data-print-badge] .badge-card--volunteer > *, body[data-print-badge] .badge-card--recipient > * { position:relative; z-index:1; }
+  /* The perforations touch, so 8471 cards use their exact boundaries rather
+     than a bleed that would run into the neighboring card. */
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-card--recipient::before,
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-card--recipient::before { inset:0; }
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-topbar,
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-topbar { top:0; right:0; left:0; }
   /* Child inserts are trimmed by hand, so each card gets a visible guide at
      its true edge. This sits above the bleed background without changing any
      measured card dimensions or the page layout. */
   body[data-print-badge][data-print-badge-group="children"] .badge-card--recipient::after { content:""; position:absolute; z-index:3; inset:0; border-top:1px solid #111821; border-left:1px solid #111821; transform:translate(-.05in,-.05in); pointer-events:none; }
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-card--recipient::after,
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-card--recipient::after { content:none; }
   body[data-print-badge] .badge-card--volunteer { width:var(--volunteer-badge-width, 3.375in); height:var(--volunteer-badge-height, 2.333in); aspect-ratio:auto; margin:0; }
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-card--recipient { width:3.5in; height:2in; aspect-ratio:auto; margin:0; }
+  /* Portrait card art is rotated inside the same 3½ × 2in Avery slot. Once
+     separated, rotate the finished card upright and it is 2 × 3½ inches. */
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:2in; height:3.5in; aspect-ratio:auto; margin:0; justify-self:center; align-self:center; transform:rotate(90deg); transform-origin:center; }
   body[data-print-badge][data-volunteer-badge-size="horizontal-35"] .badge-card--volunteer { width:3.5in; height:2.25in; }
   body[data-print-badge] .badge-card--recipient { width:var(--child-badge-width, 3in); height:var(--child-badge-height, 4in); aspect-ratio:auto; margin:0; break-after:auto; }
-  body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-grid--children { grid-template-columns:repeat(4,2in); gap:0; justify-content:center; align-content:center; width:8.5in; min-height:11in; padding:2in .25in; }
-  body[data-print-badge][data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:2in; height:3.5in; }
-  body[data-print-badge][data-child-badge-size="business-card"] .badge-grid--children { grid-template-columns:repeat(2,3.5in); gap:0; justify-content:center; align-content:center; width:8.5in; min-height:11in; padding:.5in .75in; }
-  body[data-print-badge][data-child-badge-size="avery-8395"] .badge-grid--children { grid-template-columns:repeat(2,3.375in); grid-auto-rows:2.333333in; column-gap:.375in; row-gap:.166667in; justify-content:start; align-content:start; width:8.5in; min-height:11in; padding:.583333in .6875in; }
   body[data-print-badge] .badge-card button { display:none!important; }
   body[data-print-badge] .badge-photo-upload { display:none!important; }
   body[data-print-badge] .badge-topbar { display:flex!important; z-index:4!important; top:-.05in; right:-.05in; left:-.05in; }
