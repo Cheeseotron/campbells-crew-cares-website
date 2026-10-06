@@ -868,7 +868,7 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   /* Avery 8471: both directions are printed on the exact same 2 × 5 card
      template, so they must share one physical registration grid. */
   body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-grid--children,
-  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-grid--children { box-sizing:border-box; grid-template-columns:repeat(2,3.5in); grid-auto-rows:2in; gap:0; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.3in .75in .7in; }
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-grid--children { box-sizing:border-box; grid-template-columns:repeat(2,3.5in); grid-auto-rows:2in; gap:0; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.5in .75in; }
   /* Avery 5395 uses its own eight-label geometry when chosen for children. */
   body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="avery-8395"] .badge-grid--children { box-sizing:border-box; grid-template-columns:repeat(2,3.375in); grid-auto-rows:2.333333in; column-gap:.375in; row-gap:.166667in; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.583333in .6875in; }
   body[data-print-badge][data-print-badge-group="children"] .badge-card-shell { display:none; }
