@@ -1588,7 +1588,11 @@
     const addVolunteer = document.querySelector("[data-add-volunteer]");
     if (addVolunteer) addVolunteer.addEventListener("click", openAddVolunteer);
     configureBadgeFormats();
-    document.querySelectorAll("[data-badge-setting]").forEach((select) => select.addEventListener("change", () => applyBadgeFormat(select.dataset.badgeSetting, select.value)));
+    document.querySelectorAll("[data-badge-setting]").forEach((select) => {
+      const refreshBadgePreview = () => applyBadgeFormat(select.dataset.badgeSetting, select.value);
+      select.addEventListener("change", refreshBadgePreview);
+      select.addEventListener("input", refreshBadgePreview);
+    });
     document.querySelectorAll("[data-badge-photo-upload]").forEach((input) => input.addEventListener("change", async () => {
       const file = input.files?.[0]; if (!file) return;
       const label = input.closest("label"); if (label) label.textContent = "Saving photo…";
@@ -2080,6 +2084,10 @@
     document.body.style.setProperty(`${prefix}ratio`, `${format.width} / ${format.height}`);
     const summary = document.querySelector(kind === "volunteer" ? "#volunteer-size-summary" : "#child-size-summary");
     if (summary) summary.textContent = format.description;
+    if (kind === "child") {
+      const helper = document.querySelector('[data-badge-setting="child"]')?.closest(".field")?.querySelector(".field-help");
+      if (helper) helper.textContent = `${format.description}. The preview and printed sheet now use this format.`;
+    }
   }
 
   function configureBadgeFormats() {

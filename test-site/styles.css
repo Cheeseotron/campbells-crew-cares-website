@@ -808,7 +808,7 @@ body[data-volunteer-badge-size="horizontal-35"] .badge-card--volunteer { aspect-
 body[data-child-badge-size="vertical-225x35"] .badge-card--recipient { width:min(100%,220px); aspect-ratio:2 / 3.5; }
 /* Horizontal cards have their own preview composition.  They cannot inherit
    the portrait logo position: that placed the logo directly over the name. */
-body[data-child-badge-orientation="horizontal"] .badge-card--recipient { width:min(100%, var(--child-badge-width, 330px)); min-height:220px; padding:50px 18px 18px 128px; align-items:flex-start; justify-content:center; text-align:left; gap:4px; }
+body[data-child-badge-orientation="horizontal"] .badge-card--recipient { width:min(100%, var(--child-badge-width, 330px)); min-height:0; height:auto; padding:50px 18px 18px 128px; align-items:flex-start; justify-content:center; text-align:left; gap:4px; }
 body[data-child-badge-orientation="horizontal"] .badge-card--recipient .badge-photo { position:absolute; top:60px; left:18px; width:92px; height:92px; min-width:92px; min-height:92px; }
 body[data-child-badge-orientation="horizontal"] .badge-card--recipient .badge-logo { position:absolute; z-index:5; top:10px; left:18px; width:48px; height:48px; padding:2px; transform:none; border:2px solid #fff; box-shadow:none; }
 body[data-child-badge-orientation="horizontal"] .badge-card--recipient .badge-photo-upload { position:absolute; z-index:2; bottom:13px; left:12px; margin:0; padding:6px 7px; font-size:8px; }
