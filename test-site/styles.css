@@ -657,6 +657,9 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 
 @media print {
   .app-header, .prototype-notice, .organizer-sidebar, .organizer-heading, .table-tools, .app-footer, .button, .text-button { display: none !important; }
+  /* The accessibility jump link is useful on-screen, but Chrome can place it
+     alone on a leading print page before the badge sheet. */
+  body[data-print-badge] .skip-link, body[data-print-badge] .loading-screen { display: none !important; }
   body, .app-shell, .organizer-shell, .organizer-main { background: var(--white) !important; }
   .organizer-shell { display: block; }
   .organizer-main { padding: 0; }
