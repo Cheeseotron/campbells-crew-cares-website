@@ -753,6 +753,7 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-settings > p { grid-column:1 / -1; margin:0; padding-top:14px; border-top:1px solid var(--line); color:var(--muted); }
 .section-title { margin:32px 0 14px; }
 .badge-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; }
+.badge-card-shell { display:contents; }
 .badge-card { min-height:190px; padding:22px; border:2px solid var(--ink); background:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:9px; }
 .badge-card > span { color:var(--green-dark); font-weight:800; text-transform:uppercase; letter-spacing:.08em; font-size:12px; }
 .badge-card > strong { font-size:25px; line-height:1.1; }
@@ -835,7 +836,10 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   /* Avery 8471: 10 perforated business cards in a 2 × 5 grid. The physical
      card slots begin .75in from the left and .5in from the top of US Letter. */
   body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-grid--children,
-  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-grid--children { grid-template-columns:repeat(2,3.5in); grid-auto-rows:2in; gap:0; justify-content:start; align-content:start; width:8.5in; min-height:11in; padding:.5in .75in; }
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-grid--children { box-sizing:border-box; grid-template-columns:repeat(2,3.5in); grid-auto-rows:2in; gap:0; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.5in .75in; }
+  body[data-print-badge][data-print-badge-group="children"] .badge-card-shell { display:none; }
+  body[data-print-badge][data-print-badge-group="children"] .badge-card-shell:has(.is-badge-print-target),
+  body[data-print-badge][data-print-badge-group="children"] .badge-card-shell:has(.badge-print-copy) { display:grid; width:100%; height:100%; place-items:center; overflow:visible; }
   body[data-print-badge] .badge-card { display:none; break-inside:avoid; box-sizing:border-box; }
   body[data-print-badge] .badge-card.is-badge-print-target, body[data-print-badge] .badge-card.badge-print-copy { display:flex; }
   /* Give Avery sheets a small visual bleed. The printable background and top
