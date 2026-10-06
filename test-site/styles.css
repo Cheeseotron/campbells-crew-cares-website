@@ -865,11 +865,11 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
      physical start points on the sheet, not generic centering values. */
   body[data-print-badge][data-print-badge-group="volunteers"][data-volunteer-badge-size="avery-8395"] .badge-grid--volunteers { box-sizing:border-box; grid-template-columns:repeat(2,3.375in); grid-auto-rows:2.333333in; column-gap:.375in; row-gap:.166667in; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.583333in .6875in; }
   body[data-print-badge][data-print-badge-group="children"] .badge-grid--children { display:grid; grid-template-columns:repeat(var(--child-badge-columns, 2), var(--child-badge-width, 3in)); gap:0; justify-content:start; align-content:start; }
-  /* Avery 8471: 10 perforated business cards in a 2 × 5 grid. The cards sit
-     .75in from the left and .3in from the top, which keeps the top row close
-     to the physical card area without shifting the left/right registration. */
-  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-grid--children,
-  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-grid--children { box-sizing:border-box; grid-template-columns:repeat(2,3.5in); grid-auto-rows:2in; gap:0; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.3in .75in .7in; }
+  /* Avery 8471: the two orientations use the same card slots but their
+     visible artwork begins differently after rotation. Keep the horizontal
+     design .4in down and pull the vertical design up to .2in. */
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-grid--children { box-sizing:border-box; grid-template-columns:repeat(2,3.5in); grid-auto-rows:2in; gap:0; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.4in .75in .6in; }
+  body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-grid--children { box-sizing:border-box; grid-template-columns:repeat(2,3.5in); grid-auto-rows:2in; gap:0; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.2in .75in .8in; }
   /* Avery 5395 uses its own eight-label geometry when chosen for children. */
   body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="avery-8395"] .badge-grid--children { box-sizing:border-box; grid-template-columns:repeat(2,3.375in); grid-auto-rows:2.333333in; column-gap:.375in; row-gap:.166667in; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.583333in .6875in; }
   body[data-print-badge][data-print-badge-group="children"] .badge-card-shell { display:none; }
