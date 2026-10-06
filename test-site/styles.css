@@ -822,12 +822,16 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
 .badge-stock-note strong { color:var(--ink); }
 .badge-stock-note span, .badge-stock-note a:not(.button) { color:var(--muted); font-size:13px; }
 .badge-stock-note .button { width:max-content; margin-top:4px; }
+.badge-print-warning { display:grid; grid-template-columns:auto minmax(0,1fr); gap:14px 18px; align-items:center; margin:22px 0 30px; padding:16px 20px; border:2px solid var(--ink); border-left:8px solid var(--green); background:#fff9d9; }
+.badge-print-warning strong { color:var(--ink); font-size:13px; font-weight:900; letter-spacing:.08em; line-height:1.2; text-transform:uppercase; }
+.badge-print-warning span { color:var(--ink); font-size:14px; line-height:1.45; }
 
 @media (max-width: 760px) {
   .upcoming-event,.finish-event-panel,.email-sender { display:flex; flex-direction:column; align-items:stretch; }
   .badge-settings { grid-template-columns:1fr; }
   .upcoming-status { align-items:stretch; min-width:0; }
   .badge-settings .field { min-width:0; }
+  .badge-print-warning { grid-template-columns:1fr; gap:7px; }
   .badge-print-section__header { grid-template-columns:1fr; align-items:stretch; }
   .badge-section-actions { justify-content:stretch; align-items:stretch; }
   .badge-section-actions .field { min-width:0; max-width:none; width:100%; }
@@ -840,9 +844,20 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
 }
 
 @media print {
+  /* A badge sheet is one physical Letter canvas. Keeping the print root at
+     that exact size prevents a hidden portal wrapper or an in-flow margin
+     from turning into an otherwise blank second page. */
+  body[data-print-badge] { position:relative!important; width:8.5in!important; height:11in!important; min-height:0!important; margin:0!important; padding:0!important; overflow:hidden!important; }
+  body[data-print-badge] #main, body[data-print-badge] .organizer-shell, body[data-print-badge] .organizer-main { width:100%!important; height:100%!important; min-height:0!important; margin:0!important; padding:0!important; overflow:visible!important; }
   body[data-print-badge] .badge-settings, body[data-print-badge] .section-title, body[data-print-badge] .badge-section-heading, body[data-print-badge] .badge-print-section__header, body[data-print-badge] .badge-size-note { display:none!important; }
   body[data-print-badge] .badge-print-section { margin:0; padding:0; border:0; }
   body[data-print-badge] .badge-grid { display:none; }
+  /* Take the selected grid out of normal portal flow and anchor it to the
+     sheet's top-left corner. The Avery 8471 top slot is exactly .5in down;
+     this avoids the large accidental gap seen in the vertical PDF. */
+  body[data-print-badge][data-print-badge-group="volunteers"] .badge-grid--volunteers,
+  body[data-print-badge][data-print-badge-group="children"] .badge-grid--children,
+  body[data-print-badge][data-print-badge-group="single"] .badge-grid:has(.is-badge-print-target) { position:absolute!important; top:0!important; left:0!important; margin:0!important; }
   body[data-print-badge][data-print-badge-group="volunteers"] .badge-grid--volunteers { display:grid; grid-template-columns:repeat(var(--volunteer-badge-columns, 2), var(--volunteer-badge-width, 3.375in)); gap:.1in; justify-content:center; align-content:start; }
   /* Avery 5395: exact two-column, four-row label geometry.  These are the
      physical start points on the sheet, not generic centering values. */
