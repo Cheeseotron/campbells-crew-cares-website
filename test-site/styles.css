@@ -739,8 +739,14 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .upcoming-status { display:flex; flex-direction:column; align-items:flex-end; gap:12px; min-width:260px; }
 .directory-actions { display:flex; justify-content:flex-end; margin:-8px 0 16px; }
 .heading-actions { display:flex; justify-content:flex-end; align-items:center; gap:10px; flex-wrap:wrap; }
-.badge-section-actions { align-items:end; }
-.badge-section-actions .field { min-width:280px; max-width:430px; }
+.badge-print-section { margin-top:34px; padding-top:6px; border-top:4px solid var(--ink); }
+.badge-print-section__header { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:22px; padding:14px 18px; border-left:6px solid var(--green); background:#f1f8f0; }
+.badge-print-section__header h2 { margin:0; color:var(--ink); font-size:24px; }
+.badge-print-section__eyebrow { margin:0 0 4px; color:var(--green-dark); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+.badge-section-actions { display:flex; justify-content:flex-end; align-items:end; gap:12px; flex-wrap:wrap; }
+.badge-section-actions .field { min-width:300px; max-width:390px; }
+.badge-section-actions .field-help { margin:4px 0 0; }
+.badge-print-section .badge-grid { margin-top:18px; }
 .email-sender { display:grid; grid-template-columns:2fr 1fr; gap:30px; border-left:6px solid var(--green); }
 .badge-settings { display:grid; grid-template-columns:minmax(260px,1fr) minmax(260px,1fr); align-items:end; gap:18px 28px; }
 .badge-settings .field { min-width:280px; }
@@ -806,6 +812,10 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   .badge-settings { grid-template-columns:1fr; }
   .upcoming-status { align-items:stretch; min-width:0; }
   .badge-settings .field { min-width:0; }
+  .badge-print-section__header { grid-template-columns:1fr; align-items:stretch; }
+  .badge-section-actions { justify-content:stretch; align-items:stretch; }
+  .badge-section-actions .field { min-width:0; max-width:none; width:100%; }
+  .badge-section-actions .button { width:100%; }
   .bag-plan-intro { grid-template-columns:1fr; }
   .bag-quick-add { grid-template-columns:1fr; align-items:stretch; }
   .bag-plan-row { grid-template-columns:1fr; gap:7px; }
