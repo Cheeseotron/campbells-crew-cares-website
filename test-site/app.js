@@ -970,6 +970,7 @@
 
   function findApplicationFlags(draft) {
     const flags = [];
+    if (state.applications.some((item) => normalize(item.guardian) === normalize(draft.guardian))) flags.push("Responsible party name matches another application");
     if (state.applications.some((item) => normalize(item.email) === normalize(draft.email))) flags.push("Email used on another application");
     if (state.applications.some((item) => normalize(item.phone) === normalize(draft.phone))) flags.push("Phone used on another application");
     if (state.applications.some((item) => normalize(`${item.address}${item.zip}`) === normalize(`${draft.address}${draft.zip}`))) flags.push("Household address matches another application");

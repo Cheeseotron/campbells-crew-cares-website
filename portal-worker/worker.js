@@ -983,8 +983,9 @@ async function registerRecipient(env, input, codeGranted = false) {
   const email = String(input.email).trim().toLowerCase();
   const phone = String(input.phone).trim();
   const address = input.address && typeof input.address === "object" ? input.address : {};
-  const { results: existingHouseholds } = await env.DB.prepare("SELECT email, phone, address_json FROM recipient_households WHERE event_id = ?").bind(event.id).all();
+  const { results: existingHouseholds } = await env.DB.prepare("SELECT guardian_name, email, phone, address_json FROM recipient_households WHERE event_id = ?").bind(event.id).all();
   const flags = [];
+  if (existingHouseholds.some((household) => normalizedMatchValue(household.guardian_name) === normalizedMatchValue(input.guardianName))) flags.push("Responsible party name matches another application");
   if (existingHouseholds.some((household) => household.email === email)) flags.push("Email used on another application");
   if (existingHouseholds.some((household) => normalizedMatchValue(household.phone) === normalizedMatchValue(phone))) flags.push("Phone used on another application");
   const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
@@ -1262,6 +1263,7 @@ async function api(request, env, url, user) {
       try { application = JSON.parse(household.application_json || "{}"); } catch {}
       try { flags = JSON.parse(household.flags_json || "[]"); } catch {}
       const otherHouseholds = results.filter((other) => other.id !== household.id);
+      if (otherHouseholds.some((other) => other.event_id === household.event_id && normalizedMatchValue(other.guardian_name) === normalizedMatchValue(household.guardian_name)) && !flags.includes("Responsible party name matches another application")) flags.push("Responsible party name matches another application");
       if (otherHouseholds.some((other) => other.event_id === household.event_id && other.email === household.email) && !flags.includes("Email used on another application")) flags.push("Email used on another application");
       if (otherHouseholds.some((other) => other.event_id === household.event_id && normalizedMatchValue(other.phone) === normalizedMatchValue(household.phone)) && !flags.includes("Phone used on another application")) flags.push("Phone used on another application");
       const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
