@@ -600,6 +600,10 @@ async function sendVolunteerConfirmation(env, recipient, name, role, event) {
   if (message) await sendEmail(env, recipient, message.subject, message.body);
 }
 
+async function sendVolunteerManagementLink(env, recipient, event, link) {
+  await sendEmail(env, recipient, `Manage your volunteer signup: ${event.title}`, `Hi,\n\nUse this private link to manage your volunteer signup for ${event.title}:\n${link}\n\nYou can change your role, cancel your signup, or add another volunteer. This link expires in seven days.\n\nIf you did not request this, you can ignore this email.`);
+}
+
 async function sendRecipientConfirmation(env, recipient, guardianName, event) {
   const message = eventEmailTemplate(event, "rec-received", { subject: "Application received: {{event}}", body: "Hi {{name}},\n\nYour Campbell's Crew Cares application for {{event}} has been received and is now awaiting review.\n\nSubmitting an application does not guarantee approval. We will contact you if we need more information or when there is an update." }, { name: guardianName });
   if (message) await sendEmail(env, recipient, message.subject, message.body);
@@ -691,6 +695,24 @@ async function hasVolunteerAccessToken(token, eventId, secret) {
     const data = JSON.parse(new TextDecoder().decode(decodeBase64Url(payload)));
     return data.eventId === eventId && Number(data.expires) > Math.floor(Date.now() / 1000);
   } catch { return false; }
+}
+
+async function volunteerManageToken(eventId, email, secret) {
+  const expires = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60);
+  const payload = base64Url(new TextEncoder().encode(JSON.stringify({ eventId, email: String(email).toLowerCase(), expires })));
+  return `${payload}.${base64Url(await hmac(secret, `volunteer-manage:${payload}`))}`;
+}
+
+async function readVolunteerManageToken(token, eventId, secret) {
+  if (!token || typeof token !== "string") return null;
+  const [payload, signature, extra] = token.split(".");
+  if (!payload || !signature || extra) return null;
+  try {
+    if (!constantTimeEqual(signature, base64Url(await hmac(secret, `volunteer-manage:${payload}`)))) return null;
+    const data = JSON.parse(new TextDecoder().decode(decodeBase64Url(payload)));
+    if (data.eventId !== eventId || !isValidEmailAddress(data.email) || Number(data.expires) <= Math.floor(Date.now() / 1000)) return null;
+    return { email: String(data.email).toLowerCase() };
+  } catch { return null; }
 }
 
 async function tokenHash(token) {
@@ -790,6 +812,29 @@ function volunteerEventChooserPage(events) {
   return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
 
+function volunteerGroupForm(event, roles, selectedRole, accessToken, notice) {
+  const roleOptions = roles.map((role) => `<option value="${escapeHtml(role.title)}" ${selectedRole?.title === role.title ? "selected" : ""}>${escapeHtml(role.title)} · ${escapeHtml(role.shift || "Shift to be announced")}</option>`).join("");
+  const memberCard = (primary = false) => `<fieldset class="member-card" data-member><legend>${primary ? "Volunteer 1" : "Additional volunteer"}</legend><div class="grid"><label>First name<input data-first autocomplete="given-name" required></label><label>Last name<input data-last autocomplete="family-name" required></label></div><label>Email address<input data-email type="email" autocomplete="email" required></label>${primary ? `<label>Mobile phone<input data-phone type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 555-5555" required></label>` : `<label>Mobile phone <small>(optional)</small><input data-phone type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 555-5555"></label>`}<label>Volunteer role<select data-role required>${roleOptions}</select></label>${primary ? "" : `<button class="button light member-remove" type="button">Remove this person</button>`}</fieldset>`;
+  const access = accessToken ? `&access=${encodeURIComponent(accessToken)}` : "";
+  return `<article class="step-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}&step=roles${access}" aria-label="Back">←</a><p class="eyebrow">Step 2 of 2</p><h1>Who is<br>volunteering?</h1><p>Add everyone signing up together. Each person needs a different email address so they receive their own event rules and confirmation.</p>${notice}<form method="post" action="/volunteer?event=${encodeURIComponent(event.id)}" id="group-signup-form"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><input type="hidden" name="access" value="${escapeHtml(accessToken)}"><input type="hidden" name="membersJson" value=""><div id="member-list">${memberCard(true)}</div><template id="additional-member-template">${memberCard(false)}</template><button class="button light" type="button" id="add-volunteer-member">+ Add another person</button><label class="check"><input name="agreement" type="checkbox" required><span>Everyone listed agrees to follow Campbell's Crew event and child-safety instructions.</span></label><button class="button dark">Complete signups →</button></form></article><script>document.addEventListener('DOMContentLoaded',()=>{const form=document.querySelector('#group-signup-form'),list=document.querySelector('#member-list'),template=document.querySelector('#additional-member-template');document.querySelector('#add-volunteer-member').addEventListener('click',()=>{list.append(template.content.cloneNode(true));});list.addEventListener('click',(event)=>{if(event.target.matches('.member-remove')) event.target.closest('[data-member]').remove();});form.addEventListener('submit',(event)=>{const members=[...list.querySelectorAll('[data-member]')].map((card)=>({firstName:card.querySelector('[data-first]').value,lastName:card.querySelector('[data-last]').value,email:card.querySelector('[data-email]').value,phone:card.querySelector('[data-phone]').value,role:card.querySelector('[data-role]').value}));const emails=members.map((member)=>member.email.trim().toLowerCase());if(new Set(emails).size!==emails.length){event.preventDefault();alert('Each volunteer needs a different email address.');return;}form.elements.membersJson.value=JSON.stringify(members);});});</script>`;
+}
+
+function volunteerManageRequestPage(event, message = "", error = "") {
+  const notice = error ? `<p class="notice error" role="alert">${escapeHtml(error)}</p>` : message ? `<p class="notice success">${escapeHtml(message)}</p>` : "";
+  return `<article class="step-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}" aria-label="Close">×</a><p class="eyebrow">Existing volunteer</p><h1>Manage your signup</h1><p>Enter your email address and we’ll send a private link to change your role, cancel your signup, or add another person.</p>${notice}<form method="post" action="/volunteer?event=${encodeURIComponent(event.id)}"><input type="hidden" name="action" value="manage-request"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><label>Email address<input name="email" type="email" autocomplete="email" required></label><button class="button green">Email my secure link →</button></form></article>`;
+}
+
+async function volunteerManagePage(env, event, token, email, message = "", error = "") {
+  const notice = error ? `<p class="notice error" role="alert">${escapeHtml(error)}</p>` : message ? `<p class="notice success">${escapeHtml(message)}</p>` : "";
+  const { results: signups } = await env.DB.prepare("SELECT s.id, s.role, v.name, v.email FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id WHERE s.event_id = ? AND v.email = ? ORDER BY s.created_at ASC").bind(event.id, email).all();
+  const roles = (Array.isArray(event.settings.roles) ? event.settings.roles : []).filter((role) => role.enabled && role.title);
+  const optionList = (selected) => roles.map((role) => `<option value="${escapeHtml(role.title)}" ${role.title === selected ? "selected" : ""}>${escapeHtml(role.title)} · ${escapeHtml(role.shift || "Shift to be announced")}</option>`).join("");
+  const forms = signups.map((signup) => `<section class="member-card"><p class="eyebrow">Registered volunteer</p><h2>${escapeHtml(signup.name)}</h2><p>${escapeHtml(signup.email)}</p><form method="post" action="/volunteer?event=${encodeURIComponent(event.id)}&manage=${encodeURIComponent(token)}"><input type="hidden" name="action" value="manage-update"><input type="hidden" name="signupId" value="${escapeHtml(signup.id)}"><label>Volunteer role<select name="role">${optionList(signup.role)}</select></label><button class="button dark">Save role change</button></form><form method="post" action="/volunteer?event=${encodeURIComponent(event.id)}&manage=${encodeURIComponent(token)}" onsubmit="return confirm('Remove this volunteer from the event?')"><input type="hidden" name="action" value="manage-cancel"><input type="hidden" name="signupId" value="${escapeHtml(signup.id)}"><button class="button light">Cancel this signup</button></form></section>`).join("") || `<p>No current signup is associated with this email address.</p>`;
+  const card = `<article class="step-card"><a class="back" href="/volunteer?event=${encodeURIComponent(event.id)}">← Back to event</a><p class="eyebrow">Private signup link</p><h1>Your signup</h1><p>Only registrations connected to this email are shown here.</p>${notice}${forms}<section class="member-card"><p class="eyebrow">Add someone else</p><h2>Add another volunteer</h2><p>They need their own email address so we can send their confirmation and event rules directly.</p><form method="post" action="/volunteer?event=${encodeURIComponent(event.id)}&manage=${encodeURIComponent(token)}"><input type="hidden" name="action" value="manage-add"><div class="grid"><label>First name<input name="firstName" autocomplete="given-name" required></label><label>Last name<input name="lastName" autocomplete="family-name" required></label></div><label>Email address<input name="email" type="email" autocomplete="email" required></label><label>Mobile phone <small>(optional)</small><input name="phone" type="tel" inputmode="tel" autocomplete="tel"></label><label>Volunteer role<select name="role" required>${optionList("")}</select></label><button class="button green">Add volunteer →</button></form></section></article>`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Manage volunteer signup | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--forest:#176b39;--mist:#eef3ef;--line:#d2d9d4;--gray:#617068}*{box-sizing:border-box}body{margin:0;background:#fff;font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100% - 40px,760px);margin:52px auto 70px}.step-card{padding:42px;background:#fff;border:1px solid var(--line);border-radius:28px;box-shadow:0 20px 50px rgba(17,24,33,.11)}.back,.eyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.back{display:inline-block;margin-bottom:25px;color:var(--forest);text-decoration:none}.eyebrow{margin:0 0 10px;color:var(--forest)}h1{margin:0 0 12px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(34px,5vw,52px);letter-spacing:-.055em;line-height:.9;text-transform:uppercase}h2{margin:7px 0;font-size:23px}p{color:var(--gray);line-height:1.5}.member-card{margin:20px 0;padding:20px;border:1px solid var(--line);background:#fafcfb}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}label{display:block;margin:18px 0 7px;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}input,select{width:100%;min-height:50px;margin-top:7px;padding:12px;border:1px solid var(--line);background:#fff;font:16px Arial,sans-serif}.button{display:inline-flex;min-height:50px;margin-top:16px;padding:0 21px;align-items:center;justify-content:center;border:1px solid var(--ink);font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}.dark{color:#fff;background:var(--ink)}.light{color:var(--ink);background:#fff}.green{color:var(--ink);background:var(--green);border-color:var(--green)}.notice{padding:13px;font-weight:700}.error{background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d}.success{background:#e9f7ea;border-left:4px solid var(--forest);color:#155b31}@media(max-width:620px){main{width:min(100% - 26px,760px);margin-top:28px}.step-card{padding:28px 22px}.grid{grid-template-columns:1fr}.button{width:100%}}</style></head><body><main>${card}</main></body></html>`;
+  return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
+}
+
 function liveVolunteerSignupPage(events, query, message = "", error = "") {
   if (!events.length) return volunteerDirectoryPage(message, error);
   if (events.length > 1 && !query.get("event")) return volunteerEventChooserPage(events);
@@ -808,12 +853,14 @@ function liveVolunteerSignupPage(events, query, message = "", error = "") {
   const location = event.settings.location || "Location to be announced";
   const address = event.settings.address || "";
   const roleCards = roles.map((role) => `<label class="role-card ${spotsOpen(role) ? "" : "is-full"}"><input type="radio" name="role" value="${escapeHtml(role.title)}" ${selectedRole?.title === role.title ? "checked" : ""} ${spotsOpen(role) ? "" : "disabled"}><span><strong>${escapeHtml(role.title)}</strong><b>${escapeHtml(role.shift || "Shift to be announced")} · ${spotsOpen(role) ? `${spotsOpen(role)} spots open` : "No spots remaining · FULL"}</b><small>${escapeHtml(role.description || "Help make this event possible.")}</small></span></label>`).join("");
-  const home = `<a class="back" href="/">← Back to Campbell's Crew Cares</a>${notice}<article class="event-card"><div class="open-bar"><span>Registration open</span><span>${totalSpots} spots open</span></div><div class="event-body"><div class="date-block"><small>${escapeHtml(date.split(" ")[0] || "Event")}</small><strong>${escapeHtml((date.match(/\b\d{1,2}\b/) || ["--"])[0])}</strong></div><div class="event-copy"><p class="eyebrow">Featured event</p><h1>${escapeHtml(event.title)}</h1><p><b>${escapeHtml(date)} · ${escapeHtml(event.settings.time || "Time to be announced")}</b><br>${escapeHtml(location)}</p><div class="actions"><a class="button dark" href="/volunteer?event=${encodeURIComponent(event.id)}&step=roles${access}">Choose a role →</a><a class="button light" href="/volunteer?event=${encodeURIComponent(event.id)}&details=1${access}">Event details</a></div></div></div></article>`;
+  const home = `<a class="back" href="/">← Back to Campbell's Crew Cares</a>${notice}<article class="event-card"><div class="open-bar"><span>Registration open</span><span>${totalSpots} spots open</span></div><div class="event-body"><div class="date-block"><small>${escapeHtml(date.split(" ")[0] || "Event")}</small><strong>${escapeHtml((date.match(/\b\d{1,2}\b/) || ["--"])[0])}</strong></div><div class="event-copy"><p class="eyebrow">Featured event</p><h1>${escapeHtml(event.title)}</h1><p><b>${escapeHtml(date)} · ${escapeHtml(event.settings.time || "Time to be announced")}</b><br>${escapeHtml(location)}</p><div class="actions"><a class="button dark" href="/volunteer?event=${encodeURIComponent(event.id)}&step=roles${access}">Choose a role →</a><a class="button light" href="/volunteer?event=${encodeURIComponent(event.id)}&step=manage">Manage existing signup</a><a class="button light" href="/volunteer?event=${encodeURIComponent(event.id)}&details=1${access}">Event details</a></div></div></div></article>`;
   const roleStep = `<article class="step-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}${access}" aria-label="Back">×</a><p class="eyebrow">Step 1 of 2</p><h1>How would you<br>like to help?</h1><form method="get" action="/volunteer"><input type="hidden" name="event" value="${escapeHtml(event.id)}"><input type="hidden" name="step" value="details"><input type="hidden" name="access" value="${escapeHtml(accessToken)}">${roleCards}<button class="button dark" ${roles.length ? "" : "disabled"}>Continue with ${escapeHtml(selectedRole?.title || "selected role")} →</button></form></article>`;
   const detailStep = `<article class="step-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}&step=roles&role=${encodeURIComponent(selectedRole?.title || "")}${access}" aria-label="Back">←</a><p class="eyebrow">Step 2 of 2</p><h1>A few details,<br>and you're in.</h1>${notice}<div class="selected-role"><span>Selected role</span><strong>${escapeHtml(selectedRole?.title || "Volunteer")}</strong><small>${escapeHtml(selectedRole?.shift || "")}</small></div><form method="post" action="/volunteer?event=${encodeURIComponent(event.id)}"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><input type="hidden" name="role" value="${escapeHtml(selectedRole?.title || "")}"><input type="hidden" name="access" value="${escapeHtml(accessToken)}"><div class="grid"><label>First name<input name="firstName" autocomplete="given-name" required></label><label>Last name<input name="lastName" autocomplete="family-name" required></label></div><label>Email address<input name="email" type="email" autocomplete="email" required></label><label>Mobile phone<input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 555-5555" required></label>${event.settings.questions?.shirtSize ? `<label>T-shirt size<select name="shirt" required><option value="">Choose size</option><option>Adult S</option><option>Adult M</option><option>Adult L</option><option>Adult XL</option><option>Adult 2XL</option><option>Adult 3XL</option></select></label>` : ""}${event.settings.questions?.volunteerNotes ? `<label>Special notes <small>(optional)</small><textarea name="notes" placeholder="Anything organizers should know?"></textarea></label>` : ""}<label class="check"><input name="agreement" type="checkbox" required><span>I agree to follow Campbell's Crew Cares event and child-safety instructions. I understand that Campbell's Crew keeps volunteer participation records for future event coordination.</span></label><button class="button dark">Complete signup →</button></form></article>`;
   const detailPanel = `<article class="details-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}" aria-label="Close">×</a><p class="eyebrow">Event details</p><h1>${escapeHtml(event.title)}</h1><div class="details-grid"><div><span>Date</span><strong>${escapeHtml(date)}</strong></div><div><span>Time</span><strong>${escapeHtml(event.settings.time || "To be announced")}</strong></div><div><span>Location</span><strong>${escapeHtml(location)}</strong></div><div><span>Address</span><strong>${escapeHtml(address || "To be announced")}</strong></div></div><a class="button green" href="/volunteer?event=${encodeURIComponent(event.id)}&step=roles">Continue to signup →</a></article>`;
-  let content = details ? detailPanel : step === "roles" ? roleStep : step === "details" ? detailStep : home;
-  content = `<style>.step-card select{width:100%;min-height:50px;margin-top:7px;padding:12px;border:1px solid var(--line);background:#fff;font:16px Arial,sans-serif}.step-card .role-card input[type="radio"]{width:20px;min-width:20px;height:20px;min-height:20px;margin:0;padding:0;border:0;flex:0 0 20px;font:inherit}.step-card .role-card.is-full{background:#f5f6f5;color:#6d7771;cursor:not-allowed}.step-card .role-card.is-full small{color:#7d8681}</style>${accessToken ? `<script>history.replaceState({}, "", location.pathname + "?" + new URLSearchParams([...new URLSearchParams(location.search)].filter(([key]) => key !== "access")).toString())</script>` : ""}${content}`;
+  const groupDetailStep = volunteerGroupForm(event, roles, selectedRole, accessToken, notice);
+  const manageRequestStep = volunteerManageRequestPage(event, message, error);
+  let content = details ? detailPanel : step === "roles" ? roleStep : step === "details" ? groupDetailStep : step === "manage" ? manageRequestStep : home;
+  content = `<style>.step-card select{width:100%;min-height:50px;margin-top:7px;padding:12px;border:1px solid var(--line);background:#fff;font:16px Arial,sans-serif}.step-card .role-card input[type="radio"]{width:20px;min-width:20px;height:20px;min-height:20px;margin:0;padding:0;border:0;flex:0 0 20px;font:inherit}.step-card .role-card.is-full{background:#f5f6f5;color:#6d7771;cursor:not-allowed}.step-card .role-card.is-full small{color:#7d8681}.member-card{margin:20px 0;padding:20px;border:1px solid var(--line);background:#fafcfb}.member-card legend{padding:0 7px;color:var(--forest);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.member-card h2{margin:7px 0;font-size:23px}.member-card p{margin:7px 0;color:var(--gray)}.member-card .button{margin-top:16px}</style>${accessToken ? `<script>history.replaceState({}, "", location.pathname + "?" + new URLSearchParams([...new URLSearchParams(location.search)].filter(([key]) => key !== "access")).toString())</script>` : ""}${content}`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Volunteer signup | Campbell's Crew Cares</title><style>:root{--ink:#111821;--green:#35d32f;--forest:#176b39;--mist:#eef3ef;--line:#d2d9d4;--gray:#617068}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#fff;font-family:Arial,sans-serif;color:var(--ink)}main{width:min(100% - 40px,760px);margin:52px auto 70px}.back,.eyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.back{display:inline-block;margin:0 0 30px;color:var(--forest);text-decoration:none}.event-card,.step-card,.details-card{overflow:hidden;background:#fff;border:1px solid var(--line);border-radius:28px;box-shadow:0 20px 50px rgba(17,24,33,.11)}.open-bar{display:flex;justify-content:space-between;padding:17px 26px;background:var(--green);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.event-body{display:grid;grid-template-columns:100px minmax(0,1fr);gap:28px;padding:38px 42px 30px}.date-block{align-self:center;text-align:center}.date-block small{font-weight:800;letter-spacing:.12em}.date-block strong{display:block;font-family:"Arial Black",Arial,sans-serif;font-size:64px;line-height:1}.eyebrow{margin:0 0 12px;color:var(--forest)}h1{margin:0 0 12px;font-family:"Arial Black",Arial,sans-serif;font-size:clamp(34px,5vw,52px);letter-spacing:-.055em;line-height:.9;text-transform:uppercase}.event-copy p{line-height:1.55;color:var(--gray)}.event-copy p b{color:var(--ink)}.actions{display:flex;gap:10px;margin-top:24px}.button{display:inline-flex;min-height:50px;padding:0 21px;align-items:center;justify-content:center;border:1px solid var(--ink);font-size:10px;font-weight:800;letter-spacing:.1em;text-decoration:none;text-transform:uppercase;cursor:pointer}.dark{color:#fff;background:var(--ink)}.light{color:var(--ink);background:#fff}.green{color:var(--ink);background:var(--green);border-color:var(--green)}.step-card,.details-card{position:relative;padding:42px}.step-card h1{font-size:28px;line-height:1.02}.round{position:absolute;top:35px;right:42px;display:grid;width:40px;height:40px;place-items:center;border:1px solid var(--line);border-radius:50%;color:var(--ink);text-decoration:none}.role-card{display:flex;align-items:center;gap:18px;margin:10px 0;padding:16px;border:1px solid var(--line);cursor:pointer}.role-card.selected,.role-card:has(input:checked){background:#edf8ed;border:2px solid var(--forest)}.role-card input{flex:0 0 20px;width:20px;height:20px;margin:0;accent-color:var(--forest)}.role-card>span{flex:1;min-width:0;text-align:left}.role-card strong,.role-card b,.role-card small{display:block}.role-card strong{font-size:16px}.role-card b{margin:2px 0 5px}.role-card small{color:var(--gray);line-height:1.4}.step-card form>.button{margin-top:18px}.selected-role{margin:22px 0;padding:16px 20px;border-left:5px solid var(--green);background:var(--mist)}.selected-role span,.selected-role strong,.selected-role small{display:block}.selected-role span,.details-grid span{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.step-card label:not(.role-card):not(.check){display:block;margin:18px 0 7px;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.step-card input:not([type=checkbox]),textarea{width:100%;min-height:50px;margin-top:7px;padding:12px;border:1px solid var(--line);font:16px Arial,sans-serif}.step-card textarea{min-height:100px;resize:vertical}.check{display:flex;gap:10px;margin-top:14px;color:var(--gray);font-size:13px;line-height:1.45}.check input{width:19px;height:19px;accent-color:var(--forest)}.details-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 0}.details-grid div{padding:17px;background:var(--mist)}.details-grid span,.details-grid strong{display:block}.details-grid strong{margin-top:6px;line-height:1.35}.notice{padding:13px;font-weight:700}.error{background:#f8e9e6;border-left:4px solid #a22d22;color:#85251d}.success{background:#e9f7ea;border-left:4px solid var(--forest);color:#155b31}@media(max-width:620px){main{width:min(100% - 26px,760px);margin-top:28px}.event-body{grid-template-columns:1fr;padding:30px}.date-block{text-align:left}.date-block strong{font-size:48px}.step-card,.details-card{padding:28px 22px}.round{top:22px;right:22px}.grid,.details-grid{grid-template-columns:1fr}.actions{flex-direction:column}.role-card{align-items:flex-start;gap:12px;margin:8px 0;padding:15px 13px}.role-card input{margin-top:3px}.role-card strong{font-size:15px}.role-card b{font-size:14px;line-height:1.25}.role-card small{font-size:13px}.step-card form>.button{width:100%;padding-inline:12px}}</style><script src="/portal-assets/volunteer-signup.js" defer></script></head><body><main>${content}</main></body></html>`;
   return new Response(html, { headers: securityHeaders(new Headers({ "Content-Type": "text/html; charset=utf-8" })) });
 }
@@ -850,7 +897,7 @@ async function registerVolunteer(env, input, codeGranted = false) {
   const codeMatches = status === "code" && String(input.accessCode || "").trim() === String(settings.volunteerCode || "").trim();
   const selectedRole = roles.find((role) => role.title === String(input.role || ""));
   if (!event || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches) || !selectedRole) return { error: "That volunteer opportunity is not available." };
-  if (!input.name || !input.email || !input.phone || !input.role) return { error: "Please complete your name, email, phone number, and volunteer role." };
+  if (!input.name || !input.email || !input.role) return { error: "Please complete your name, email address, and volunteer role." };
   if (!isValidEmailAddress(input.email)) return { error: "Enter a complete email address, such as name@example.com." };
   const email = String(input.email).trim().toLowerCase();
   const currentRoleSignups = await env.DB.prepare("SELECT COUNT(*) AS count FROM volunteer_signups WHERE event_id = ? AND role = ?").bind(event.id, selectedRole.title).first();
@@ -870,6 +917,49 @@ async function registerVolunteer(env, input, codeGranted = false) {
   } catch { return { error: "That email is already registered for this event." }; }
   await audit(env, null, "volunteer_signed_up", "volunteer_signup", signupId, event.id);
   return { id: signupId, event };
+}
+
+async function registerVolunteerGroup(env, input, codeGranted = false) {
+  const members = Array.isArray(input.members) ? input.members.slice(0, 8) : [];
+  if (!members.length) return { error: "Add at least one volunteer." };
+  const normalized = members.map((member) => ({
+    name: `${String(member.firstName || "").trim()} ${String(member.lastName || "").trim()}`.trim(),
+    email: String(member.email || "").trim().toLowerCase(),
+    phone: String(member.phone || "").trim(),
+    role: String(member.role || "").trim(),
+    shirt: String(member.shirt || "").trim(),
+    notes: String(member.notes || "").trim()
+  }));
+  if (normalized.some((member) => !member.name || !isValidEmailAddress(member.email) || !member.role)) return { error: "Every volunteer needs a full name, unique email address, and role." };
+  if (!normalized[0].phone) return { error: "Please add a mobile phone number for the first volunteer." };
+  if (new Set(normalized.map((member) => member.email)).size !== normalized.length) return { error: "Each volunteer needs a different email address." };
+
+  const event = await env.DB.prepare("SELECT id, title, settings_json FROM events WHERE id = ? AND status = 'open'").bind(input.eventId).first();
+  const settings = event ? eventSettings(event) : null;
+  const roles = Array.isArray(settings?.roles) ? settings.roles.filter((role) => role.enabled && role.title) : [];
+  const status = settings?.volunteerStatus;
+  const codeMatches = status === "code" && String(input.accessCode || "").trim() === String(settings.volunteerCode || "").trim();
+  if (!event || !["open", "code"].includes(status) || (status === "code" && !codeGranted && !codeMatches)) return { error: "That volunteer opportunity is not available." };
+  if (normalized.some((member) => !roles.some((role) => role.title === member.role))) return { error: "One of the selected roles is no longer available." };
+
+  for (const email of normalized.map((member) => member.email)) {
+    const existing = await env.DB.prepare("SELECT s.id FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id WHERE s.event_id = ? AND v.email = ?").bind(event.id, email).first();
+    if (existing) return { error: "One of those email addresses is already registered for this event." };
+  }
+  for (const role of roles) {
+    const requested = normalized.filter((member) => member.role === role.title).length;
+    if (!requested) continue;
+    const current = await env.DB.prepare("SELECT COUNT(*) AS count FROM volunteer_signups WHERE event_id = ? AND role = ?").bind(event.id, role.title).first();
+    if ((Number(current?.count) || 0) + requested > (Number(role.capacity) || 0)) return { error: `${role.title} no longer has enough open spots for everyone in this signup.` };
+  }
+
+  const registrations = [];
+  for (const member of normalized) {
+    const result = await registerVolunteer(env, { ...member, eventId: input.eventId }, codeGranted);
+    if (result.error) return { error: result.error };
+    registrations.push({ ...member, id: result.id, event: result.event });
+  }
+  return { registrations, event };
 }
 
 async function registerRecipient(env, input, codeGranted = false) {
@@ -1520,24 +1610,74 @@ export default {
           return new Response(null, { status: 303, headers: securityHeaders(new Headers({ Location: `/volunteer?event=${encodeURIComponent(event.id)}&access=${encodeURIComponent(access)}` })) });
         }
         if (!event) return liveVolunteerSignupPage(events, url.searchParams, "", "That volunteer opportunity is not available.");
+        const manageToken = String(url.searchParams.get("manage") || "");
+        const manageAccess = await readVolunteerManageToken(manageToken, event.id, env.PORTAL_SESSION_SECRET);
+        if (input.action === "manage-request") {
+          const email = String(input.email || "").trim().toLowerCase();
+          const query = new URLSearchParams({ event: event.id, step: "manage" });
+          if (!isValidEmailAddress(email)) return liveVolunteerSignupPage(events, query, "", "Enter a complete email address, such as name@example.com.");
+          const existing = await env.DB.prepare("SELECT s.id FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id WHERE s.event_id = ? AND v.email = ? LIMIT 1").bind(event.id, email).first();
+          if (existing) {
+            try {
+              const token = await volunteerManageToken(event.id, email, env.PORTAL_SESSION_SECRET);
+              const link = `${url.origin}/volunteer?event=${encodeURIComponent(event.id)}&manage=${encodeURIComponent(token)}`;
+              await sendVolunteerManagementLink(env, email, event, link);
+              await audit(env, null, "volunteer_management_link_sent", "volunteer_signup", existing.id, event.id);
+            } catch (error) { console.error("Volunteer management email delivery failed", error); }
+          }
+          return liveVolunteerSignupPage(events, query, "If a current registration matches that email, we sent a private management link.");
+        }
+        if (["manage-update", "manage-cancel", "manage-add"].includes(String(input.action || ""))) {
+          if (!manageAccess) return liveVolunteerSignupPage(events, new URLSearchParams({ event: event.id, step: "manage" }), "", "This private link has expired. Request a new one to continue.");
+          if (input.action === "manage-update") {
+            const signup = await env.DB.prepare("SELECT s.id, s.role FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id WHERE s.id = ? AND s.event_id = ? AND v.email = ?").bind(String(input.signupId || ""), event.id, manageAccess.email).first();
+            const role = (Array.isArray(event.settings.roles) ? event.settings.roles : []).find((item) => item.enabled && item.title === String(input.role || ""));
+            if (!signup || !role) return volunteerManagePage(env, event, manageToken, manageAccess.email, "", "Choose an available volunteer role.");
+            if (signup.role !== role.title) {
+              const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM volunteer_signups WHERE event_id = ? AND role = ? AND id <> ?").bind(event.id, role.title, signup.id).first();
+              if ((Number(count?.count) || 0) >= (Number(role.capacity) || 0)) return volunteerManagePage(env, event, manageToken, manageAccess.email, "", "That volunteer role is now full. Please choose another role.");
+              await env.DB.prepare("UPDATE volunteer_signups SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(role.title, signup.id).run();
+              await audit(env, null, "volunteer_signup_role_updated", "volunteer_signup", signup.id, event.id);
+            }
+            return volunteerManagePage(env, event, manageToken, manageAccess.email, "Your volunteer role was updated.");
+          }
+          if (input.action === "manage-cancel") {
+            const signup = await env.DB.prepare("SELECT s.id FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id WHERE s.id = ? AND s.event_id = ? AND v.email = ?").bind(String(input.signupId || ""), event.id, manageAccess.email).first();
+            if (!signup) return volunteerManagePage(env, event, manageToken, manageAccess.email, "", "That signup could not be found.");
+            await env.DB.prepare("DELETE FROM volunteer_signups WHERE id = ?").bind(signup.id).run();
+            await audit(env, null, "volunteer_signup_cancelled", "volunteer_signup", signup.id, event.id);
+            return volunteerManagePage(env, event, manageToken, manageAccess.email, "This volunteer has been removed from the event.");
+          }
+          const addInput = { ...input, eventId: event.id, name: `${String(input.firstName || "").trim()} ${String(input.lastName || "").trim()}`.trim() };
+          const result = await registerVolunteer(env, addInput, true);
+          if (result.error) return volunteerManagePage(env, event, manageToken, manageAccess.email, "", result.error);
+          try { await sendVolunteerConfirmation(env, addInput.email, addInput.name, addInput.role, result.event); await audit(env, null, "volunteer_confirmation_sent", "volunteer_signup", result.id, event.id); }
+          catch (error) { console.error("Volunteer confirmation delivery failed", error); await audit(env, null, "volunteer_confirmation_failed", "volunteer_signup", result.id, event.id); }
+          return volunteerManagePage(env, event, manageToken, manageAccess.email, "The volunteer was added. Their confirmation email is on its way.");
+        }
         const codeGranted = event.settings.volunteerStatus !== "code" || await hasVolunteerAccessToken(String(input.access || ""), event.id, env.PORTAL_SESSION_SECRET);
         if (!codeGranted) return volunteerCodePage(event, "Enter the invitation code before completing this signup.");
-        input.name = `${String(input.firstName || "").trim()} ${String(input.lastName || "").trim()}`.trim();
         if (input.agreement !== "on") return liveVolunteerSignupPage(events, url.searchParams, "", "Please agree to the event and child-safety instructions before continuing.");
-        const result = await registerVolunteer(env, input, codeGranted);
+        let members = [];
+        try { members = JSON.parse(String(input.membersJson || "[]")); } catch { return liveVolunteerSignupPage(events, url.searchParams, "", "We could not read the volunteer details. Please try again."); }
+        const result = await registerVolunteerGroup(env, { eventId: event.id, members }, codeGranted);
         if (result.error) return liveVolunteerSignupPage(events, url.searchParams, "", result.error);
-        try {
-          await sendVolunteerConfirmation(env, input.email, input.name, input.role, result.event);
-          await audit(env, null, "volunteer_confirmation_sent", "volunteer_signup", result.id, result.event.id);
-          return liveVolunteerSignupPage(events, url.searchParams, "You are registered. A confirmation email is on its way.");
-        } catch (error) {
-          console.error("Volunteer confirmation delivery failed", error);
-          await audit(env, null, "volunteer_confirmation_failed", "volunteer_signup", result.id, result.event.id);
-          return liveVolunteerSignupPage(events, url.searchParams, "You are registered, but we could not send the confirmation email.");
+        let sent = 0;
+        for (const registration of result.registrations) {
+          try { await sendVolunteerConfirmation(env, registration.email, registration.name, registration.role, registration.event); await audit(env, null, "volunteer_confirmation_sent", "volunteer_signup", registration.id, registration.event.id); sent += 1; }
+          catch (error) { console.error("Volunteer confirmation delivery failed", error); await audit(env, null, "volunteer_confirmation_failed", "volunteer_signup", registration.id, registration.event.id); }
         }
+        const total = result.registrations.length;
+        return liveVolunteerSignupPage(events, url.searchParams, sent === total ? `${total} ${total === 1 ? "volunteer is" : "volunteers are"} registered. Each will receive a confirmation email.` : `${total} ${total === 1 ? "volunteer is" : "volunteers are"} registered, but we could not send every confirmation email.`);
       }
       const selected = events.find((item) => item.id === url.searchParams.get("event")) || events[0];
-      if (selected?.settings.volunteerStatus === "code" && !(await hasVolunteerAccessToken(url.searchParams.get("access"), selected.id, env.PORTAL_SESSION_SECRET))) return volunteerCodePage(selected);
+      const manageToken = String(url.searchParams.get("manage") || "");
+      if (selected && manageToken) {
+        const manageAccess = await readVolunteerManageToken(manageToken, selected.id, env.PORTAL_SESSION_SECRET);
+        if (!manageAccess) return liveVolunteerSignupPage(events, new URLSearchParams({ event: selected.id, step: "manage" }), "", "This private link has expired. Request a new one to continue.");
+        return volunteerManagePage(env, selected, manageToken, manageAccess.email);
+      }
+      if (selected?.settings.volunteerStatus === "code" && url.searchParams.get("step") !== "manage" && !(await hasVolunteerAccessToken(url.searchParams.get("access"), selected.id, env.PORTAL_SESSION_SECRET))) return volunteerCodePage(selected);
       return liveVolunteerSignupPage(events, url.searchParams);
     }
     if (url.pathname === "/apply") {
