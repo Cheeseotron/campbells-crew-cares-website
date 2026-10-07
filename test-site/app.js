@@ -283,7 +283,7 @@
 
   function createRecipientDraft() {
     return {
-      acknowledgments: {}, agreementSignature: "", finalSignature: "", guardian: "", email: "", phone: "", address: "", city: "", zip: "", referral: "", preferredContact: "Email", notes: "",
+      acknowledgments: {}, agreementSignature: "", finalSignature: "", guardian: "", email: "", phone: "", address: "", city: "", state: "AZ", zip: "", referral: "", preferredContact: "Email", notes: "",
       children: [{ name: "", firstName: "", lastName: "", birthdate: "", gender: "", shirt: "", pants: "", shoes: "", socks: "", underwear: "", bra: "", coat: "", preferences: "", accommodations: "" }],
       emergencyName: "", emergencyPhone: "", emergencyRelation: "", recipientCode: "", documents: []
     };
@@ -486,6 +486,7 @@
         phone: record.phone || "",
         address: address.address || "",
         city: address.city || "",
+        state: address.state || "AZ",
         zip: address.zip || "",
         referral: application.referral || "",
         emergencyName: application.emergencyName || "",
@@ -785,6 +786,7 @@
         <div class="field"><label for="recipient-phone">Mobile phone</label><input id="recipient-phone" name="phone" type="tel" autocomplete="tel" value="${esc(recipientDraft.phone)}" required></div>
         <div class="field field--span-2"><label for="recipient-address">Home address</label><input id="recipient-address" name="address" autocomplete="street-address" value="${esc(recipientDraft.address)}" required></div>
         <div class="field"><label for="recipient-city">City</label><input id="recipient-city" name="city" autocomplete="address-level2" value="${esc(recipientDraft.city)}" required></div>
+        <div class="field"><label for="recipient-state">State</label><input id="recipient-state" name="state" autocomplete="address-level1" value="${esc(recipientDraft.state || "AZ")}" maxlength="2" placeholder="AZ" required></div>
         <div class="field"><label for="recipient-zip">ZIP code</label><input id="recipient-zip" name="zip" inputmode="numeric" autocomplete="postal-code" value="${esc(recipientDraft.zip)}" maxlength="10" required></div>
         <div class="field"><label for="referral">Who referred your family?</label><input id="referral" name="referral" value="${esc(recipientDraft.referral)}" placeholder="School, counselor, church, organization, or person" required></div>
         <div class="field"><label for="preferred-contact">Preferred contact</label><select id="preferred-contact" name="preferredContact"><option ${recipientDraft.preferredContact === "Email" ? "selected" : ""}>Email</option><option ${recipientDraft.preferredContact === "Text message" ? "selected" : ""}>Text message</option><option ${recipientDraft.preferredContact === "Phone call" ? "selected" : ""}>Phone call</option></select></div>
@@ -802,7 +804,7 @@
   }
 
   function saveHousehold(data) {
-    ["guardian", "email", "phone", "address", "city", "zip", "referral", "preferredContact", "notes"].forEach((key) => { recipientDraft[key] = String(data.get(key) || "").trim(); });
+    ["guardian", "email", "phone", "address", "city", "state", "zip", "referral", "preferredContact", "notes"].forEach((key) => { recipientDraft[key] = String(data.get(key) || "").trim(); });
   }
 
   function renderChildren(panel) {
@@ -971,6 +973,7 @@
     if (state.applications.some((item) => normalize(item.email) === normalize(draft.email))) flags.push("Email used on another application");
     if (state.applications.some((item) => normalize(item.phone) === normalize(draft.phone))) flags.push("Phone used on another application");
     if (state.applications.some((item) => normalize(`${item.address}${item.zip}`) === normalize(`${draft.address}${draft.zip}`))) flags.push("Household address matches another application");
+    if (String(draft.state || "AZ").trim().toUpperCase() !== "AZ") flags.push("Address is outside Arizona");
     const existingChildren = state.applications.flatMap((item) => item.children);
     draft.children.forEach((child) => {
       if (existingChildren.some((existing) => normalize(existing.name) === normalize(child.name))) flags.push("Child name matches another application");
@@ -1001,7 +1004,7 @@
       try {
         const response = await fetch("/portal-api/public/applications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
           eventId: state.event.id, guardianName: recipientDraft.guardian, email: recipientDraft.email, phone: recipientDraft.phone,
-          address: { address: recipientDraft.address, city: recipientDraft.city, zip: recipientDraft.zip }, notes: recipientDraft.notes,
+          address: { address: recipientDraft.address, city: recipientDraft.city, state: recipientDraft.state, zip: recipientDraft.zip }, notes: recipientDraft.notes,
           application: { referral: recipientDraft.referral, preferredContact: recipientDraft.preferredContact, emergencyName: recipientDraft.emergencyName, emergencyPhone: recipientDraft.emergencyPhone, emergencyRelation: recipientDraft.emergencyRelation, agreementSignature: recipientDraft.agreementSignature, finalSignature: recipientDraft.finalSignature, acknowledgments: recipientDraft.acknowledgments },
           children: recipientDraft.children.map((child) => ({ firstName: child.firstName, lastName: child.lastName, birthDate: child.birthdate, photoDataUrl: child.photoDataUrl || "", details: { gender: child.gender, shirt: child.shirt, pants: child.pants, shoes: child.shoes, socks: child.socks, underwear: child.underwear, bra: child.bra, coat: child.coat, preferences: child.preferences, accommodations: child.accommodations } }))
         }) });

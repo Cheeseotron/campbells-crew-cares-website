@@ -989,6 +989,8 @@ async function registerRecipient(env, input, codeGranted = false) {
   if (existingHouseholds.some((household) => normalizedMatchValue(household.phone) === normalizedMatchValue(phone))) flags.push("Phone used on another application");
   const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
   if (addressKey && existingHouseholds.some((household) => { try { const saved = JSON.parse(household.address_json || "{}"); return normalizedMatchValue(`${saved.address || ""}${saved.zip || ""}`) === addressKey; } catch { return false; } })) flags.push("Household address matches another application");
+  const addressState = String(address.state || "AZ").trim().toUpperCase();
+  if (addressState && addressState !== "AZ") flags.push("Address is outside Arizona");
   const { results: existingChildren } = await env.DB.prepare("SELECT c.first_name, c.last_name FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id WHERE h.event_id = ?").bind(event.id).all();
   const matchingNames = submittedChildren.filter((child) => existingChildren.some((existing) => normalizedMatchValue(`${existing.first_name} ${existing.last_name}`) === normalizedMatchValue(`${child.firstName} ${child.lastName}`)));
   if (matchingNames.length) flags.push(matchingNames.length === 1 ? "Child name matches another application" : `${matchingNames.length} child names match another application`);
@@ -1264,6 +1266,7 @@ async function api(request, env, url, user) {
       if (otherHouseholds.some((other) => other.event_id === household.event_id && normalizedMatchValue(other.phone) === normalizedMatchValue(household.phone)) && !flags.includes("Phone used on another application")) flags.push("Phone used on another application");
       const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
       if (addressKey && otherHouseholds.some((other) => { try { const saved = JSON.parse(other.address_json || "{}"); return other.event_id === household.event_id && normalizedMatchValue(`${saved.address || ""}${saved.zip || ""}`) === addressKey; } catch { return false; } }) && !flags.includes("Household address matches another application")) flags.push("Household address matches another application");
+      if (String(address.state || "AZ").trim().toUpperCase() !== "AZ" && !flags.includes("Address is outside Arizona")) flags.push("Address is outside Arizona");
       const { results: otherChildren } = await env.DB.prepare("SELECT c.first_name, c.last_name FROM recipient_children c JOIN recipient_households h ON h.id = c.household_id WHERE h.event_id = ? AND h.id <> ?").bind(household.event_id, household.id).all();
       const matchingNames = children.filter((child) => otherChildren.some((other) => normalizedMatchValue(`${other.first_name} ${other.last_name}`) === normalizedMatchValue(`${child.first_name} ${child.last_name}`)));
       const nameFlag = matchingNames.length === 1 ? "Child name matches another application" : `${matchingNames.length} child names match another application`;
