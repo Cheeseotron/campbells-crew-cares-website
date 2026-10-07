@@ -600,10 +600,6 @@ async function sendVolunteerConfirmation(env, recipient, name, role, event) {
   if (message) await sendEmail(env, recipient, message.subject, message.body);
 }
 
-async function sendVolunteerManagementLink(env, recipient, event, link) {
-  await sendEmail(env, recipient, `Manage your volunteer signup: ${event.title}`, `Hi,\n\nUse this private link to manage your volunteer signup for ${event.title}:\n${link}\n\nYou can change your role, cancel your signup, or add another volunteer. This link expires in seven days.\n\nIf you did not request this, you can ignore this email.`);
-}
-
 async function sendRecipientConfirmation(env, recipient, guardianName, event) {
   const message = eventEmailTemplate(event, "rec-received", { subject: "Application received: {{event}}", body: "Hi {{name}},\n\nYour Campbell's Crew Cares application for {{event}} has been received and is now awaiting review.\n\nSubmitting an application does not guarantee approval. We will contact you if we need more information or when there is an update." }, { name: guardianName });
   if (message) await sendEmail(env, recipient, message.subject, message.body);
@@ -821,7 +817,7 @@ function volunteerGroupForm(event, roles, selectedRole, accessToken, notice) {
 
 function volunteerManageRequestPage(event, message = "", error = "") {
   const notice = error ? `<p class="notice error" role="alert">${escapeHtml(error)}</p>` : message ? `<p class="notice success">${escapeHtml(message)}</p>` : "";
-  return `<article class="step-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}" aria-label="Close">×</a><p class="eyebrow">Existing volunteer</p><h1>Manage your signup</h1><p>Enter your email address and we’ll send a private link to change your role, cancel your signup, or add another person.</p>${notice}<form method="post" action="/volunteer?event=${encodeURIComponent(event.id)}"><input type="hidden" name="action" value="manage-request"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><label>Email address<input name="email" type="email" autocomplete="email" required></label><button class="button green">Email my secure link →</button></form></article>`;
+  return `<article class="step-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}" aria-label="Close">×</a><p class="eyebrow">Existing volunteer</p><h1>Manage your signup</h1><p>Enter the email address you used to sign up. We’ll open your signup here so you can change your role, cancel, or add another person.</p>${notice}<form method="post" action="/volunteer?event=${encodeURIComponent(event.id)}"><input type="hidden" name="action" value="manage-request"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><label>Email address<input name="email" type="email" autocomplete="email" required></label><button class="button green">Manage my signup →</button></form></article>`;
 }
 
 async function volunteerManagePage(env, event, token, email, message = "", error = "") {
@@ -1617,15 +1613,10 @@ export default {
           const query = new URLSearchParams({ event: event.id, step: "manage" });
           if (!isValidEmailAddress(email)) return liveVolunteerSignupPage(events, query, "", "Enter a complete email address, such as name@example.com.");
           const existing = await env.DB.prepare("SELECT s.id FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id WHERE s.event_id = ? AND v.email = ? LIMIT 1").bind(event.id, email).first();
-          if (existing) {
-            try {
-              const token = await volunteerManageToken(event.id, email, env.PORTAL_SESSION_SECRET);
-              const link = `${url.origin}/volunteer?event=${encodeURIComponent(event.id)}&manage=${encodeURIComponent(token)}`;
-              await sendVolunteerManagementLink(env, email, event, link);
-              await audit(env, null, "volunteer_management_link_sent", "volunteer_signup", existing.id, event.id);
-            } catch (error) { console.error("Volunteer management email delivery failed", error); }
-          }
-          return liveVolunteerSignupPage(events, query, "If a current registration matches that email, we sent a private management link.");
+          if (!existing) return liveVolunteerSignupPage(events, query, "", "We could not find a signup for that email at this event. Check the address or sign up as a new volunteer.");
+          const token = await volunteerManageToken(event.id, email, env.PORTAL_SESSION_SECRET);
+          await audit(env, null, "volunteer_signup_management_opened", "volunteer_signup", existing.id, event.id);
+          return volunteerManagePage(env, event, token, email);
         }
         if (["manage-update", "manage-cancel", "manage-add"].includes(String(input.action || ""))) {
           if (!manageAccess) return liveVolunteerSignupPage(events, new URLSearchParams({ event: event.id, step: "manage" }), "", "This private link has expired. Request a new one to continue.");
