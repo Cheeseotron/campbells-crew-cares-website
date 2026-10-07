@@ -973,7 +973,7 @@
     if (state.applications.some((item) => normalize(`${item.address}${item.zip}`) === normalize(`${draft.address}${draft.zip}`))) flags.push("Household address matches another application");
     const existingChildren = state.applications.flatMap((item) => item.children);
     draft.children.forEach((child) => {
-      if (existingChildren.some((existing) => normalize(existing.name) === normalize(child.name) && existing.birthdate === child.birthdate)) flags.push(`Possible duplicate child: ${child.name}`);
+      if (existingChildren.some((existing) => normalize(existing.name) === normalize(child.name))) flags.push("Child name matches another application");
     });
     const adultChildren = draft.children.filter((child) => {
       const birth = new Date(`${child.birthdate || ""}T12:00:00`);
