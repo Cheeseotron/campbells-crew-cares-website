@@ -975,6 +975,14 @@
     draft.children.forEach((child) => {
       if (existingChildren.some((existing) => normalize(existing.name) === normalize(child.name) && existing.birthdate === child.birthdate)) flags.push(`Possible duplicate child: ${child.name}`);
     });
+    const adultChildren = draft.children.filter((child) => {
+      const birth = new Date(`${child.birthdate || ""}T12:00:00`);
+      if (Number.isNaN(birth.valueOf())) return false;
+      const today = new Date(); let age = today.getFullYear() - birth.getFullYear();
+      if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) age -= 1;
+      return age >= 18;
+    });
+    if (adultChildren.length) flags.push(adultChildren.length === 1 ? "Child is age 18 or older" : `${adultChildren.length} children are age 18 or older`);
     return [...new Set(flags)];
   }
 

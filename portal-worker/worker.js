@@ -264,6 +264,17 @@ function childProfileValues({ child, household, event }) {
   };
 }
 
+function ageFromBirthDate(birthDate, onDate = new Date()) {
+  const value = String(birthDate || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const birth = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(birth.valueOf()) || birth > onDate) return null;
+  let age = onDate.getFullYear() - birth.getFullYear();
+  const birthdayThisYear = new Date(onDate.getFullYear(), birth.getMonth(), birth.getDate());
+  if (onDate < birthdayThisYear) age -= 1;
+  return age;
+}
+
 // Keep the accent away from the page edge. Some printers cannot reliably
 // print in their outermost margin, even though a PDF viewer displays it.
 function drawPrintSafeTopBar(page) {
@@ -978,6 +989,8 @@ async function registerRecipient(env, input, codeGranted = false) {
   if (existingHouseholds.some((household) => normalizedMatchValue(household.phone) === normalizedMatchValue(phone))) flags.push("Phone used on another application");
   const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
   if (addressKey && existingHouseholds.some((household) => { try { const saved = JSON.parse(household.address_json || "{}"); return normalizedMatchValue(`${saved.address || ""}${saved.zip || ""}`) === addressKey; } catch { return false; } })) flags.push("Household address matches another application");
+  const adults = submittedChildren.filter((child) => Number(ageFromBirthDate(child.birthDate)) >= 18);
+  if (adults.length) flags.push(adults.length === 1 ? "Child is age 18 or older" : `${adults.length} children are age 18 or older`);
   let householdId = recipientApplicationReference();
   while (await env.DB.prepare("SELECT id FROM recipient_households WHERE id = ?").bind(householdId).first()) householdId = recipientApplicationReference();
   await env.DB.prepare("INSERT INTO recipient_households (id, event_id, guardian_name, email, phone, flags_json, address_json, application_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
@@ -1248,6 +1261,9 @@ async function api(request, env, url, user) {
       if (otherHouseholds.some((other) => other.event_id === household.event_id && normalizedMatchValue(other.phone) === normalizedMatchValue(household.phone)) && !flags.includes("Phone used on another application")) flags.push("Phone used on another application");
       const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
       if (addressKey && otherHouseholds.some((other) => { try { const saved = JSON.parse(other.address_json || "{}"); return other.event_id === household.event_id && normalizedMatchValue(`${saved.address || ""}${saved.zip || ""}`) === addressKey; } catch { return false; } }) && !flags.includes("Household address matches another application")) flags.push("Household address matches another application");
+      const adultChildren = children.filter((child) => Number(ageFromBirthDate(child.birth_date)) >= 18);
+      const ageFlag = adultChildren.length === 1 ? "Child is age 18 or older" : `${adultChildren.length} children are age 18 or older`;
+      if (adultChildren.length && !flags.some((flag) => /child(?:ren)? (?:is|are) age 18 or older/.test(flag))) flags.push(ageFlag);
       return { ...household, reference_code: recipientApplicationReference(household.id), address, application, flags, children: children.map((child) => { let details = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {} return { ...child, photo_url: child.photo_key ? `/portal-api/organizer/children/${encodeURIComponent(child.id)}/photo` : "", details }; }) };
     }));
     return json({ recipients });
