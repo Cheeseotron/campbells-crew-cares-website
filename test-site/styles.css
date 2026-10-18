@@ -669,8 +669,9 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
   body[data-print-badge] .organizer-shell,
   body[data-print-badge] .organizer-main { display:block !important; }
   body[data-print-badge][data-print-badge-group="volunteers"] .badge-print-section--volunteers,
-  body[data-print-badge][data-print-badge-group="children"] .badge-print-section--children { display:block !important; }
-  body[data-print-badge][data-print-badge-group="all"] .badge-print-section,
+  body[data-print-badge][data-print-badge-group="children"] .badge-print-section--children,
+  body[data-print-badge][data-print-badge-group="board"] .badge-print-section--board { display:block !important; }
+  body[data-print-badge][data-print-badge-group="all"] .badge-print-section:not(.badge-print-section--board),
   body[data-print-badge][data-print-badge-group="single"] .badge-print-section:has(.is-badge-print-target) { display:block !important; }
   body, .app-shell, .organizer-shell, .organizer-main { background: var(--white) !important; }
   .organizer-shell { display: block; }
@@ -781,6 +782,7 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-section-heading .section-title { margin:0 0 5px; }
 .badge-section-heading p { margin:0; color:var(--muted); }
 .badge-grid--volunteers { grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); }
+.badge-grid--board { grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); }
 .badge-card--volunteer { --badge-background:linear-gradient(125deg,rgba(43,214,43,.18),rgba(43,214,43,0) 48%),radial-gradient(circle,rgba(23,107,57,.11) 0 1.15px,transparent 1.45px),#fbfefb; position:relative; isolation:isolate; overflow:hidden; width:min(100%, var(--volunteer-badge-width, 330px)); min-height:0; aspect-ratio:var(--volunteer-badge-ratio, 3.375 / 2.333); padding:20px 24px 17px; flex-direction:row; justify-content:flex-start; text-align:left; gap:18px; border:0; background:var(--badge-background); background-size:auto,15px 15px,auto; box-shadow:none; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 .badge-topbar { position:absolute!important; z-index:4!important; top:0; right:0; left:0; height:28px; overflow:hidden; pointer-events:none; }
 .badge-topbar i { position:absolute; top:0; bottom:0; display:block; }
@@ -795,6 +797,17 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card--volunteer > div > b { display:inline-block; padding:4px 10px; color:var(--ink); background:rgba(255,255,255,.74); border:2px solid var(--ink); border-radius:999px; font-size:13px; line-height:1.05; letter-spacing:.04em; }
 .badge-card--volunteer > div > em { color:var(--green-dark); font-size:10px; font-style:normal; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
 .badge-card--volunteer > button { align-self:flex-end; }
+.badge-card--board { --badge-background:linear-gradient(135deg,#101923 0%,#101923 56%,#173b2c 100%); position:relative; isolation:isolate; overflow:hidden; width:min(100%, var(--volunteer-badge-width, 330px)); min-height:0; aspect-ratio:var(--volunteer-badge-ratio, 3.375 / 2.333); padding:38px 24px 20px; flex-direction:row; justify-content:flex-start; align-items:center; text-align:left; gap:18px; border:0; background:var(--badge-background); box-shadow:none; color:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.badge-card--board::before { content:""; position:absolute; z-index:0; right:-14%; bottom:-47%; width:72%; height:125%; border:18px solid rgba(43,214,43,.18); border-radius:50%; transform:rotate(-25deg); pointer-events:none; }
+.badge-card--board::after { content:""; position:absolute; z-index:0; right:0; bottom:0; left:0; height:8px; background:linear-gradient(90deg,#2bd62b 0 64%,#f4cb59 64% 100%); pointer-events:none; }
+.badge-card--board > * { position:relative; z-index:1; }
+.badge-card--board > img { width:82px; height:82px; padding:4px; object-fit:contain; flex:0 0 auto; border:2px solid #2bd62b; border-radius:50%; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.1); }
+.board-badge-ribbon { position:absolute!important; z-index:2!important; top:0; right:0; padding:9px 14px 8px; color:#101923; background:#2bd62b; font-size:10px; font-weight:900; letter-spacing:.13em; line-height:1; text-transform:uppercase; }
+.board-badge-copy { display:flex; min-width:0; flex:1; flex-direction:column; align-items:flex-start; gap:5px; }
+.board-badge-copy > span { color:#8de08e; font-size:10px; font-weight:800; letter-spacing:.12em; line-height:1.1; text-transform:uppercase; }
+.board-badge-copy > strong { color:#fff; font-size:29px; line-height:.93; letter-spacing:-.05em; overflow-wrap:anywhere; }
+.board-badge-copy > b { color:#f7e4a3; font-size:11px; line-height:1.16; letter-spacing:.02em; }
+.badge-section-description { margin:5px 0 0; color:var(--muted); font-size:14px; }
 .badge-card--recipient { --badge-background:linear-gradient(155deg,rgba(43,214,43,.16),rgba(43,214,43,0) 48%),repeating-linear-gradient(45deg,rgba(23,107,57,.055) 0 1px,transparent 1px 11px),#fbfefb; position:relative; isolation:isolate; overflow:hidden; width:min(100%, var(--child-badge-width, 2in)); min-height:0; aspect-ratio:var(--child-badge-ratio, 2 / 3.5); padding:26px 13px 16px; justify-self:center; gap:7px; border:0; background:var(--badge-background); box-shadow:none; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 .badge-card--recipient::before, .badge-card--recipient::after { content:none; }
 .badge-card--recipient > * { position:relative; z-index:1; }
@@ -859,11 +872,14 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
      this avoids the large accidental gap seen in the vertical PDF. */
   body[data-print-badge][data-print-badge-group="volunteers"] .badge-grid--volunteers,
   body[data-print-badge][data-print-badge-group="children"] .badge-grid--children,
+  body[data-print-badge][data-print-badge-group="board"] .badge-grid--board,
   body[data-print-badge][data-print-badge-group="single"] .badge-grid:has(.is-badge-print-target) { position:absolute!important; top:0!important; left:0!important; margin:0!important; }
   body[data-print-badge][data-print-badge-group="volunteers"] .badge-grid--volunteers { display:grid; grid-template-columns:repeat(var(--volunteer-badge-columns, 2), var(--volunteer-badge-width, 3.375in)); gap:.1in; justify-content:center; align-content:start; }
   /* Avery 5395: exact two-column, four-row label geometry.  These are the
      physical start points on the sheet, not generic centering values. */
   body[data-print-badge][data-print-badge-group="volunteers"][data-volunteer-badge-size="avery-8395"] .badge-grid--volunteers { box-sizing:border-box; grid-template-columns:repeat(2,3.375in); grid-auto-rows:2.333333in; column-gap:.375in; row-gap:.166667in; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.583333in .6875in; }
+  /* Board badges use the same Avery 5395 stock as volunteers. */
+  body[data-print-badge][data-print-badge-group="board"] .badge-grid--board { box-sizing:border-box; display:grid; grid-template-columns:repeat(2,3.375in); grid-auto-rows:2.333333in; column-gap:.375in; row-gap:.166667in; justify-content:start; align-content:start; width:8.5in; height:11in; min-height:0; padding:.583333in .6875in; }
   body[data-print-badge][data-print-badge-group="children"] .badge-grid--children { display:grid; grid-template-columns:repeat(var(--child-badge-columns, 2), var(--child-badge-width, 3in)); gap:0; justify-content:start; align-content:start; }
   /* Avery 8471: both directions are printed on the exact same 2 × 5 card
      template, so they must share one physical registration grid. */
@@ -880,9 +896,9 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
      accent run .05in beyond the sticker edge, while all names, logos, photos,
      and role text remain inside the actual label area. This hides tiny feeder
      or template shifts without relying on a hard perimeter line. */
-  body[data-print-badge] .badge-card--volunteer, body[data-print-badge] .badge-card--recipient { overflow:visible; background:transparent; }
-  body[data-print-badge] .badge-card--volunteer::before, body[data-print-badge] .badge-card--recipient::before { content:""; position:absolute; z-index:0; inset:-.05in; background:var(--badge-background); -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  body[data-print-badge] .badge-card--volunteer > *, body[data-print-badge] .badge-card--recipient > * { position:relative; z-index:1; }
+  body[data-print-badge] .badge-card--volunteer, body[data-print-badge] .badge-card--recipient, body[data-print-badge] .badge-card--board { overflow:visible; background:transparent; }
+  body[data-print-badge] .badge-card--volunteer::before, body[data-print-badge] .badge-card--recipient::before, body[data-print-badge] .badge-card--board::before { content:""; position:absolute; z-index:0; inset:-.05in; background:var(--badge-background); -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body[data-print-badge] .badge-card--volunteer > *, body[data-print-badge] .badge-card--recipient > *, body[data-print-badge] .badge-card--board > * { position:relative; z-index:1; }
   /* The perforations touch, so 8471 cards use their exact boundaries rather
      than a bleed that would run into the neighboring card. */
   body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-card--recipient::before,
@@ -896,6 +912,7 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-card--recipient::after,
   body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="vertical-225x35"] .badge-card--recipient::after { content:none; }
   body[data-print-badge] .badge-card--volunteer { width:var(--volunteer-badge-width, 3.375in); height:var(--volunteer-badge-height, 2.333in); aspect-ratio:auto; margin:0; }
+  body[data-print-badge] .badge-card--board { width:3.375in; height:2.333333in; aspect-ratio:auto; margin:0; }
   body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-card--recipient { width:3.5in; height:2in; aspect-ratio:auto; margin:0; }
   body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="avery-8395"] .badge-card--recipient { width:3.375in; height:2.333333in; aspect-ratio:auto; margin:0; }
   /* Portrait card art is rotated inside the same 3½ × 2in Avery slot. Once
