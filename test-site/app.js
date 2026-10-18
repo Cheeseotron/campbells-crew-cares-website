@@ -240,6 +240,7 @@
   }
 
   let state = prepareEventCollection((SERVER_AUTH || LIVE_PUBLIC_RECIPIENT) ? createLiveState() : loadState());
+  let roleLibrary = [];
   if (!SERVER_AUTH && !LIVE_PUBLIC_RECIPIENT) {
     if (state.volunteers.length < 15 || state.applications.length < 15) expandDemoData(state);
     state.volunteers.forEach((volunteer,index) => { if (volunteer.currentEvent === undefined) volunteer.currentEvent = index < 5 ? state.event.title : ""; });
@@ -407,6 +408,12 @@
       ? rememberedEventId
       : events.find((event) => !event.closed)?.id || events[0]?.id || "";
     state = prepareEventCollection({ ...createLiveState(), events, activeEventId });
+    try {
+      const libraryResponse = await fetch("/portal-api/role-library", { headers: { Accept: "application/json" } });
+      if (libraryResponse.ok) roleLibrary = (await libraryResponse.json()).roles || [];
+    } catch {
+      // Event setup remains available if the reusable-library request is temporarily unavailable.
+    }
   }
 
   async function loadLiveImpact() {
@@ -1124,7 +1131,7 @@
     const budgetTotal = e.budgetItems.filter((item) => item.enabled).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     return `${heading("Event management", "Event setup", "Configure the public forms, event-day rules, budgets and access in one place.", `<a class="button button--light" href="#volunteer">Preview volunteer page</a>`)}
       <form id="event-form"><details class="settings-section" open><summary><span><b>01</b><strong>Event basics</strong></span><small>Date, place and overall capacity</small></summary><div class="settings-section__body"><div class="form-grid"><div class="field field--span-2"><label for="event-title">Event name</label><input id="event-title" name="title" value="${esc(e.title)}" required></div><div class="field"><label for="event-date">Date</label><input id="event-date" name="date" value="${esc(e.date)}" required></div><div class="field"><label for="event-time">Time</label><input id="event-time" name="time" value="${esc(e.time)}" required></div><div class="field"><label for="event-location">Meeting location</label><input id="event-location" name="location" value="${esc(e.location)}" required></div><div class="field"><label for="event-address">Address</label><input id="event-address" name="address" value="${esc(e.address)}" required></div><div class="field"><label for="vol-capacity">Overall volunteer capacity</label><input id="vol-capacity" name="volunteerCapacity" type="number" min="1" value="${esc(e.volunteerCapacity)}"></div><div class="field"><label for="rec-capacity">Recipient child capacity</label><input id="rec-capacity" name="recipientCapacity" type="number" min="1" value="${esc(e.recipientCapacity)}"></div></div></div></details>
-      <details class="settings-section" open><summary><span><b>02</b><strong>Volunteer roles & spots</strong></span><small>Names, shifts, limits, and signup guidance</small></summary><div class="settings-section__body"><div class="editor-table">${roleEditorRows(e.roles)}</div><div class="editor-actions"><button class="button button--light" type="button" data-add-role>+ Add another role</button><button class="button button--light" type="button" data-remove-roles>Remove roles</button></div></div></details>
+      <details class="settings-section" open><summary><span><b>02</b><strong>Volunteer roles & spots</strong></span><small>Names, shifts, limits, and signup guidance</small></summary><div class="settings-section__body"><div class="editor-table">${roleEditorRows(e.roles)}</div><div class="editor-actions"><button class="button button--light" type="button" data-add-role>+ Add another role</button><button class="button button--light" type="button" data-remove-roles>Remove roles</button></div><div class="role-library-actions"><div><strong>Reusable role library</strong><small>Save this event’s role setup once, then every new Shopping Event will start with it.</small></div><button class="button button--dark" type="button" data-save-role-library>Save as reusable roles</button><button class="button button--light" type="button" data-restore-role-library ${roleLibrary.length ? "" : "disabled"}>Use saved roles for this event</button></div></div></details>
       <details class="settings-section"><summary><span><b>03</b><strong>Signup access & questions</strong></span><small>Open, code, closed and field visibility</small></summary><div class="settings-section__body"><h3>Volunteer registration</h3><div class="event-editor-grid">${statusChoice("volunteerStatus", "open", "Open", "Anyone can register.", e.volunteerStatus)}${statusChoice("volunteerStatus", "code", "Access code", "Require an invitation code.", e.volunteerStatus)}${statusChoice("volunteerStatus", "closed", "Closed", "Show a closed message.", e.volunteerStatus)}</div><div class="field"><label for="volunteer-access-code">Volunteer invitation code</label><input id="volunteer-access-code" name="volunteerCode" value="${esc(e.volunteerCode)}"></div><h3>Recipient applications</h3><div class="event-editor-grid">${statusChoice("recipientStatus", "open", "Open", "Applications without a code.", e.recipientStatus)}${statusChoice("recipientStatus", "code", "Access code", "Require referral code.", e.recipientStatus)}${statusChoice("recipientStatus", "closed", "Closed", "Stop new applications.", e.recipientStatus)}</div><div class="field"><label for="recipient-access-code">Recipient invitation code</label><input id="recipient-access-code" name="recipientCode" value="${esc(e.recipientCode)}"></div><div class="toggle-grid">${questionToggle("shirtSize", "Volunteer T-shirt size", e.questions.shirtSize)}${questionToggle("volunteerNotes", "Volunteer special notes", e.questions.volunteerNotes)}${questionToggle("preferences", "Child preferences", e.questions.preferences)}${questionToggle("accommodations", "Child accommodations", e.questions.accommodations)}${questionToggle("braSize", "Bra size when applicable", e.questions.braSize)}${questionToggle("documents", "Supporting documents", e.questions.documents)}</div></div></details>
       <details class="settings-section" open><summary><span><b>04</b><strong>Shopping rules & budgets</strong></span><small>Overall per-child total: <b data-budget-total>$${budgetTotal}</b></small></summary><div class="settings-section__body"><div class="budget-header"><div class="budget-total-card"><span>Overall per-child maximum</span><strong data-budget-total>$${budgetTotal}</strong><small>Calculated from enabled items</small></div><p>Set each item amount below. Turn an item off to remove it from the total and every child packet.</p></div><div class="budget-grid">${e.budgetItems.map((item) => `<label class="budget-item"><input type="checkbox" name="budget-enabled-${item.id}" ${item.enabled ? "checked" : ""}><span class="switch-control" aria-hidden="true"></span><span><strong>${esc(item.label)}</strong><small>${esc(item.mode === "relevant" ? "When relevant" : item.mode === "optional" ? "Optional" : "Standard item")}</small></span><b>$</b><input aria-label="${esc(item.label)} budget" name="budget-amount-${item.id}" type="number" min="0" step="1" value="${esc(item.amount)}"></label>`).join("")}</div></div></details>
       <div class="sticky-save"><span>All changes are saved.</span><button class="button button--green" type="submit">Save & update event →</button></div></form>`;
@@ -1134,7 +1141,7 @@
     const itemTotal = (item) => Number(item.quantity || 0) * Number(e.bagGoal || 0);
     return `${heading("Event management", "Food Bag Event setup", "Configure volunteer signups and the plan for every food bag.", `<a class="button button--light" href="#volunteer">Preview volunteer page</a>`)}
       <form id="event-form"><details class="settings-section" open><summary><span><b>01</b><strong>Event basics</strong></span><small>Date, place and overall capacity</small></summary><div class="settings-section__body"><div class="form-grid"><div class="field field--span-2"><label for="event-title">Event name</label><input id="event-title" name="title" value="${esc(e.title)}" required></div><div class="field"><label for="event-date">Date</label><input id="event-date" name="date" value="${esc(e.date)}" required></div><div class="field"><label for="event-time">Time</label><input id="event-time" name="time" value="${esc(e.time)}" required></div><div class="field"><label for="event-location">Meeting location</label><input id="event-location" name="location" value="${esc(e.location)}" required></div><div class="field"><label for="event-address">Address</label><input id="event-address" name="address" value="${esc(e.address)}" required></div><div class="field"><label for="vol-capacity">Overall volunteer capacity</label><input id="vol-capacity" name="volunteerCapacity" type="number" min="1" value="${esc(e.volunteerCapacity)}"></div></div></div></details>
-      <details class="settings-section" open><summary><span><b>02</b><strong>Volunteer roles & spots</strong></span><small>Names, shifts, limits, and signup guidance</small></summary><div class="settings-section__body"><div class="editor-table">${roleEditorRows(e.roles)}</div><div class="editor-actions"><button class="button button--light" type="button" data-add-role>+ Add another role</button><button class="button button--light" type="button" data-remove-roles>Remove roles</button></div></div></details>
+      <details class="settings-section" open><summary><span><b>02</b><strong>Volunteer roles & spots</strong></span><small>Names, shifts, limits, and signup guidance</small></summary><div class="settings-section__body"><div class="editor-table">${roleEditorRows(e.roles)}</div><div class="editor-actions"><button class="button button--light" type="button" data-add-role>+ Add another role</button><button class="button button--light" type="button" data-remove-roles>Remove roles</button></div><div class="role-library-actions"><div><strong>Reusable role library</strong><small>Save this event’s role setup once, then every new Shopping Event will start with it.</small></div><button class="button button--dark" type="button" data-save-role-library>Save as reusable roles</button><button class="button button--light" type="button" data-restore-role-library ${roleLibrary.length ? "" : "disabled"}>Use saved roles for this event</button></div></div></details>
       <details class="settings-section"><summary><span><b>03</b><strong>Volunteer signup access</strong></span><small>Open, code or closed</small></summary><div class="settings-section__body"><div class="configuration-heading"><span>Volunteer configuration</span><small>Control public access and the optional volunteer questions.</small></div><div class="event-editor-grid">${statusChoice("volunteerStatus", "open", "Open", "Anyone can register.", e.volunteerStatus)}${statusChoice("volunteerStatus", "code", "Access code", "Require an invitation code.", e.volunteerStatus)}${statusChoice("volunteerStatus", "closed", "Closed", "Show a closed message.", e.volunteerStatus)}</div><div class="field"><label for="volunteer-access-code">Volunteer invitation code</label><input id="volunteer-access-code" name="volunteerCode" value="${esc(e.volunteerCode)}"></div><div class="toggle-grid">${questionToggle("shirtSize", "Volunteer T-shirt size", e.questions.shirtSize)}${questionToggle("volunteerNotes", "Volunteer special notes", e.questions.volunteerNotes)}</div></div></details>
       <details class="settings-section" open><summary><span><b>04</b><strong>Bag plan & order totals</strong></span><small>${esc(e.bagGoal)} bags planned</small></summary><div class="settings-section__body"><div class="bag-plan-intro"><div class="field"><label for="bag-goal">Goal number of bags</label><input id="bag-goal" name="bagGoal" type="number" min="1" value="${esc(e.bagGoal)}"></div><p>Enter what goes in one bag. The total needed updates automatically for the goal number of bags.</p></div><div class="bag-quick-add"><label for="routine-bag-item">Quick add a routine item<select id="routine-bag-item"><option value="">Choose a standard item</option>${foodBagRoutineItems.map((item) => `<option value="${esc(item)}">${esc(item)}</option>`).join("")}</select></label><button class="button button--dark" type="button" data-add-routine-item>Add selected item</button><button class="button button--light" type="button" data-add-routine-set>Add all routine items</button><button class="button button--light" type="button" data-add-bag-item>+ Add blank item</button></div><div class="bag-plan-table"><div class="bag-plan-row bag-plan-row--head"><span>Item for each bag</span><span>Quantity per bag</span><span>Total to order</span><span></span></div>${e.bagItems.map((item) => `<div class="bag-plan-row"><input name="bag-item-label-${item.id}" value="${esc(item.label)}" aria-label="Bag item"><input name="bag-item-quantity-${item.id}" type="number" min="0" value="${esc(item.quantity)}" aria-label="Quantity per bag"><strong data-bag-total="${item.id}">${itemTotal(item)}</strong><button class="bag-remove" type="button" data-remove-bag-item="${esc(item.id)}" aria-label="Remove ${esc(item.label)}">Remove</button></div>`).join("")}</div><div class="bag-plan-actions"><button class="button button--light" type="button" data-export="bag-plan">Download order spreadsheet</button><button class="button button--green" type="button" data-print-bag-guide>Print packing guide</button></div><article class="bag-packing-guide"><img src="../assets/images/ccc-logo.png" alt="Campbell's Crew Cares logo"><p class="eyebrow">Volunteer packing guide</p><h2>${esc(e.title)}</h2><p>Pack <strong>each bag</strong> with the following items.</p><div class="bag-guide-list">${e.bagItems.map((item) => `<p><b>${esc(item.quantity)}</b><span>${esc(item.label)}</span></p>`).join("")}</div><footer>Goal: ${esc(e.bagGoal)} bags · Campbell's Crew Cares</footer></article></div></details>
       <div class="sticky-save"><span>All changes are saved.</span><button class="button button--green" type="submit">Save & update event →</button></div></form>`;
@@ -1165,6 +1172,22 @@
 
   function roleEditorRows(roles) {
     return `<div class="editor-row editor-row--head"><span>Open</span><span>Role</span><span>Shift</span><span>Spots</span></div>${roles.map((role) => `<div class="role-editor"><div class="editor-row"><label class="switch"><input type="checkbox" name="role-enabled-${role.id}" ${role.enabled ? "checked" : ""}><span></span></label><input aria-label="${esc(role.title)} role name" name="role-title-${role.id}" value="${esc(role.title)}"><input aria-label="${esc(role.title)} shift" name="role-shift-${role.id}" value="${esc(role.shift)}"><input aria-label="${esc(role.title)} spots" name="role-capacity-${role.id}" type="number" min="0" value="${esc(role.capacity)}"></div><label class="role-guide-field"><span>Role guide shown during signup</span><textarea name="role-description-${role.id}" rows="4" placeholder="Explain what this volunteer role involves and any important expectations.">${esc(starterRoleGuide(role))}</textarea></label></div>`).join("")}`;
+  }
+
+  function rolesFromRoleEditor() {
+    return state.event.roles.map((role) => ({
+      ...role,
+      enabled: Boolean(document.querySelector(`[name="role-enabled-${role.id}"]`)?.checked),
+      title: String(document.querySelector(`[name="role-title-${role.id}"]`)?.value || role.title || "").trim(),
+      shift: String(document.querySelector(`[name="role-shift-${role.id}"]`)?.value || role.shift || "").trim(),
+      capacity: Math.max(0, Number(document.querySelector(`[name="role-capacity-${role.id}"]`)?.value || 0)),
+      description: String(document.querySelector(`[name="role-description-${role.id}"]`)?.value || "").trim().slice(0, 2500)
+    }));
+  }
+
+  function eventRolesFromLibrary(roles) {
+    const stamp = Date.now();
+    return roles.map((role, index) => ({ id: `role-${stamp}-${index}`, title: role.title, description: role.description || "", shift: role.shift || "", capacity: Math.max(0, Number(role.capacity) || 0), enabled: role.enabled !== false }));
   }
 
   function statusChoice(name, value, title, copy, current) {
@@ -1411,13 +1434,7 @@
         ["title", "date", "time", "location", "address", "volunteerStatus", "volunteerCode"].forEach((key) => { state.event[key] = String(data.get(key) || "").trim(); });
         if (state.event.type !== "food-bag") ["recipientStatus", "recipientCode"].forEach((key) => { state.event[key] = String(data.get(key) || "").trim(); });
         if (state.event.type !== "food-bag") ["recipientCapacity"].forEach((key) => { state.event[key] = Number(data.get(key)); });
-        state.event.roles.forEach((role) => {
-          role.enabled = data.has(`role-enabled-${role.id}`);
-          role.title = String(data.get(`role-title-${role.id}`) || role.title).trim();
-          role.shift = String(data.get(`role-shift-${role.id}`) || role.shift).trim();
-          role.capacity = Number(data.get(`role-capacity-${role.id}`) || 0);
-          role.description = String(data.get(`role-description-${role.id}`) || "").trim().slice(0, 2500);
-        });
+        state.event.roles = rolesFromRoleEditor();
         state.event.volunteerCapacity = state.event.roles.filter((role) => role.enabled).reduce((total, role) => total + Math.max(0, Number(role.capacity) || 0), 0);
         Object.keys(state.event.questions).forEach((key) => { state.event.questions[key] = data.has(`question-${key}`); });
         if (state.event.type === "food-bag") {
@@ -1475,6 +1492,31 @@
       });
       const removeRoles = document.querySelector("[data-remove-roles]");
       if (removeRoles) removeRoles.addEventListener("click", openRemoveRoles);
+      const saveRoleLibrary = document.querySelector("[data-save-role-library]");
+      if (saveRoleLibrary) saveRoleLibrary.addEventListener("click", async () => {
+        const roles = rolesFromRoleEditor();
+        if (!roles.length || roles.some((role) => !role.title)) { toast("Give every reusable role a name before saving it."); return; }
+        saveRoleLibrary.disabled = true;
+        try {
+          const response = await fetch("/portal-api/role-library", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles }) });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || "The reusable roles could not be saved.");
+          roleLibrary = payload.roles || [];
+          toast("Reusable role library saved. New Shopping Events will start with these roles.");
+        } catch (error) { toast(error.message || "The reusable roles could not be saved."); }
+        finally { saveRoleLibrary.disabled = false; }
+      });
+      const restoreRoleLibrary = document.querySelector("[data-restore-role-library]");
+      if (restoreRoleLibrary) restoreRoleLibrary.addEventListener("click", () => {
+        if (!roleLibrary.length) { toast("No reusable roles have been saved yet."); return; }
+        if (!window.confirm("Replace this event’s current roles with your saved reusable roles? You can still adjust them before saving this event.")) return;
+        state.event.roles = eventRolesFromLibrary(roleLibrary);
+        renderOrganizer("events");
+        const freshSaveBar = document.querySelector(".sticky-save");
+        freshSaveBar?.classList.add("is-dirty");
+        if (freshSaveBar?.querySelector("span")) freshSaveBar.querySelector("span").textContent = "Saved roles loaded — save this event when you are ready.";
+        toast("Saved roles loaded for this event.");
+      });
       const addRoutineItem = document.querySelector("[data-add-routine-item]");
       if (addRoutineItem) addRoutineItem.addEventListener("click", () => { const picker = document.querySelector("#routine-bag-item"); const label = String(picker?.value || ""); if (!label) { toast("Choose a routine item first."); return; } if (state.event.bagItems.some((item) => item.label.toLowerCase() === label.toLowerCase())) { toast(`${label} is already in this bag plan.`); return; } state.event.bagItems.push(makeBagItem(label)); saveState(); renderOrganizer("events"); });
       const addRoutineSet = document.querySelector("[data-add-routine-set]");
@@ -1915,6 +1957,7 @@
       fresh.time = String(data.get("time") || "").trim(); fresh.location = String(data.get("location") || "").trim(); fresh.address = String(data.get("address") || "").trim();
       fresh.id = `event-${Date.now()}`; fresh.type = String(data.get("eventType") || "shopping"); fresh.volunteerEnabled = data.has("volunteerEnabled"); fresh.recipientEnabled = fresh.type === "shopping" && data.has("recipientEnabled");
       fresh.bagGoal = 100; fresh.bagItems = routineBagItems();
+      if (fresh.type === "shopping" && roleLibrary.length) fresh.roles = eventRolesFromLibrary(roleLibrary);
       if (fresh.type === "food-bag") fresh.roles = [
         { id: "bag-packer", title: "Bag Packer", description: "Pack planned food items into completed bags.", shift: fresh.time, capacity: 40, enabled: true },
         { id: "inventory", title: "Inventory Checker", description: "Keep item counts organized and restock packing stations.", shift: fresh.time, capacity: 8, enabled: true },

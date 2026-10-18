@@ -337,6 +337,11 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .settings-section__body h3 { margin-top: 24px; }
 .editor-table { margin: 18px 0; border: 1px solid var(--line); }
 .editor-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.role-library-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:16px; padding:14px 16px; border-left:4px solid var(--green); background:var(--mist); }
+.role-library-actions > div { flex:1 1 260px; }
+.role-library-actions strong,.role-library-actions small { display:block; }
+.role-library-actions small { margin-top:3px; color:var(--muted); }
+.role-library-actions .button { margin:0; }
 .editor-row { display: grid; grid-template-columns: 60px 1.2fr 1fr 90px; gap: 8px; padding: 9px; align-items: center; border-bottom: 1px solid var(--line); }
 .editor-row:last-child { border-bottom: 0; }
 .editor-row--head { color: var(--gray); background: var(--mist-2); font-size: 9px; font-weight: 800; text-transform: uppercase; }

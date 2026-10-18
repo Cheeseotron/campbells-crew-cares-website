@@ -773,6 +773,33 @@ function volunteerRoleGuide(role) {
   return (!existing || legacy.has(existing)) && guides[title] ? guides[title] : existing;
 }
 
+function normalizeRoleLibrary(input) {
+  if (!Array.isArray(input) || input.length > 30) return null;
+  const seenTitles = new Set();
+  const roles = [];
+  for (let index = 0; index < input.length; index += 1) {
+    const item = input[index] || {};
+    const title = String(item.title || "").trim().slice(0, 80);
+    if (!title || seenTitles.has(title.toLowerCase())) return null;
+    seenTitles.add(title.toLowerCase());
+    roles.push({
+      id: String(item.id || randomId("role_library")).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100) || randomId("role_library"),
+      title,
+      description: String(item.description || "").trim().slice(0, 2500),
+      shift: String(item.shift || "").trim().slice(0, 120),
+      capacity: Math.max(0, Math.min(10000, Math.floor(Number(item.capacity) || 0))),
+      enabled: item.enabled !== false,
+      sortOrder: index
+    });
+  }
+  return roles;
+}
+
+async function readRoleLibrary(env) {
+  const { results } = await env.DB.prepare("SELECT id, title, description, default_shift, default_capacity, enabled FROM volunteer_role_library ORDER BY sort_order ASC, title COLLATE NOCASE ASC").all();
+  return results.map((role) => ({ id: role.id, title: role.title, description: role.description, shift: role.default_shift, capacity: Number(role.default_capacity) || 0, enabled: Boolean(role.enabled) }));
+}
+
 async function publicVolunteerEvents(env) {
   const { results } = await env.DB.prepare("SELECT id, title, event_date, settings_json FROM events WHERE status = 'open' AND event_type IN ('shopping', 'food_bag') ORDER BY event_date ASC").all();
   const events = results.map((event) => ({ ...event, settings: eventSettings(event) })).filter((event) => ["open", "code"].includes(event.settings.volunteerStatus));
@@ -1132,6 +1159,26 @@ async function api(request, env, url, user) {
     if (!user) return json({ error: "Sign in required." }, 401);
     const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date, status, settings_json, created_at, updated_at FROM events ORDER BY event_date DESC").all();
     return json({ events: results.map((event) => ({ ...event, settings: JSON.parse(event.settings_json) })) });
+  }
+
+  if (url.pathname === "/portal-api/role-library" && request.method === "GET") {
+    if (!user) return json({ error: "Sign in required." }, 401);
+    return json({ roles: await readRoleLibrary(env) });
+  }
+
+  if (url.pathname === "/portal-api/role-library" && request.method === "PUT") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
+    const input = await request.json();
+    const roles = normalizeRoleLibrary(input.roles);
+    if (!roles || !roles.length) return json({ error: "Add at least one role with a unique name before saving the reusable role library." }, 400);
+    const statements = [env.DB.prepare("DELETE FROM volunteer_role_library")];
+    for (const role of roles) {
+      statements.push(env.DB.prepare("INSERT INTO volunteer_role_library (id, title, description, default_shift, default_capacity, enabled, sort_order, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)")
+        .bind(role.id, role.title, role.description, role.shift, role.capacity, role.enabled ? 1 : 0, role.sortOrder));
+    }
+    await env.DB.batch(statements);
+    await audit(env, user, "volunteer_role_library_updated", "volunteer_role_library", "default", null, { count: roles.length });
+    return json({ roles: await readRoleLibrary(env) });
   }
 
   if (url.pathname === "/portal-api/events" && request.method === "POST") {
