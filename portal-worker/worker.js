@@ -907,6 +907,10 @@ function volunteerRoleGuide(role) {
   return (!existing || legacy.has(existing)) && guides[title] ? guides[title] : existing;
 }
 
+function isAdultOnlyVolunteerRole(roleTitle) {
+  return /(^|\b)(cart checker|check-in\s*\/\s*cart checker)(\b|$)/i.test(String(roleTitle || ""));
+}
+
 function normalizeRoleLibrary(input) {
   if (!Array.isArray(input) || input.length > 30) return null;
   const seenTitles = new Set();
@@ -1006,10 +1010,10 @@ function volunteerGroupForm(event, roles, selectedRole, accessToken, notice) {
   const roleGuides = Object.fromEntries(roles.map((role) => [role.title, volunteerRoleGuide(role) || "Ask an organizer about the expectations for this role."]));
   const roleGuideData = JSON.stringify(roleGuides).replace(/</g, "\\u003c");
   const selectedGuide = roleGuides[selectedRole?.title] || Object.values(roleGuides)[0] || "Ask an organizer about the expectations for this role.";
-  const memberCard = (primary = false) => `<fieldset class="member-card" data-member><legend>${primary ? "Volunteer 1" : "Additional volunteer"}</legend><div class="grid"><label>First name<input data-first autocomplete="given-name" required></label><label>Last name<input data-last autocomplete="family-name" required></label></div><label>Email address<input data-email type="email" autocomplete="email" required></label>${primary ? `<label>Mobile phone<input data-phone type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 555-5555" required></label>` : `<label>Mobile phone <small>(optional)</small><input data-phone type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 555-5555"></label>`}<label>Volunteer role<select data-role required>${roleOptions}</select></label><p class="member-role-guide" data-role-guide-copy>${escapeHtml(selectedGuide)}</p>${primary ? "" : `<button class="button light member-remove" type="button">Remove this person</button>`}</fieldset>`;
+  const memberCard = (primary = false) => `<fieldset class="member-card" data-member><legend>${primary ? "Volunteer 1" : "Additional volunteer"}</legend><div class="grid"><label>First name<input data-first autocomplete="given-name" required></label><label>Last name<input data-last autocomplete="family-name" required></label></div><label>Email address<input data-email type="email" autocomplete="email" required></label>${primary ? `<label>Mobile phone<input data-phone type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 555-5555" required></label>` : `<label>Mobile phone <small>(optional)</small><input data-phone type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 555-5555"></label>`}<label>Volunteer age<select data-age-group required><option value="">Choose age group</option><option value="adult">18 or older</option><option value="minor">Under 18</option></select></label><p class="member-minor-note" data-minor-note hidden><strong>Youth volunteer:</strong> An adult volunteer must be included in this same signup. Please help make the day positive without taking away from the recipient child’s shopping experience—let the child choose.</p><label>Volunteer role<select data-role required>${roleOptions}</select></label><p class="member-role-guide" data-role-guide-copy>${escapeHtml(selectedGuide)}</p>${primary ? "" : `<button class="button light member-remove" type="button">Remove this person</button>`}</fieldset>`;
   const access = accessToken ? `&access=${encodeURIComponent(accessToken)}` : "";
   const additionalMemberData = JSON.stringify(memberCard(false)).replace(/</g, "\\u003c");
-  return `<style>.member-role-guide{margin:8px 0 0;padding:12px 14px;border-left:4px solid var(--green);background:var(--mist);color:var(--gray);font-size:14px;line-height:1.48}.selected-role p{margin:8px 0 0;color:var(--ink);font-size:14px;line-height:1.48}</style><article class="step-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}&step=roles${access}" aria-label="Back">←</a><p class="eyebrow">Step 2 of 2</p><h1>Who is<br>volunteering?</h1><p>Add everyone signing up together. Each person needs a different email address so they receive their own confirmation and role guide.</p>${notice}<form method="post" action="/volunteer?event=${encodeURIComponent(event.id)}" id="group-signup-form" data-role-guides="${escapeHtml(roleGuideData)}" data-additional-member="${escapeHtml(additionalMemberData)}"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><input type="hidden" name="access" value="${escapeHtml(accessToken)}"><input type="hidden" name="membersJson" value=""><div id="member-list">${memberCard(true)}</div><button class="button light" type="button" id="add-volunteer-member">+ Add another person</button><label class="check"><input name="agreement" type="checkbox" required><span>I confirm that everyone listed has reviewed the guide for their selected role and agrees to follow Campbell's Crew event and child-safety instructions.</span></label><button class="button dark">Complete signups →</button></form></article>`;
+  return `<style>.member-role-guide{margin:8px 0 0;padding:12px 14px;border-left:4px solid var(--green);background:var(--mist);color:var(--gray);font-size:14px;line-height:1.48}.member-minor-note{margin:8px 0 0;padding:12px 14px;border-left:4px solid #5aa9dd;background:#edf7ff;color:#25475c;font-size:14px;line-height:1.48}.selected-role p{margin:8px 0 0;color:var(--ink);font-size:14px;line-height:1.48}</style><article class="step-card"><a class="round" href="/volunteer?event=${encodeURIComponent(event.id)}&step=roles${access}" aria-label="Back">←</a><p class="eyebrow">Step 2 of 2</p><h1>Who is<br>volunteering?</h1><p>Add everyone signing up together. Each person needs a different email address so they receive their own confirmation and role guide. Volunteers under 18 must be signed up with an adult volunteer in this same group.</p>${notice}<form method="post" action="/volunteer?event=${encodeURIComponent(event.id)}" id="group-signup-form" data-role-guides="${escapeHtml(roleGuideData)}" data-additional-member="${escapeHtml(additionalMemberData)}"><input type="hidden" name="eventId" value="${escapeHtml(event.id)}"><input type="hidden" name="access" value="${escapeHtml(accessToken)}"><input type="hidden" name="membersJson" value=""><div id="member-list">${memberCard(true)}</div><button class="button light" type="button" id="add-volunteer-member">+ Add another person</button><label class="check"><input name="agreement" type="checkbox" required><span>I confirm that everyone listed has reviewed the guide for their selected role and agrees to follow Campbell's Crew event and child-safety instructions.</span></label><button class="button dark">Complete signups →</button></form></article>`;
 }
 
 function volunteerManageRequestPage(event, message = "", error = "") {
@@ -1098,10 +1102,10 @@ async function registerVolunteer(env, input, codeGranted = false) {
   let profile = await env.DB.prepare("SELECT id FROM volunteer_profiles WHERE email = ?").bind(email).first();
   if (!profile) {
     profile = { id: randomId("volunteer") };
-    await env.DB.prepare("INSERT INTO volunteer_profiles (id, name, email, phone, alert_opt_in) VALUES (?, ?, ?, ?, ?)")
-      .bind(profile.id, String(input.name).slice(0, 120), email, normalizePhoneNumber(input.phone).slice(0, 30), 0).run();
-  } else await env.DB.prepare("UPDATE volunteer_profiles SET name = ?, phone = ? WHERE id = ?")
-    .bind(String(input.name).slice(0, 120), normalizePhoneNumber(input.phone).slice(0, 30), profile.id).run();
+    await env.DB.prepare("INSERT INTO volunteer_profiles (id, name, email, phone, age_group, alert_opt_in) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(profile.id, String(input.name).slice(0, 120), email, normalizePhoneNumber(input.phone).slice(0, 30), input.ageGroup === "minor" ? "minor" : "adult", 0).run();
+  } else await env.DB.prepare("UPDATE volunteer_profiles SET name = ?, phone = ?, age_group = ? WHERE id = ?")
+    .bind(String(input.name).slice(0, 120), normalizePhoneNumber(input.phone).slice(0, 30), input.ageGroup === "minor" ? "minor" : "adult", profile.id).run();
   const signupId = randomId("signup");
   const notes = [input.shirt ? `T-shirt size: ${String(input.shirt).slice(0, 30)}` : "", String(input.notes || "").slice(0, 1900)].filter(Boolean).join("\n");
   try {
@@ -1121,11 +1125,14 @@ async function registerVolunteerGroup(env, input, codeGranted = false) {
     phone: normalizePhoneNumber(member.phone),
     role: String(member.role || "").trim(),
     shirt: String(member.shirt || "").trim(),
-    notes: String(member.notes || "").trim()
+    notes: String(member.notes || "").trim(),
+    ageGroup: String(member.ageGroup || "").trim()
   }));
-  if (normalized.some((member) => !member.name || !isValidEmailAddress(member.email) || !member.role)) return { error: "Every volunteer needs a full name, unique email address, and role." };
+  if (normalized.some((member) => !member.name || !isValidEmailAddress(member.email) || !member.role || !["adult", "minor"].includes(member.ageGroup))) return { error: "Every volunteer needs a full name, unique email address, age group, and role." };
   if (!normalized[0].phone) return { error: "Please add a mobile phone number for the first volunteer." };
   if (new Set(normalized.map((member) => member.email)).size !== normalized.length) return { error: "Each volunteer needs a different email address." };
+  if (normalized.some((member) => member.ageGroup === "minor") && !normalized.some((member) => member.ageGroup === "adult")) return { error: "Volunteers under 18 must be signed up with at least one adult volunteer in the same group." };
+  if (normalized.some((member) => member.ageGroup === "minor" && isAdultOnlyVolunteerRole(member.role))) return { error: "Check-In / Cart Checker is limited to volunteers age 18 or older." };
 
   const event = await env.DB.prepare("SELECT id, title, settings_json FROM events WHERE id = ? AND status = 'open'").bind(input.eventId).first();
   const settings = event ? eventSettings(event) : null;
@@ -1453,7 +1460,7 @@ async function api(request, env, url, user) {
 
   if (url.pathname === "/portal-api/organizer/volunteers" && request.method === "GET") {
     if (!user) return json({ error: "Sign in required." }, 401);
-    const { results } = await env.DB.prepare("SELECT COALESCE(s.id, v.id) AS id, s.event_id, s.role, s.status, s.notes, COALESCE(s.created_at, v.created_at) AS created_at, v.name, v.email, v.phone, e.title AS event_title FROM volunteer_profiles v LEFT JOIN volunteer_signups s ON s.volunteer_id = v.id LEFT JOIN events e ON e.id = s.event_id ORDER BY COALESCE(s.created_at, v.created_at) DESC").all();
+    const { results } = await env.DB.prepare("SELECT COALESCE(s.id, v.id) AS id, s.event_id, s.role, s.status, s.notes, COALESCE(s.created_at, v.created_at) AS created_at, v.name, v.email, v.phone, v.age_group, e.title AS event_title FROM volunteer_profiles v LEFT JOIN volunteer_signups s ON s.volunteer_id = v.id LEFT JOIN events e ON e.id = s.event_id ORDER BY COALESCE(s.created_at, v.created_at) DESC").all();
     return json({ volunteers: results });
   }
 

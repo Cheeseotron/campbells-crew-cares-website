@@ -28,11 +28,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const guide = card?.querySelector("[data-role-guide-copy]");
     if (select && guide) guide.textContent = roleGuides[select.value] || "Ask an organizer about the expectations for this role.";
   };
+  const updateAgeGroup = (card) => {
+    const ageGroup = card?.querySelector("[data-age-group]");
+    const note = card?.querySelector("[data-minor-note]");
+    const role = card?.querySelector("[data-role]");
+    if (!ageGroup) return;
+    const isMinor = ageGroup.value === "minor";
+    if (note) note.hidden = !isMinor;
+    [...(role?.options || [])].forEach((option) => {
+      const adultOnly = /(^|\b)(cart checker|check-in\s*\/\s*cart checker)(\b|$)/i.test(option.value);
+      option.disabled = isMinor && adultOnly;
+    });
+    if (isMinor && role?.selectedOptions?.[0]?.disabled) {
+      const firstAvailable = [...role.options].find((option) => !option.disabled);
+      if (firstAvailable) role.value = firstAvailable.value;
+      updateGuide(card);
+    }
+  };
   addButton?.addEventListener("click", () => {
     if (!additionalMemberMarkup) return;
     list.insertAdjacentHTML("beforeend", additionalMemberMarkup);
     const card = list.lastElementChild;
     updateGuide(card);
+    updateAgeGroup(card);
     card.scrollIntoView({ block: "nearest", behavior: "smooth" });
     card.querySelector("[data-first]")?.focus();
   });
@@ -41,20 +59,28 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   list?.addEventListener("change", (event) => {
     if (event.target.matches("[data-role]")) updateGuide(event.target.closest("[data-member]"));
+    if (event.target.matches("[data-age-group]")) updateAgeGroup(event.target.closest("[data-member]"));
   });
-  [...(list?.querySelectorAll("[data-member]") || [])].forEach(updateGuide);
+  [...(list?.querySelectorAll("[data-member]") || [])].forEach((card) => { updateGuide(card); updateAgeGroup(card); });
   form.addEventListener("submit", (event) => {
     const members = [...list.querySelectorAll("[data-member]")].map((card) => ({
       firstName: card.querySelector("[data-first]").value,
       lastName: card.querySelector("[data-last]").value,
       email: card.querySelector("[data-email]").value,
       phone: card.querySelector("[data-phone]").value,
-      role: card.querySelector("[data-role]").value
+      role: card.querySelector("[data-role]").value,
+      ageGroup: card.querySelector("[data-age-group]").value
     }));
     const emails = members.map((member) => member.email.trim().toLowerCase());
     if (new Set(emails).size !== emails.length) {
       event.preventDefault();
       alert("Each volunteer needs a different email address.");
+      return;
+    }
+    const minors = members.filter((member) => member.ageGroup === "minor");
+    if (minors.length && !members.some((member) => member.ageGroup === "adult")) {
+      event.preventDefault();
+      alert("Volunteers under 18 must be signed up with at least one adult volunteer in this same group.");
       return;
     }
     form.elements.membersJson.value = JSON.stringify(members);
