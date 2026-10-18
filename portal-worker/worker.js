@@ -729,6 +729,27 @@ async function sendWeekBeforeReminders(env) {
   }
 }
 
+async function sendDayBeforeReminders(env) {
+  const { results: events } = await env.DB.prepare("SELECT id, title, event_date, settings_json FROM events WHERE status = 'open'").all();
+  for (const event of events || []) {
+    if (eventDateKey(event, -1) !== arizonaDateKey()) continue;
+    const send = async (recipient, name, role, templateId, fallback) => {
+      if (!isValidEmailAddress(recipient)) return;
+      const existing = await env.DB.prepare("SELECT id FROM email_jobs WHERE event_id = ? AND template_id = ? AND recipient_email = ? AND status = 'sent'").bind(event.id, templateId, recipient).first();
+      if (existing) return;
+      const message = eventEmailTemplate(event, templateId, fallback, { name, role });
+      if (!message) return;
+      const id = randomId("email_job");
+      try { await sendEmail(env, recipient, message.subject, message.body); await env.DB.prepare("INSERT INTO email_jobs (id, event_id, template_id, recipient_email, subject, body, status, sent_at) VALUES (?, ?, ?, ?, ?, ?, 'sent', CURRENT_TIMESTAMP)").bind(id, event.id, templateId, recipient, message.subject, message.body).run(); }
+      catch (error) { await env.DB.prepare("INSERT INTO email_jobs (id, event_id, template_id, recipient_email, subject, body, status) VALUES (?, ?, ?, ?, ?, ?, 'failed')").bind(id, event.id, templateId, recipient, message.subject, message.body).run(); console.error("Day-before reminder failed", error); }
+    };
+    const { results: volunteers } = await env.DB.prepare("SELECT DISTINCT v.name, v.email, s.role FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id WHERE s.event_id = ? AND s.status = 'confirmed' AND v.email <> ''").bind(event.id).all();
+    const { results: households } = await env.DB.prepare("SELECT guardian_name AS name, email FROM recipient_households WHERE event_id = ? AND status = 'approved' AND email <> ''").bind(event.id).all();
+    for (const volunteer of volunteers || []) await send(volunteer.email, volunteer.name, volunteer.role, "volunteer-day-reminder", { subject: "Tomorrow is the day: {{event}}", body: "Hi {{name}},\n\nTomorrow is {{event}} — we are excited to have you on the crew!\n\nPlease arrive on time. Your volunteer role is {{role}}.\n\nDate: {{date}}\nYour scheduled time: {{time}}\nLocation: {{location}}\n\nThank you for helping make this day special for our families." });
+    for (const household of households || []) await send(household.email, household.name, "", "recipient-day-reminder", { subject: "Important: {{event}} is tomorrow", body: "Hi {{name}},\n\n{{event}} is tomorrow! We are excited to welcome your family.\n\nDate: {{date}}\nArrival time: {{time}}\nLocation: {{location}}\n\nPlease arrive on time in order to participate. If you run into car trouble, have a sick child, or have any other issue that may prevent your family from attending, please email us as soon as possible. A no-call/no-show may make your family ineligible for future Campbell's Crew Cares events.\n\nWe look forward to seeing you tomorrow." });
+  }
+}
+
 async function sendRecipientDecisionEmail(env, recipient, guardianName, childName, decision, event, decisionNote = "") {
   const details = eventEmailDetails(event);
   const messages = {
@@ -1720,7 +1741,7 @@ async function api(request, env, url, user) {
 }
 
 export default {
-  async scheduled(controller, env, ctx) { ctx.waitUntil(sendWeekBeforeReminders(env)); },
+  async scheduled(controller, env, ctx) { ctx.waitUntil(Promise.all([sendWeekBeforeReminders(env), sendDayBeforeReminders(env)])); },
   async fetch(request, env) {
     const url = new URL(request.url);
     // Logout is a protected portal action too. It must reach this Worker so it
