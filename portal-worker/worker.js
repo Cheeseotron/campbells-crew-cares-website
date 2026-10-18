@@ -591,6 +591,49 @@ function eventEmailDetails(event) {
   return { date: emailLine(event.event_date || settings.date || "To be announced"), time: emailLine(settings.time || "To be announced"), location: emailLine(settings.location || "To be announced"), address: emailLine(settings.address || "") };
 }
 
+function calendarDateParts(event) {
+  const settings = eventSettings(event) || {};
+  const parsed = new Date(event.event_date || settings.date || "");
+  if (Number.isNaN(parsed.getTime())) return null;
+  return { year: parsed.getUTCFullYear(), month: parsed.getUTCMonth() + 1, day: parsed.getUTCDate() };
+}
+
+function calendarTimeParts(value, fallback = { hour: 9, minute: 0 }) {
+  const match = String(value || "").match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return fallback;
+  let hour = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === "PM") hour += 12;
+  return { hour, minute: Number(match[2]) };
+}
+
+function calendarStamp(date, time) {
+  return `${String(date.year).padStart(4, "0")}${String(date.month).padStart(2, "0")}${String(date.day).padStart(2, "0")}T${String(time.hour).padStart(2, "0")}${String(time.minute).padStart(2, "0")}00`;
+}
+
+function escapeCalendarText(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+}
+
+function volunteerCalendarIcs(event, origin) {
+  const date = calendarDateParts(event);
+  const details = eventEmailDetails(event);
+  const settings = eventSettings(event) || {};
+  const start = calendarTimeParts(String(settings.time || "").split(/[–—-]/)[0]);
+  const end = calendarTimeParts(String(settings.time || "").split(/[–—-]/)[1], { hour: Math.min(23, start.hour + 2), minute: start.minute });
+  const location = [details.location, details.address].filter(Boolean).join(" — ");
+  const description = `Campbell's Crew Cares volunteer event.\nRole details and event-day guidance are available in your confirmation email.`;
+  const now = new Date();
+  const created = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}T${String(now.getUTCHours()).padStart(2, "0")}${String(now.getUTCMinutes()).padStart(2, "0")}00Z`;
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Campbell's Crew Cares//Volunteer Event//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT", `UID:${event.id}@campbellscrew.com`, `DTSTAMP:${created}`, `SUMMARY:${escapeCalendarText(event.title)}`, `DESCRIPTION:${escapeCalendarText(description)}`, `LOCATION:${escapeCalendarText(location)}`, `URL:${origin}/volunteer?event=${encodeURIComponent(event.id)}`];
+  if (date) {
+    lines.push(`DTSTART;TZID=America/Phoenix:${calendarStamp(date, start)}`, `DTEND;TZID=America/Phoenix:${calendarStamp(date, end)}`);
+  } else {
+    lines.push(`DTSTART;VALUE=DATE:${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}`);
+  }
+  lines.push("END:VEVENT", "END:VCALENDAR", "");
+  return lines.join("\r\n");
+}
+
 function eventEmailTemplate(event, id, fallback, values = {}) {
   const templates = eventSettings(event)?.emailTemplates || [];
   const saved = templates.find((template) => template.id === id);
@@ -608,7 +651,10 @@ async function sendPasswordResetEmail(env, recipient, resetUrl) {
 async function sendVolunteerConfirmation(env, recipient, name, role, event) {
   const details = eventEmailDetails(event);
   const message = eventEmailTemplate(event, "vol-confirm", { subject: `You're registered: {{event}}`, body: `Hi {{name}},\n\nThank you for volunteering with Campbell's Crew Cares. You are registered for {{event}} as a {{role}}.\n\nDate: {{date}}\nTime: {{time}}\nLocation: {{location}}${details.address ? `\nAddress: ${details.address}` : ""}\n\nWe look forward to seeing you there.` }, { name, role });
-  if (message) await sendEmail(env, recipient, message.subject, message.body);
+  if (message) {
+    const calendarUrl = `https://campbellscrew.com/portal-api/public/events/${encodeURIComponent(event.id)}/calendar.ics`;
+    await sendEmail(env, recipient, message.subject, `${message.body}\n\nAdd this event to your calendar:\n${calendarUrl}`);
+  }
 }
 
 async function sendRecipientConfirmation(env, recipient, guardianName, event) {
@@ -1080,6 +1126,14 @@ async function audit(env, actor, action, targetType, targetId, eventId = null, m
 async function api(request, env, url, user) {
   if (url.pathname === "/portal-api/health") return json({ ready: true, mode: env.PORTAL_MODE || "closed", emailDelivery: "not_configured" });
   if (url.pathname === "/portal-api/public/events" && request.method === "GET") return json({ events: await activeEvents(env), mode: env.PORTAL_MODE || "closed" });
+  const volunteerCalendarMatch = url.pathname.match(/^\/portal-api\/public\/events\/([^/]+)\/calendar\.ics$/);
+  if (volunteerCalendarMatch && request.method === "GET") {
+    const event = await env.DB.prepare("SELECT id, title, event_date, settings_json FROM events WHERE id = ?").bind(volunteerCalendarMatch[1]).first();
+    if (!event) return json({ error: "Event not found." }, 404);
+    const calendar = volunteerCalendarIcs(event, url.origin);
+    const filename = `${String(event.title || "campbells-crew-event").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "campbells-crew-event"}.ics`;
+    return new Response(calendar, { headers: securityHeaders(new Headers({ "Content-Type": "text/calendar; charset=utf-8", "Content-Disposition": `attachment; filename="${filename}"` })) });
+  }
   if (url.pathname === "/portal-api/public/event-stories" && request.method === "GET") {
     const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date, settings_json FROM events WHERE status = 'closed' ORDER BY event_date DESC").all();
     const stories = results.map((event) => { let settings = {}; try { settings = JSON.parse(event.settings_json || "{}"); } catch {} const story = settings.publicStory || {}; const closeout = settings.closeout || {}; const outcome = event.event_type === "food_bag" ? Number(closeout.bagsMade || 0) : Number(closeout.childrenAttended || 0); return { id: event.id, title: story.title || event.title, recap: story.recap || "", impactLine: String(story.impactLine || (event.event_type === "food_bag" ? `${outcome.toLocaleString()} food bags prepared` : `${outcome.toLocaleString()} children supported`)).slice(0, 180), eventDate: event.event_date || settings.date || "", eventType: event.event_type, outcome, photos: publicStoryPhotos(event, story), published: story.published === true }; }).filter((story) => story.published);
