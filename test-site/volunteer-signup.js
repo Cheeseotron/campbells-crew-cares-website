@@ -1,11 +1,18 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const formatPhone = (phone) => {
+    let digits = phone.value.replace(/\D/g, "");
+    if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
+    digits = digits.slice(0, 10);
+    if (digits.length < 4) phone.value = digits;
+    else if (digits.length < 7) phone.value = `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    else phone.value = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  };
   document.querySelectorAll('input[type="tel"]').forEach((phone) => {
-    phone.addEventListener("input", () => {
-      const digits = phone.value.replace(/\D/g, "").slice(0, 10);
-      if (digits.length < 4) phone.value = digits;
-      else if (digits.length < 7) phone.value = `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-      else phone.value = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-    });
+    phone.addEventListener("input", () => formatPhone(phone));
+    phone.addEventListener("change", () => formatPhone(phone));
+    phone.addEventListener("focus", () => formatPhone(phone));
+    formatPhone(phone);
+    setTimeout(() => formatPhone(phone), 250);
   });
 
   const form = document.querySelector("#group-signup-form");

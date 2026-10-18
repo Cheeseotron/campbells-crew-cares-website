@@ -35,6 +35,21 @@ function normalizedMatchValue(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function normalizePhoneNumber(value) {
+  const original = String(value || "").trim();
+  let digits = original.replace(/\D/g, "");
+  // North American phone numbers never have an area code beginning with 1.
+  // An 11-digit value that starts with 1 is therefore the optional +1 country
+  // code supplied by browser autofill, not part of the local number.
+  if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
+  if (digits.length !== 10) return original;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+function normalizedPhoneValue(value) {
+  return normalizePhoneNumber(value).replace(/\D/g, "");
+}
+
 function randomId(prefix) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
@@ -993,7 +1008,7 @@ function volunteerDirectoryPage(message = "", error = "") {
 
 async function registerVolunteerDirectory(env, input) {
   const name = `${String(input.firstName || "").trim()} ${String(input.lastName || "").trim()}`.trim();
-  const email = String(input.email || "").trim().toLowerCase(); const phone = String(input.phone || "").trim();
+  const email = String(input.email || "").trim().toLowerCase(); const phone = normalizePhoneNumber(input.phone);
   if (!name || !phone || !isValidEmailAddress(email)) return { error: "Please enter your full name, a complete email address, and phone number." };
   let profile = await env.DB.prepare("SELECT id FROM volunteer_profiles WHERE email = ?").bind(email).first();
   if (!profile) { profile = { id: randomId("volunteer") }; await env.DB.prepare("INSERT INTO volunteer_profiles (id, name, email, phone, alert_opt_in) VALUES (?, ?, ?, ?, 1)").bind(profile.id, name.slice(0, 120), email, phone.slice(0, 30)).run(); }
@@ -1026,9 +1041,9 @@ async function registerVolunteer(env, input, codeGranted = false) {
   if (!profile) {
     profile = { id: randomId("volunteer") };
     await env.DB.prepare("INSERT INTO volunteer_profiles (id, name, email, phone, alert_opt_in) VALUES (?, ?, ?, ?, ?)")
-      .bind(profile.id, String(input.name).slice(0, 120), email, String(input.phone).slice(0, 30), 0).run();
+      .bind(profile.id, String(input.name).slice(0, 120), email, normalizePhoneNumber(input.phone).slice(0, 30), 0).run();
   } else await env.DB.prepare("UPDATE volunteer_profiles SET name = ?, phone = ? WHERE id = ?")
-    .bind(String(input.name).slice(0, 120), String(input.phone).slice(0, 30), profile.id).run();
+    .bind(String(input.name).slice(0, 120), normalizePhoneNumber(input.phone).slice(0, 30), profile.id).run();
   const signupId = randomId("signup");
   const notes = [input.shirt ? `T-shirt size: ${String(input.shirt).slice(0, 30)}` : "", String(input.notes || "").slice(0, 1900)].filter(Boolean).join("\n");
   try {
@@ -1045,7 +1060,7 @@ async function registerVolunteerGroup(env, input, codeGranted = false) {
   const normalized = members.map((member) => ({
     name: `${String(member.firstName || "").trim()} ${String(member.lastName || "").trim()}`.trim(),
     email: String(member.email || "").trim().toLowerCase(),
-    phone: String(member.phone || "").trim(),
+    phone: normalizePhoneNumber(member.phone),
     role: String(member.role || "").trim(),
     shirt: String(member.shirt || "").trim(),
     notes: String(member.notes || "").trim()
@@ -1094,13 +1109,13 @@ async function registerRecipient(env, input, codeGranted = false) {
   if (!submittedChildren.length) return { error: "Add at least one child with a full name." };
   if (submittedChildren.some((child) => !photoFromDataUrl(child.photoDataUrl))) return { error: "A valid JPG or PNG photo is required for every child before the application can be submitted." };
   const email = String(input.email).trim().toLowerCase();
-  const phone = String(input.phone).trim();
+  const phone = normalizePhoneNumber(input.phone);
   const address = input.address && typeof input.address === "object" ? input.address : {};
   const { results: existingHouseholds } = await env.DB.prepare("SELECT guardian_name, email, phone, address_json FROM recipient_households WHERE event_id = ?").bind(event.id).all();
   const flags = [];
   if (existingHouseholds.some((household) => normalizedMatchValue(household.guardian_name) === normalizedMatchValue(input.guardianName))) flags.push("Responsible party name matches another application");
   if (existingHouseholds.some((household) => household.email === email)) flags.push("Email used on another application");
-  if (existingHouseholds.some((household) => normalizedMatchValue(household.phone) === normalizedMatchValue(phone))) flags.push("Phone used on another application");
+  if (existingHouseholds.some((household) => normalizedPhoneValue(household.phone) === normalizedPhoneValue(phone))) flags.push("Phone used on another application");
   const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
   if (addressKey && existingHouseholds.some((household) => { try { const saved = JSON.parse(household.address_json || "{}"); return normalizedMatchValue(`${saved.address || ""}${saved.zip || ""}`) === addressKey; } catch { return false; } })) flags.push("Household address matches another application");
   const addressState = String(address.state || "AZ").trim().toUpperCase();
@@ -1406,7 +1421,7 @@ async function api(request, env, url, user) {
       const otherHouseholds = results.filter((other) => other.id !== household.id);
       if (otherHouseholds.some((other) => other.event_id === household.event_id && normalizedMatchValue(other.guardian_name) === normalizedMatchValue(household.guardian_name)) && !flags.includes("Responsible party name matches another application")) flags.push("Responsible party name matches another application");
       if (otherHouseholds.some((other) => other.event_id === household.event_id && other.email === household.email) && !flags.includes("Email used on another application")) flags.push("Email used on another application");
-      if (otherHouseholds.some((other) => other.event_id === household.event_id && normalizedMatchValue(other.phone) === normalizedMatchValue(household.phone)) && !flags.includes("Phone used on another application")) flags.push("Phone used on another application");
+      if (otherHouseholds.some((other) => other.event_id === household.event_id && normalizedPhoneValue(other.phone) === normalizedPhoneValue(household.phone)) && !flags.includes("Phone used on another application")) flags.push("Phone used on another application");
       const addressKey = normalizedMatchValue(`${address.address || ""}${address.zip || ""}`);
       if (addressKey && otherHouseholds.some((other) => { try { const saved = JSON.parse(other.address_json || "{}"); return other.event_id === household.event_id && normalizedMatchValue(`${saved.address || ""}${saved.zip || ""}`) === addressKey; } catch { return false; } }) && !flags.includes("Household address matches another application")) flags.push("Household address matches another application");
       if (String(address.state || "AZ").trim().toUpperCase() !== "AZ" && !flags.includes("Address is outside Arizona")) flags.push("Address is outside Arizona");
