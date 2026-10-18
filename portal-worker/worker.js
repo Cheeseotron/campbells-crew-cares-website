@@ -66,11 +66,12 @@ function recipientApplicationReference(value = null) {
 
 function photoFromDataUrl(value) {
   if (!value || typeof value !== "string") return null;
-  const match = value.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  const match = value.match(/^data:(image\/(?:jpe?g|png|webp));base64,([A-Za-z0-9+/=]+)$/i);
   if (!match) return null;
   const binary = atob(match[2]);
   if (binary.length > 1024 * 1024) return null;
-  return { contentType: match[1], bytes: Uint8Array.from(binary, (character) => character.charCodeAt(0)) };
+  const contentType = match[1].toLowerCase() === "image/jpg" ? "image/jpeg" : match[1].toLowerCase();
+  return { contentType, bytes: Uint8Array.from(binary, (character) => character.charCodeAt(0)) };
 }
 
 function base64Url(bytes) {
@@ -1172,7 +1173,7 @@ async function registerRecipient(env, input, codeGranted = false) {
   if (!isValidEmailAddress(input.email)) return { error: "Enter a complete email address, such as name@example.com." };
   const submittedChildren = input.children.slice(0, 12).filter((child) => child?.firstName && child?.lastName);
   if (!submittedChildren.length) return { error: "Add at least one child with a full name." };
-  if (submittedChildren.some((child) => !photoFromDataUrl(child.photoDataUrl))) return { error: "A valid JPG or PNG photo is required for every child before the application can be submitted." };
+  if (submittedChildren.some((child) => !photoFromDataUrl(child.photoDataUrl))) return { error: "A valid child photo is required for every child. Please choose the photo again and wait for its preview before submitting." };
   const email = String(input.email).trim().toLowerCase();
   const phone = normalizePhoneNumber(input.phone);
   const address = input.address && typeof input.address === "object" ? input.address : {};

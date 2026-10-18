@@ -875,7 +875,7 @@
       <div class="field"><label for="child-${index}-gender">Sizing category</label><select id="child-${index}-gender" name="child-${index}-gender" data-child-gender="${index}" required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This helps the organizers understand the child’s typical sizing.</small></div>
       <div class="field field--span-2 size-guidance"><strong>Clothing sizes</strong><small>Spell out letter sizes—for example: <b>Small</b>, <b>Medium</b>, or <b>Large</b>. You can also be more specific for pants if you know the size, such as <b>30/32</b>. For socks and shoes, please use numbers. If you are unsure, you can always go a little bigger so we can make sure the clothes will fit.</small></div>
       ${sizeField(index,"shirt","Shirt",child.shirt)}${sizeField(index,"pants","Pants",child.pants)}${sizeField(index,"shoes","Shoes",child.shoes)}${sizeField(index,"socks","Socks",child.socks)}${sizeField(index,"underwear","Underwear",child.underwear)}${braBudgetEnabled() ? braSizeField(index, child) : ""}${sizeField(index,"coat","Coat",child.coat)}
-      <div class="field field--span-2 child-photo-field"><label for="child-${index}-photo">Recent photo of this child</label><div class="child-photo-control"><div class="child-photo-preview${child.photoDataUrl ? " has-photo" : ""}" data-child-photo-preview="${index}" aria-live="polite">${child.photoDataUrl ? `<img src="${esc(child.photoDataUrl)}" alt="Preview of ${esc(child.firstName || "this child")}">` : `<span>Photo<br>preview</span>`}</div><div><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png" data-child-photo-input="${index}" ${child.photoDataUrl ? "" : "required"}><small>A photo is required for every child so Campbell's Crew can pre-make their event badge and keep it with the correct clothing bag. This preview uses the same square, center-cropped framing as the badge, so keep the child’s face near the middle. JPG or PNG only. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div></div></div>
+      <div class="field field--span-2 child-photo-field"><label for="child-${index}-photo">Recent photo of this child</label><div class="child-photo-control"><div class="child-photo-preview${child.photoDataUrl ? " has-photo" : ""}" data-child-photo-preview="${index}" aria-live="polite">${child.photoDataUrl ? `<img src="${esc(child.photoDataUrl)}" alt="Preview of ${esc(child.firstName || "this child")}">` : `<span>Photo<br>preview</span>`}</div><div><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" data-child-photo-input="${index}" ${child.photoDataUrl ? "" : "required"}><small>A current photo is required for every child so Campbell's Crew can pre-make their event badge and keep it with the correct clothing bag. Keep the child’s face near the middle—the preview uses the same square, center-cropped framing as the badge. JPG, PNG, and iPad HEIC photos are accepted; HEIC photos are converted safely before your application is sent. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div></div></div>
       <div class="field field--span-2"><label for="child-${index}-preferences">Colors, styles, interests, likes, or dislikes</label><textarea id="child-${index}-preferences" name="child-${index}-preferences" required>${esc(child.preferences)}</textarea></div>
       <div class="field field--span-2"><label for="child-${index}-accommodations">Medical, sensory, communication, mobility, or behavioral accommodations</label><textarea id="child-${index}-accommodations" name="child-${index}-accommodations" required>${esc(child.accommodations)}</textarea><small>Enter “None” if no accommodation is needed.</small></div>
     </div></section>`;
@@ -887,21 +887,34 @@
   }
 
   async function photoDataUrl(file) {
-    const source = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error("The photo could not be read.")); reader.readAsDataURL(file); });
-    // Most phone PNGs and JPGs can be sent straight through.  Avoid sending a
-    // perfectly valid image back through a second browser decoder merely to
-    // compress it; that decoder was the source of the false "choose a photo"
-    // message on some mobile devices.
-    if (file.size <= 950 * 1024) return source;
-    return new Promise((resolve, reject) => {
-      const image = new Image(); image.onload = () => {
-        let width = image.naturalWidth; let height = image.naturalHeight; const scale = Math.min(1, 1200 / Math.max(width, height)); width = Math.max(1, Math.round(width * scale)); height = Math.max(1, Math.round(height * scale));
-        if (width < 400 || height < 400) { resolve(source); return; }
-        const canvas = document.createElement("canvas"); const context = canvas.getContext("2d"); let output = "";
-        while (width >= 400 && height >= 400) { canvas.width = width; canvas.height = height; context.drawImage(image, 0, 0, width, height); output = canvas.toDataURL("image/jpeg", .8); if (output.length <= 1300000) break; width = Math.round(width * .8); height = Math.round(height * .8); }
-        resolve(output || source);
-      }; image.onerror = () => reject(new Error("This image could not be prepared. Please choose a different JPG or PNG photo.")); image.src = source;
-    });
+    const source = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error("The photo could not be read. Please choose it again.")); reader.readAsDataURL(file); });
+    const type = String(file.type || "").toLowerCase();
+    const needsConversion = !/^image\/(?:jpeg|jpg|png|webp)$/.test(type) || file.size > 700 * 1024;
+    // iPads commonly provide a small HEIC file. It must still be converted to
+    // JPEG—sending it through untouched makes the server reject the whole form.
+    if (!needsConversion) return source;
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const candidate = new Image();
+        candidate.onload = () => resolve(candidate);
+        candidate.onerror = () => reject(new Error("This iPad could not prepare that photo. Please choose a JPG or PNG photo, or use an iPad camera photo with Settings > Camera > Formats > Most Compatible."));
+        candidate.src = objectUrl;
+      });
+      let width = image.naturalWidth; let height = image.naturalHeight;
+      const scale = Math.min(1, 1200 / Math.max(width, height));
+      width = Math.max(1, Math.round(width * scale)); height = Math.max(1, Math.round(height * scale));
+      const canvas = document.createElement("canvas"); const context = canvas.getContext("2d"); let output = "";
+      while (width >= 64 && height >= 64) {
+        canvas.width = width; canvas.height = height;
+        context.drawImage(image, 0, 0, width, height);
+        output = canvas.toDataURL("image/jpeg", .82);
+        if (output.length <= 900000) break;
+        width = Math.round(width * .8); height = Math.round(height * .8);
+      }
+      if (!output) throw new Error("This photo could not be prepared. Please choose a different photo.");
+      return output;
+    } finally { URL.revokeObjectURL(objectUrl); }
   }
 
   function braSizeApplies(gender) { return /girl|women|female/i.test(String(gender || "")); }
@@ -933,9 +946,12 @@
       ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "bra", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); });
       if (!braBudgetEnabled() || !braSizeApplies(next.gender)) next.bra = "";
       const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || "");
-      if (photo?.files[0]) next.photoDataUrl = await photoDataUrl(photo.files[0]);
+      // The picker already prepares and previews a photo as soon as it is chosen.
+      // Reusing that safe copy avoids a second iPad conversion during submission.
+      if (child.photoDataUrl) next.photoDataUrl = child.photoDataUrl;
+      else if (photo?.files[0]) next.photoDataUrl = await photoDataUrl(photo.files[0]);
       else next.photoDataUrl = child.photoDataUrl || "";
-      if (!next.photoDataUrl) throw new Error(`Please add a JPG or PNG photo for ${next.firstName || `Child ${index + 1}`}.`);
+      if (!next.photoDataUrl) throw new Error(`Please add a photo for ${next.firstName || `Child ${index + 1}`}.`);
       next.name = `${next.firstName} ${next.lastName}`.trim();
       return next;
     }));
@@ -1040,8 +1056,13 @@
           application: { referral: recipientDraft.referral, preferredContact: recipientDraft.preferredContact, emergencyName: recipientDraft.emergencyName, emergencyPhone: recipientDraft.emergencyPhone, emergencyRelation: recipientDraft.emergencyRelation, agreementSignature: recipientDraft.agreementSignature, finalSignature: recipientDraft.finalSignature, acknowledgments: recipientDraft.acknowledgments },
           children: recipientDraft.children.map((child) => ({ firstName: child.firstName, lastName: child.lastName, birthDate: child.birthdate, photoDataUrl: child.photoDataUrl || "", details: { gender: child.gender, shirt: child.shirt, pants: child.pants, shoes: child.shoes, socks: child.socks, underwear: child.underwear, bra: child.bra, coat: child.coat, preferences: child.preferences, accommodations: child.accommodations } }))
         }) });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Your application could not be submitted.");
+        let payload = {}; try { payload = await response.json(); } catch {}
+        if (!response.ok) {
+          const message = response.status === 413
+            ? "Your application photos are too large to send. Please choose smaller photos and try again."
+            : (payload.error || "Your application could not be submitted. Please try again.");
+          throw new Error(message);
+        }
         recipientConfirmation = { id: payload.id, guardian: recipientDraft.guardian, eventName: state.event.title, flags: [] };
         const key = recipientDraftKey(); if (key) sessionStorage.removeItem(key);
         renderRecipient();
