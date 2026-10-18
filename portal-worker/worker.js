@@ -683,7 +683,11 @@ async function sendVolunteerConfirmation(env, recipient, name, role, event) {
   const details = eventEmailDetails(event);
   const message = eventEmailTemplate(event, "vol-confirm", { subject: `You're registered: {{event}}`, body: `Hi {{name}},\n\nThank you for volunteering with Campbell's Crew Cares. You are registered for {{event}} as a {{role}}.\n\nDate: {{date}}\nTime: {{time}}\nLocation: {{location}}${details.address ? `\nAddress: ${details.address}` : ""}\n\nWe look forward to seeing you there.` }, { name, role });
   if (message) {
-    await sendEmail(env, recipient, `${message.subject} — calendar invite attached`, message.body, { googleUrl: googleCalendarUrl(event), ics: volunteerCalendarIcs(event, "https://campbellscrew.com", "REQUEST", recipient) });
+    const eventRoles = eventSettings(event).roles;
+    const selectedRole = (Array.isArray(eventRoles) ? eventRoles : []).find((item) => String(item?.title || "").trim() === String(role || "").trim());
+    const roleGuide = volunteerRoleGuide(selectedRole);
+    const body = roleGuide ? `${message.body}\n\nYOUR ROLE GUIDE — ${role}\n${roleGuide}` : message.body;
+    await sendEmail(env, recipient, `${message.subject} — calendar invite attached`, body, { googleUrl: googleCalendarUrl(event), ics: volunteerCalendarIcs(event, "https://campbellscrew.com", "REQUEST", recipient) });
   }
 }
 
