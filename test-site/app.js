@@ -2150,7 +2150,8 @@
       if (SERVER_AUTH) {
         try {
           const response = await fetch(`/portal-api/organizer/recipients/${encodeURIComponent(item.id)}/children/${encodeURIComponent(child.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, decisionNote }) });
-          const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "The recipient decision could not be saved.");
+          let payload = {}; try { payload = await response.json(); } catch {}
+          if (!response.ok) throw new Error(payload.error || "The recipient decision could not be saved. Please try again.");
           await loadLiveApplications();
           toast(payload.emailSent === false ? `${child.name} marked ${label}, but the email could not be sent.` : `${child.name} marked ${label}.${payload.emailSent ? " An email was sent." : ""}`);
           closeDialog(); renderOrganizer("applications");

@@ -1617,6 +1617,7 @@ async function api(request, env, url, user) {
     if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
     const input = await request.json();
     const decision = String(input.decision || "");
+    const storedDecision = decision === "info" ? "needs_information" : decision;
     const decisionNote = String(input.decisionNote || "").trim().slice(0, 1000);
     if (!["approved", "declined", "waitlisted", "needs_information", "info", "review"].includes(decision)) return json({ error: "That decision is not supported." }, 400);
     if (decision === "declined" && !decisionNote) return json({ error: "Please provide a reason before declining this application." }, 400);
@@ -1626,21 +1627,21 @@ async function api(request, env, url, user) {
     const child = await env.DB.prepare("SELECT id, first_name, last_name, details_json FROM recipient_children WHERE id = ? AND household_id = ?").bind(recipientDecisionMatch[2], household.id).first();
     if (!child) return json({ error: "That child was not found in this household." }, 404);
     let details = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {}
-    if (decision === "declined") details.organizerDecisionNote = decisionNote;
-    if (["needs_information", "info"].includes(decision)) details.organizerInformationRequest = decisionNote;
-    await env.DB.prepare("UPDATE recipient_children SET status = ?, details_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(decision, JSON.stringify(details), child.id).run();
+    if (storedDecision === "declined") details.organizerDecisionNote = decisionNote;
+    if (storedDecision === "needs_information") details.organizerInformationRequest = decisionNote;
+    await env.DB.prepare("UPDATE recipient_children SET status = ?, details_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(storedDecision, JSON.stringify(details), child.id).run();
     const { results: children } = await env.DB.prepare("SELECT status FROM recipient_children WHERE household_id = ?").bind(household.id).all();
-    const statuses = children.map((record) => record.status === "needs_information" ? "info" : record.status);
-    const householdStatus = !statuses.length ? "review" : statuses.every((status) => status === statuses[0]) ? statuses[0] : statuses.some((status) => ["review", "submitted", "info"].includes(status)) ? "review" : "mixed";
+    const statuses = children.map((record) => record.status);
+    const householdStatus = !statuses.length ? "review" : statuses.every((status) => status === statuses[0]) ? statuses[0] : statuses.some((status) => ["review", "submitted", "needs_information"].includes(status)) ? "review" : "mixed";
     await env.DB.prepare("UPDATE recipient_households SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(householdStatus, household.id).run();
     let emailSent = null;
-    if (["approved", "declined", "waitlisted", "needs_information", "info"].includes(decision)) {
-      const emailDecision = decision === "needs_information" ? "info" : decision;
+    if (["approved", "declined", "waitlisted", "needs_information", "info"].includes(storedDecision)) {
+      const emailDecision = storedDecision === "needs_information" ? "info" : storedDecision;
       try { await sendRecipientDecisionEmail(env, household.email, household.guardian_name, `${child.first_name} ${child.last_name}`.trim(), emailDecision, household, decisionNote); emailSent = true; }
       catch (error) { console.error("Recipient decision delivery failed", error); emailSent = false; }
     }
-    await audit(env, user, `recipient_child_${decision}`, "recipient_child", child.id, household.event_id, ["declined", "needs_information", "info"].includes(decision) ? { decisionNote } : {});
-    return json({ id: child.id, decision, householdStatus, emailSent });
+    await audit(env, user, `recipient_child_${storedDecision}`, "recipient_child", child.id, household.event_id, ["declined", "needs_information"].includes(storedDecision) ? { decisionNote } : {});
+    return json({ id: child.id, decision: storedDecision, householdStatus, emailSent });
   }
 
   if (url.pathname === "/portal-api/organizer/reports" && request.method === "GET") {
