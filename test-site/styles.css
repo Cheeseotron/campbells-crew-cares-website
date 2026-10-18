@@ -798,15 +798,15 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card--volunteer > div > em { color:var(--green-dark); font-size:10px; font-style:normal; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
 .badge-card--volunteer > button { align-self:flex-end; }
 .badge-card--board { --badge-background:linear-gradient(135deg,#101923 0%,#101923 56%,#173b2c 100%); position:relative; isolation:isolate; overflow:hidden; width:min(100%, var(--volunteer-badge-width, 330px)); min-height:0; aspect-ratio:var(--volunteer-badge-ratio, 3.375 / 2.333); padding:38px 24px 20px; flex-direction:row; justify-content:flex-start; align-items:center; text-align:left; gap:18px; border:0; background:var(--badge-background); box-shadow:none; color:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-.badge-card--board::before { content:""; position:absolute; z-index:0; right:-14%; bottom:-47%; width:72%; height:125%; border:18px solid rgba(43,214,43,.18); border-radius:50%; transform:rotate(-25deg); pointer-events:none; }
-.badge-card--board::after { content:""; position:absolute; z-index:0; right:0; bottom:0; left:0; height:8px; background:linear-gradient(90deg,#2bd62b 0 64%,#f4cb59 64% 100%); pointer-events:none; }
+.badge-card--board::after { content:""; position:absolute; z-index:0; right:0; bottom:0; left:0; height:8px; background:linear-gradient(90deg,#2bd62b 0 64%,#176b39 64% 100%); pointer-events:none; }
 .badge-card--board > * { position:relative; z-index:1; }
+.board-badge-orbit { position:absolute!important; z-index:0!important; right:-14%; bottom:-47%; width:72%; height:125%; border:18px solid rgba(43,214,43,.18); border-radius:50%; transform:rotate(-25deg); pointer-events:none; }
 .badge-card--board > img { width:82px; height:82px; padding:4px; object-fit:contain; flex:0 0 auto; border:2px solid #2bd62b; border-radius:50%; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.1); }
 .board-badge-ribbon { position:absolute!important; z-index:2!important; top:0; right:0; padding:9px 14px 8px; color:#101923; background:#2bd62b; font-size:10px; font-weight:900; letter-spacing:.13em; line-height:1; text-transform:uppercase; }
 .board-badge-copy { display:flex; min-width:0; flex:1; flex-direction:column; align-items:flex-start; gap:5px; }
 .board-badge-copy > span { color:#8de08e; font-size:10px; font-weight:800; letter-spacing:.12em; line-height:1.1; text-transform:uppercase; }
 .board-badge-copy > strong { color:#fff; font-size:29px; line-height:.93; letter-spacing:-.05em; overflow-wrap:anywhere; }
-.board-badge-copy > b { color:#f7e4a3; font-size:11px; line-height:1.16; letter-spacing:.02em; }
+.board-badge-copy > b { color:#d8f2d6; font-size:11px; line-height:1.16; letter-spacing:.02em; }
 .badge-section-description { margin:5px 0 0; color:var(--muted); font-size:14px; }
 .badge-card--recipient { --badge-background:linear-gradient(155deg,rgba(43,214,43,.16),rgba(43,214,43,0) 48%),repeating-linear-gradient(45deg,rgba(23,107,57,.055) 0 1px,transparent 1px 11px),#fbfefb; position:relative; isolation:isolate; overflow:hidden; width:min(100%, var(--child-badge-width, 2in)); min-height:0; aspect-ratio:var(--child-badge-ratio, 2 / 3.5); padding:26px 13px 16px; justify-self:center; gap:7px; border:0; background:var(--badge-background); box-shadow:none; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 .badge-card--recipient::before, .badge-card--recipient::after { content:none; }
@@ -899,6 +899,13 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   body[data-print-badge] .badge-card--volunteer, body[data-print-badge] .badge-card--recipient, body[data-print-badge] .badge-card--board { overflow:visible; background:transparent; }
   body[data-print-badge] .badge-card--volunteer::before, body[data-print-badge] .badge-card--recipient::before, body[data-print-badge] .badge-card--board::before { content:""; position:absolute; z-index:0; inset:-.05in; background:var(--badge-background); -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   body[data-print-badge] .badge-card--volunteer > *, body[data-print-badge] .badge-card--recipient > *, body[data-print-badge] .badge-card--board > * { position:relative; z-index:1; }
+  /* Leadership badges intentionally match their on-screen design exactly.
+     The visual ring is clipped to the Avery label, so it cannot spill into
+     an adjacent label while the dark background remains solid edge-to-edge. */
+  body[data-print-badge][data-print-badge-group="board"] .badge-card--board { overflow:hidden; background:var(--badge-background)!important; }
+  body[data-print-badge][data-print-badge-group="board"] .badge-card--board::before { content:none; }
+  body[data-print-badge][data-print-badge-group="board"] .badge-card--board .board-badge-orbit { position:absolute!important; z-index:0!important; }
+  body[data-print-badge][data-print-badge-group="board"] .badge-card--board .board-badge-ribbon { position:absolute!important; z-index:2!important; }
   /* The perforations touch, so 8471 cards use their exact boundaries rather
      than a bleed that would run into the neighboring card. */
   body[data-print-badge][data-print-badge-group="children"][data-child-badge-size="business-card"] .badge-card--recipient::before,
