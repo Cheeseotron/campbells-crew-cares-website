@@ -620,7 +620,7 @@ function escapeCalendarText(value) {
   return String(value || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 }
 
-function volunteerCalendarIcs(event, origin) {
+function volunteerCalendarIcs(event, origin, method = "PUBLISH", attendee = "") {
   const date = calendarDateParts(event);
   const details = eventEmailDetails(event);
   const settings = eventSettings(event) || {};
@@ -630,7 +630,8 @@ function volunteerCalendarIcs(event, origin) {
   const description = `Campbell's Crew Cares volunteer event.\nRole details and event-day guidance are available in your confirmation email.`;
   const now = new Date();
   const created = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}T${String(now.getUTCHours()).padStart(2, "0")}${String(now.getUTCMinutes()).padStart(2, "0")}00Z`;
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Campbell's Crew Cares//Volunteer Event//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT", `UID:${event.id}@campbellscrew.com`, `DTSTAMP:${created}`, `SUMMARY:${escapeCalendarText(event.title)}`, `DESCRIPTION:${escapeCalendarText(description)}`, `LOCATION:${escapeCalendarText(location)}`, `URL:${origin}/volunteer?event=${encodeURIComponent(event.id)}`];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Campbell's Crew Cares//Volunteer Event//EN", "CALSCALE:GREGORIAN", `METHOD:${method}`, "BEGIN:VEVENT", `UID:${event.id}@campbellscrew.com`, `DTSTAMP:${created}`, `SUMMARY:${escapeCalendarText(event.title)}`, `DESCRIPTION:${escapeCalendarText(description)}`, `LOCATION:${escapeCalendarText(location)}`, `URL:${origin}/volunteer?event=${encodeURIComponent(event.id)}`];
+  if (method === "REQUEST") { lines.push(`ORGANIZER;CN=Campbell's Crew Cares:mailto:${EMAIL_SENDER}`); if (attendee) lines.push(`ATTENDEE;CN=${escapeCalendarText(attendee)};RSVP=TRUE:mailto:${attendee}`); }
   if (date) {
     lines.push(`DTSTART;TZID=America/Phoenix:${calendarStamp(date, start)}`, `DTEND;TZID=America/Phoenix:${calendarStamp(date, end)}`);
   } else {
@@ -667,8 +668,7 @@ async function sendVolunteerConfirmation(env, recipient, name, role, event) {
   const details = eventEmailDetails(event);
   const message = eventEmailTemplate(event, "vol-confirm", { subject: `You're registered: {{event}}`, body: `Hi {{name}},\n\nThank you for volunteering with Campbell's Crew Cares. You are registered for {{event}} as a {{role}}.\n\nDate: {{date}}\nTime: {{time}}\nLocation: {{location}}${details.address ? `\nAddress: ${details.address}` : ""}\n\nWe look forward to seeing you there.` }, { name, role });
   if (message) {
-    const calendarUrl = `https://campbellscrew.com/portal-api/public/events/${encodeURIComponent(event.id)}/calendar.ics`;
-    await sendEmail(env, recipient, message.subject, `${message.body}\n\nGoogle Calendar: ${googleCalendarUrl(event)}\nApple / iCloud Calendar: Open the attached event invitation.\n\nYou can also download the event file here: ${calendarUrl}`, { googleUrl: googleCalendarUrl(event), ics: volunteerCalendarIcs(event, "https://campbellscrew.com") });
+    await sendEmail(env, recipient, message.subject, message.body, { googleUrl: googleCalendarUrl(event), ics: volunteerCalendarIcs(event, "https://campbellscrew.com", "REQUEST", recipient) });
   }
 }
 
