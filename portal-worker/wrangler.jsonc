@@ -13,6 +13,7 @@
     "PORTAL_MODE": "closed",
     "GOOGLE_OAUTH_CLIENT_ID": "142554695071-lkl9k20sfcjc0i074opd9h6vhuogip84.apps.googleusercontent.com"
   },
+  "triggers": { "crons": ["0 16 * * *"] },
   "routes": [
     { "pattern": "campbellscrew.com/volunteer*", "zone_name": "campbellscrew.com" },
     { "pattern": "campbellscrew.com/apply", "zone_name": "campbellscrew.com" },

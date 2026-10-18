@@ -696,6 +696,39 @@ async function sendRecipientConfirmation(env, recipient, guardianName, event) {
   if (message) await sendEmail(env, recipient, message.subject, message.body);
 }
 
+function eventDateKey(event, daysAhead = 0) {
+  const parsed = new Date(String(event.event_date || eventSettings(event).date || "").trim());
+  if (Number.isNaN(parsed.getTime())) return "";
+  parsed.setUTCDate(parsed.getUTCDate() + daysAhead);
+  return parsed.toISOString().slice(0, 10);
+}
+
+function arizonaDateKey() {
+  const values = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Phoenix", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+async function sendWeekBeforeReminders(env) {
+  const { results: events } = await env.DB.prepare("SELECT id, title, event_date, settings_json FROM events WHERE status = 'open'").all();
+  for (const event of events || []) {
+    if (eventDateKey(event, -7) !== arizonaDateKey()) continue;
+    const send = async (recipient, name, role, templateId, fallback) => {
+      if (!isValidEmailAddress(recipient)) return;
+      const existing = await env.DB.prepare("SELECT id FROM email_jobs WHERE event_id = ? AND template_id = ? AND recipient_email = ? AND status = 'sent'").bind(event.id, templateId, recipient).first();
+      if (existing) return;
+      const message = eventEmailTemplate(event, templateId, fallback, { name, role });
+      if (!message) return;
+      const id = randomId("email_job");
+      try { await sendEmail(env, recipient, message.subject, message.body); await env.DB.prepare("INSERT INTO email_jobs (id, event_id, template_id, recipient_email, subject, body, status, sent_at) VALUES (?, ?, ?, ?, ?, ?, 'sent', CURRENT_TIMESTAMP)").bind(id, event.id, templateId, recipient, message.subject, message.body).run(); }
+      catch (error) { await env.DB.prepare("INSERT INTO email_jobs (id, event_id, template_id, recipient_email, subject, body, status) VALUES (?, ?, ?, ?, ?, ?, 'failed')").bind(id, event.id, templateId, recipient, message.subject, message.body).run(); console.error("Week-before reminder failed", error); }
+    };
+    const { results: volunteers } = await env.DB.prepare("SELECT DISTINCT v.name, v.email, s.role FROM volunteer_signups s JOIN volunteer_profiles v ON v.id = s.volunteer_id WHERE s.event_id = ? AND s.status = 'confirmed' AND v.email <> ''").bind(event.id).all();
+    const { results: households } = await env.DB.prepare("SELECT guardian_name AS name, email FROM recipient_households WHERE event_id = ? AND status = 'approved' AND email <> ''").bind(event.id).all();
+    for (const volunteer of volunteers || []) await send(volunteer.email, volunteer.name, volunteer.role, "volunteer-week-reminder", { subject: "One week away: {{event}}", body: "Hi {{name}},\n\n{{event}} is one week away.\n\nDate: {{date}}\nTime: {{time}}\nLocation: {{location}}\n\nYou are registered as: {{role}}\n\nPlease plan to arrive on time. We look forward to seeing you there." });
+    for (const household of households || []) await send(household.email, household.name, "", "recipient-week-reminder", { subject: "One week away: {{event}}", body: "Hi {{name}},\n\n{{event}} is one week away.\n\nDate: {{date}}\nTime: {{time}}\nLocation: {{location}}\n\nWe look forward to seeing your family there." });
+  }
+}
+
 async function sendRecipientDecisionEmail(env, recipient, guardianName, childName, decision, event, decisionNote = "") {
   const details = eventEmailDetails(event);
   const messages = {
@@ -1687,6 +1720,7 @@ async function api(request, env, url, user) {
 }
 
 export default {
+  async scheduled(controller, env, ctx) { ctx.waitUntil(sendWeekBeforeReminders(env)); },
   async fetch(request, env) {
     const url = new URL(request.url);
     // Logout is a protected portal action too. It must reach this Worker so it
