@@ -1142,8 +1142,29 @@
 
   function questionToggle(id, label, checked) { if (id === "documents" || id === "braSize") return ""; return `<label class="question-toggle"><input type="checkbox" name="question-${id}" ${checked ? "checked" : ""}><span class="switch-control" aria-hidden="true"></span><span><strong>${esc(label)}</strong><small>${checked ? "Shown" : "Hidden"} on the public form</small></span></label>`; }
 
+  function starterRoleGuide(role) {
+    const title = String(role?.title || "").trim().toLowerCase();
+    const existing = String(role?.description || "").trim();
+    const legacy = new Set([
+      "Shop one-on-one with a child for approved essentials.",
+      "Review carts against the event shopping guide.",
+      "Keep checkout groups organized and moving.",
+      "Capture respectful event moments under charity guidelines.",
+      "Go wherever organizers need an extra set of hands."
+    ]);
+    const guides = {
+      "shopper": "Arrive on time so the team can walk you through the event flow. You will shop one-on-one with a child without their parent, help find the correct sizes, then bring the cart to the Garden Center cashier for review and checkout. Shopping is usually about 45 minutes, but please plan for flexibility. Ask an organizer if you have concerns, and choose another role if this one is not a fit.",
+      "cart checker": "Help welcome and check in families and volunteers, then help review carts before checkout. Compare items with the child’s approved list and kindly address anything that cannot be purchased. This role is best for someone organized, calm, and comfortable having respectful but direct conversations when needed.",
+      "check-in / cart checker": "Help welcome and check in families and volunteers, then help review carts before checkout. Compare items with the child’s approved list and kindly address anything that cannot be purchased. This role is best for someone organized, calm, and comfortable having respectful but direct conversations when needed.",
+      "checkout assistant": "Keep the Garden Center checkout area organized and moving. Help shoppers, cart checkers, and cashiers stay coordinated; direct completed carts; and assist with bags, receipts, and the next family in line. Ask an organizer whenever a purchase or process is unclear.",
+      "photographer": "Capture respectful, positive event moments while protecting each family’s privacy and dignity. Follow organizer direction about photos, avoid interrupting the child’s shopping experience, and check with staff before photographing sensitive or uncertain situations.",
+      "floater": "Be ready to jump in wherever the event needs an extra set of hands. You may help with greeting, directions, supplies, line flow, checkout, or another task assigned by an organizer. Please stay flexible, check in often, and ask when you are ready for your next task."
+    };
+    return (!existing || legacy.has(existing)) && guides[title] ? guides[title] : existing;
+  }
+
   function roleEditorRows(roles) {
-    return `<div class="editor-row editor-row--head"><span>Open</span><span>Role</span><span>Shift</span><span>Spots</span></div>${roles.map((role) => `<div class="role-editor"><div class="editor-row"><label class="switch"><input type="checkbox" name="role-enabled-${role.id}" ${role.enabled ? "checked" : ""}><span></span></label><input aria-label="${esc(role.title)} role name" name="role-title-${role.id}" value="${esc(role.title)}"><input aria-label="${esc(role.title)} shift" name="role-shift-${role.id}" value="${esc(role.shift)}"><input aria-label="${esc(role.title)} spots" name="role-capacity-${role.id}" type="number" min="0" value="${esc(role.capacity)}"></div><label class="role-guide-field"><span>Role guide shown during signup</span><textarea name="role-description-${role.id}" rows="4" placeholder="Explain what this volunteer role involves and any important expectations.">${esc(role.description || "")}</textarea></label></div>`).join("")}`;
+    return `<div class="editor-row editor-row--head"><span>Open</span><span>Role</span><span>Shift</span><span>Spots</span></div>${roles.map((role) => `<div class="role-editor"><div class="editor-row"><label class="switch"><input type="checkbox" name="role-enabled-${role.id}" ${role.enabled ? "checked" : ""}><span></span></label><input aria-label="${esc(role.title)} role name" name="role-title-${role.id}" value="${esc(role.title)}"><input aria-label="${esc(role.title)} shift" name="role-shift-${role.id}" value="${esc(role.shift)}"><input aria-label="${esc(role.title)} spots" name="role-capacity-${role.id}" type="number" min="0" value="${esc(role.capacity)}"></div><label class="role-guide-field"><span>Role guide shown during signup</span><textarea name="role-description-${role.id}" rows="4" placeholder="Explain what this volunteer role involves and any important expectations.">${esc(starterRoleGuide(role))}</textarea></label></div>`).join("")}`;
   }
 
   function statusChoice(name, value, title, copy, current) {
