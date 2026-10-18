@@ -565,12 +565,13 @@ function emailLine(value) {
   return String(value || "").replace(/[\r\n]+/g, " ").trim();
 }
 
-function brandedEmailHtml(subject, body) {
+function brandedEmailHtml(subject, body, calendar = null) {
   const paragraphs = String(body || "").split(/\r?\n\r?\n/).filter(Boolean).map((paragraph) => `<p style="margin:0 0 18px;color:#111821;font:16px/1.55 Arial,sans-serif;overflow-wrap:anywhere">${escapeHtml(paragraph).replace(/\r?\n/g, "<br>")}</p>`).join("");
-  return `<!doctype html><html><body style="margin:0;padding:0;background:#eef3ef"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:#eef3ef"><tr><td align="center" style="padding:28px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ffffff"><tr><td style="height:7px;background:#35d32f;font-size:0;line-height:0">&nbsp;</td></tr><tr><td style="padding:20px 26px;background:#111821"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:14px"><img src="https://campbellscrew.com/assets/images/ccc-logo.png" width="52" height="52" alt="Campbell's Crew Cares" style="display:block;border:0;border-radius:50%;background:#fff"></td><td><div style="color:#fff;font:700 14px Arial,sans-serif;letter-spacing:.7px;text-transform:uppercase">Campbell's Crew Cares</div><div style="padding-top:4px;color:#b9c8bf;font:12px Arial,sans-serif">Community care in action</div></td></tr></table></td></tr><tr><td style="padding:30px 30px 14px"><h1 style="margin:0 0 22px;color:#176b39;font:700 24px/1.2 Arial,sans-serif">${escapeHtml(subject)}</h1>${paragraphs}</td></tr><tr><td style="padding:18px 30px;background:#f2f7f2;border-top:1px solid #d2d9d4;color:#617068;font:12px/1.45 Arial,sans-serif">Campbell's Crew Cares<br>Questions? Reply directly to this email.</td></tr></table></td></tr></table></body></html>`;
+  const calendarPanel = calendar ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px"><tr><td style="padding-right:10px"><a href="${escapeHtml(calendar.googleUrl)}" style="display:inline-block;padding:14px 17px;background:#4285f4;color:#fff;font:700 12px Arial,sans-serif;text-decoration:none">Google Calendar</a></td><td style="padding:11px 0;color:#34413b;font:700 12px/1.35 Arial,sans-serif">Apple / iCloud Calendar<br><span style="font-weight:400;color:#617068">Open the attached calendar invitation.</span></td></tr></table>` : "";
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#eef3ef"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:#eef3ef"><tr><td align="center" style="padding:28px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ffffff"><tr><td style="height:7px;background:#35d32f;font-size:0;line-height:0">&nbsp;</td></tr><tr><td style="padding:20px 26px;background:#111821"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:14px"><img src="https://campbellscrew.com/assets/images/ccc-logo.png" width="52" height="52" alt="Campbell's Crew Cares" style="display:block;border:0;border-radius:50%;background:#fff"></td><td><div style="color:#fff;font:700 14px Arial,sans-serif;letter-spacing:.7px;text-transform:uppercase">Campbell's Crew Cares</div><div style="padding-top:4px;color:#b9c8bf;font:12px Arial,sans-serif">Community care in action</div></td></tr></table></td></tr><tr><td style="padding:30px 30px 14px"><h1 style="margin:0 0 22px;color:#176b39;font:700 24px/1.2 Arial,sans-serif">${escapeHtml(subject)}</h1>${paragraphs}${calendarPanel}</td></tr><tr><td style="padding:18px 30px;background:#f2f7f2;border-top:1px solid #d2d9d4;color:#617068;font:12px/1.45 Arial,sans-serif">Campbell's Crew Cares<br>Questions? Reply directly to this email.</td></tr></table></td></tr></table></body></html>`;
 }
 
-async function sendEmail(env, recipient, subject, body) {
+async function sendEmail(env, recipient, subject, body, calendar = null) {
   const credential = await env.DB.prepare("SELECT encrypted_refresh_token FROM email_oauth_credentials WHERE id = 1").first();
   if (!credential || !env.GOOGLE_OAUTH_CLIENT_ID || !env.GOOGLE_OAUTH_CLIENT_SECRET) throw new Error("Email delivery has not been connected yet.");
   const destination = emailLine(recipient).toLowerCase();
@@ -581,7 +582,12 @@ async function sendEmail(env, recipient, subject, body) {
   if (!tokenResponse.ok || !token.access_token) throw new Error("Google email authorization needs to be reconnected.");
   const boundary = `ccc-${crypto.randomUUID()}`;
   const plainText = String(body || "").replace(/\r?\n/g, "\r\n");
-  const message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\nSubject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n--${boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${plainText}\r\n\r\n--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${brandedEmailHtml(subject, body)}\r\n\r\n--${boundary}--`;
+  const alternative = (key) => `--${key}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${plainText}\r\n\r\n--${key}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${brandedEmailHtml(subject, body, calendar)}\r\n\r\n--${key}--`;
+  let message;
+  if (calendar?.ics) {
+    const mixed = `${boundary}-mixed`; const encodedIcs = base64Url(new TextEncoder().encode(calendar.ics)).replace(/-/g, "+").replace(/_/g, "/");
+    message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\nSubject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="${mixed}"\r\n\r\n--${mixed}\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n${alternative(boundary)}\r\n--${mixed}\r\nContent-Type: text/calendar; method=REQUEST; charset=UTF-8; name="campbells-crew-event.ics"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="campbells-crew-event.ics"\r\n\r\n${encodedIcs}\r\n--${mixed}--`;
+  } else message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\nSubject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n${alternative(boundary)}`;
   const sent = await fetch(`https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(EMAIL_SENDER)}/messages/send`, { method: "POST", headers: { Authorization: `Bearer ${token.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw: base64Url(new TextEncoder().encode(message)) }) });
   if (!sent.ok) throw new Error("Google could not send the email.");
 }
@@ -634,6 +640,15 @@ function volunteerCalendarIcs(event, origin) {
   return lines.join("\r\n");
 }
 
+function googleCalendarUrl(event) {
+  const date = calendarDateParts(event); const settings = eventSettings(event) || {}; const details = eventEmailDetails(event);
+  if (!date) return "https://calendar.google.com";
+  const start = calendarTimeParts(String(settings.time || "").split(/[–—-]/)[0]);
+  const end = calendarTimeParts(String(settings.time || "").split(/[–—-]/)[1], { hour: Math.min(23, start.hour + 2), minute: start.minute });
+  const query = new URLSearchParams({ action: "TEMPLATE", text: event.title || "Campbell's Crew Cares event", dates: `${calendarStamp(date, start)}/${calendarStamp(date, end)}`, ctz: "America/Phoenix", location: [details.location, details.address].filter(Boolean).join(" — "), details: "Campbell's Crew Cares volunteer event." });
+  return `https://calendar.google.com/calendar/r/eventedit?${query.toString()}`;
+}
+
 function eventEmailTemplate(event, id, fallback, values = {}) {
   const templates = eventSettings(event)?.emailTemplates || [];
   const saved = templates.find((template) => template.id === id);
@@ -653,7 +668,7 @@ async function sendVolunteerConfirmation(env, recipient, name, role, event) {
   const message = eventEmailTemplate(event, "vol-confirm", { subject: `You're registered: {{event}}`, body: `Hi {{name}},\n\nThank you for volunteering with Campbell's Crew Cares. You are registered for {{event}} as a {{role}}.\n\nDate: {{date}}\nTime: {{time}}\nLocation: {{location}}${details.address ? `\nAddress: ${details.address}` : ""}\n\nWe look forward to seeing you there.` }, { name, role });
   if (message) {
     const calendarUrl = `https://campbellscrew.com/portal-api/public/events/${encodeURIComponent(event.id)}/calendar.ics`;
-    await sendEmail(env, recipient, message.subject, `${message.body}\n\nAdd this event to your calendar:\n${calendarUrl}`);
+    await sendEmail(env, recipient, message.subject, `${message.body}\n\nGoogle Calendar: ${googleCalendarUrl(event)}\nApple / iCloud Calendar: Open the attached event invitation.\n\nYou can also download the event file here: ${calendarUrl}`, { googleUrl: googleCalendarUrl(event), ics: volunteerCalendarIcs(event, "https://campbellscrew.com") });
   }
 }
 
