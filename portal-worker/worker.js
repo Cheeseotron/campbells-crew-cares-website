@@ -5,6 +5,7 @@ const SESSION_SECONDS = 60 * 60 * 8;
 const REMEMBER_SESSION_SECONDS = 60 * 60 * 24 * 30;
 const PORTAL_PATHS = new Set(["/volunteer", "/apply", "/login", "/setup", "/organizer", "/forgot-password", "/google-email/connect", "/google-email/callback"]);
 const EMAIL_SENDER = "Submission@campbellscrew.com";
+const ORGANIZER_REPLY_TO = "Campbell@Campbellscrew.com";
 const OWNER_ROLES = new Set(["executive_owner"]);
 const EDITOR_ROLES = new Set(["executive_owner", "event_admin"]);
 
@@ -587,11 +588,13 @@ function brandedEmailHtml(subject, body, calendar = null) {
   return `<!doctype html><html><body style="margin:0;padding:0;background:#eef3ef"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:#eef3ef"><tr><td align="center" style="padding:28px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ffffff"><tr><td style="height:7px;background:#35d32f;font-size:0;line-height:0">&nbsp;</td></tr><tr><td style="padding:20px 26px;background:#111821"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:14px"><img src="https://campbellscrew.com/assets/images/ccc-logo.png" width="52" height="52" alt="Campbell's Crew Cares" style="display:block;border:0;border-radius:50%;background:#fff"></td><td><div style="color:#fff;font:700 14px Arial,sans-serif;letter-spacing:.7px;text-transform:uppercase">Campbell's Crew Cares</div><div style="padding-top:4px;color:#b9c8bf;font:12px Arial,sans-serif">Community care in action</div></td></tr></table></td></tr><tr><td style="padding:30px 30px 14px"><h1 style="margin:0 0 22px;color:#176b39;font:700 24px/1.2 Arial,sans-serif">${escapeHtml(subject)}</h1>${paragraphs}${calendarPanel}</td></tr><tr><td style="padding:18px 30px;background:#f2f7f2;border-top:1px solid #d2d9d4;color:#617068;font:12px/1.45 Arial,sans-serif">Campbell's Crew Cares<br>Questions? Reply directly to this email.</td></tr></table></td></tr></table></body></html>`;
 }
 
-async function sendEmail(env, recipient, subject, body, calendar = null) {
+async function sendEmail(env, recipient, subject, body, calendar = null, replyTo = "") {
   const credential = await env.DB.prepare("SELECT encrypted_refresh_token FROM email_oauth_credentials WHERE id = 1").first();
   if (!credential || !env.GOOGLE_OAUTH_CLIENT_ID || !env.GOOGLE_OAUTH_CLIENT_SECRET) throw new Error("Email delivery has not been connected yet.");
   const destination = emailLine(recipient).toLowerCase();
   if (!/^\S+@\S+\.\S+$/.test(destination)) throw new Error("A valid email address is required for delivery.");
+  const replyAddress = emailLine(replyTo).toLowerCase();
+  if (replyAddress && !/^\S+@\S+\.\S+$/.test(replyAddress)) throw new Error("A valid reply-to email address is required for delivery.");
   const refreshToken = await decryptEmailToken(credential.encrypted_refresh_token, env);
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_OAUTH_CLIENT_ID, client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET, refresh_token: refreshToken, grant_type: "refresh_token" }) });
   const token = await tokenResponse.json();
@@ -600,10 +603,11 @@ async function sendEmail(env, recipient, subject, body, calendar = null) {
   const plainText = String(body || "").replace(/\r?\n/g, "\r\n");
   const alternative = (key) => `--${key}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${plainText}\r\n\r\n--${key}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${brandedEmailHtml(subject, body, calendar)}\r\n\r\n--${key}--`;
   let message;
+  const replyHeader = replyAddress ? `Reply-To: ${replyAddress}\r\n` : "";
   if (calendar?.ics) {
     const mixed = `${boundary}-mixed`; const encodedIcs = base64Url(new TextEncoder().encode(calendar.ics)).replace(/-/g, "+").replace(/_/g, "/");
-    message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\nSubject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="${mixed}"\r\n\r\n--${mixed}\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n${alternative(boundary)}\r\n--${mixed}\r\nContent-Type: text/calendar; method=REQUEST; charset=UTF-8; name="Campbells-Crew-event-invitation.ics"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="Campbells-Crew-event-invitation.ics"\r\n\r\n${encodedIcs}\r\n--${mixed}--`;
-  } else message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\nSubject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n${alternative(boundary)}`;
+    message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\n${replyHeader}Subject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="${mixed}"\r\n\r\n--${mixed}\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n${alternative(boundary)}\r\n--${mixed}\r\nContent-Type: text/calendar; method=REQUEST; charset=UTF-8; name="Campbells-Crew-event-invitation.ics"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="Campbells-Crew-event-invitation.ics"\r\n\r\n${encodedIcs}\r\n--${mixed}--`;
+  } else message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\n${replyHeader}Subject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n${alternative(boundary)}`;
   const sent = await fetch(`https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(EMAIL_SENDER)}/messages/send`, { method: "POST", headers: { Authorization: `Bearer ${token.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw: base64Url(new TextEncoder().encode(message)) }) });
   if (!sent.ok) throw new Error("Google could not send the email.");
 }
@@ -756,12 +760,13 @@ async function sendRecipientDecisionEmail(env, recipient, guardianName, childNam
   const messages = {
     approved: { subject: `Approved: ${emailLine(event.title)}`, body: `We are happy to let you know that ${emailLine(childName)} has been approved for ${emailLine(event.title)}.\n\nDate: ${details.date}\nTime: ${details.time}\nLocation: ${details.location}${details.address ? `\nAddress: ${details.address}` : ""}\n\nWe look forward to seeing you there.` },
     declined: { subject: `An update on ${emailLine(childName)}’s application`, body: `Thank you for taking the time to apply for ${emailLine(event.title)}. After careful review, we are unable to offer ${emailLine(childName)} a place in this event.\n\nReason provided by the Campbell's Crew Cares team:\n${emailLine(decisionNote)}\n\nWe understand this may be disappointing. We appreciate your understanding and hope you will consider future Campbell's Crew Cares opportunities.` },
-    waitlisted: { subject: `Waitlist update: ${emailLine(event.title)}`, body: `${emailLine(childName)} has been placed on the waitlist for ${emailLine(event.title)}.\n\nWe will contact you if a place becomes available. Please do not make event plans until you receive a separate approval message.` }
+    waitlisted: { subject: `Waitlist update: ${emailLine(event.title)}`, body: `${emailLine(childName)} has been placed on the waitlist for ${emailLine(event.title)}.\n\nWe will contact you if a place becomes available. Please do not make event plans until you receive a separate approval message.` },
+    info: { subject: `Action needed: ${emailLine(childName)}’s application`, body: `Hi ${emailLine(guardianName)},\n\nWe are reviewing ${emailLine(childName)}’s application for ${emailLine(event.title)} and need a little more information before we can continue.\n\nWhat we need:\n${emailLine(decisionNote)}\n\nPlease reply directly to this email with the requested information. You do not need to submit a new application or make changes to the original form. Once we receive your reply, our team will continue the review.` }
   };
   const fallback = messages[decision];
   const message = fallback ? eventEmailTemplate(event, decision, fallback, { name: guardianName, child: childName, reason: decisionNote }) : null;
   if (!message) return;
-  await sendEmail(env, recipient, message.subject, message.body);
+  await sendEmail(env, recipient, message.subject, message.body, null, decision === "info" ? ORGANIZER_REPLY_TO : "");
 }
 
 async function sendOrganizerInvitation(env, recipient, name, role, setupUrl) {
@@ -1615,23 +1620,26 @@ async function api(request, env, url, user) {
     const decisionNote = String(input.decisionNote || "").trim().slice(0, 1000);
     if (!["approved", "declined", "waitlisted", "needs_information", "info", "review"].includes(decision)) return json({ error: "That decision is not supported." }, 400);
     if (decision === "declined" && !decisionNote) return json({ error: "Please provide a reason before declining this application." }, 400);
+    if (["needs_information", "info"].includes(decision) && !decisionNote) return json({ error: "Please explain what information is needed before sending the request." }, 400);
     const household = await env.DB.prepare("SELECT h.id, h.event_id, h.guardian_name, h.email, e.title, e.event_date, e.settings_json FROM recipient_households h JOIN events e ON e.id = h.event_id WHERE h.id = ?").bind(recipientDecisionMatch[1]).first();
     if (!household) return json({ error: "That recipient household was not found." }, 404);
     const child = await env.DB.prepare("SELECT id, first_name, last_name, details_json FROM recipient_children WHERE id = ? AND household_id = ?").bind(recipientDecisionMatch[2], household.id).first();
     if (!child) return json({ error: "That child was not found in this household." }, 404);
     let details = {}; try { details = JSON.parse(child.details_json || "{}"); } catch {}
     if (decision === "declined") details.organizerDecisionNote = decisionNote;
+    if (["needs_information", "info"].includes(decision)) details.organizerInformationRequest = decisionNote;
     await env.DB.prepare("UPDATE recipient_children SET status = ?, details_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(decision, JSON.stringify(details), child.id).run();
     const { results: children } = await env.DB.prepare("SELECT status FROM recipient_children WHERE household_id = ?").bind(household.id).all();
     const statuses = children.map((record) => record.status === "needs_information" ? "info" : record.status);
     const householdStatus = !statuses.length ? "review" : statuses.every((status) => status === statuses[0]) ? statuses[0] : statuses.some((status) => ["review", "submitted", "info"].includes(status)) ? "review" : "mixed";
     await env.DB.prepare("UPDATE recipient_households SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(householdStatus, household.id).run();
     let emailSent = null;
-    if (["approved", "declined", "waitlisted"].includes(decision)) {
-      try { await sendRecipientDecisionEmail(env, household.email, household.guardian_name, `${child.first_name} ${child.last_name}`.trim(), decision, household, decisionNote); emailSent = true; }
+    if (["approved", "declined", "waitlisted", "needs_information", "info"].includes(decision)) {
+      const emailDecision = decision === "needs_information" ? "info" : decision;
+      try { await sendRecipientDecisionEmail(env, household.email, household.guardian_name, `${child.first_name} ${child.last_name}`.trim(), emailDecision, household, decisionNote); emailSent = true; }
       catch (error) { console.error("Recipient decision delivery failed", error); emailSent = false; }
     }
-    await audit(env, user, `recipient_child_${decision}`, "recipient_child", child.id, household.event_id, decision === "declined" ? { decisionNote } : {});
+    await audit(env, user, `recipient_child_${decision}`, "recipient_child", child.id, household.event_id, ["declined", "needs_information", "info"].includes(decision) ? { decisionNote } : {});
     return json({ id: child.id, decision, householdStatus, emailSent });
   }
 
