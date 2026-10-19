@@ -968,7 +968,7 @@
 
   function braSizeField(index, child) {
     const applicable = braSizeApplies(child.gender);
-    return `<div class="field size-field" data-bra-field="${index}" ${applicable ? "" : "hidden"}><label for="child-${index}-bra">Bra size <span>(if applicable)</span></label><input id="child-${index}-bra" name="child-${index}-bra" value="${esc(child.bra || "")}" placeholder="Enter size" ${applicable ? "" : "disabled"}></div>`;
+    return `<div class="field size-field" data-bra-field="${index}" ${applicable ? "" : "hidden"}><label for="child-${index}-bra">Bra size <span>(if applicable)</span></label><input id="child-${index}-bra" name="child-${index}-bra" value="${esc(child.bra || "")}" placeholder="Enter size" ${applicable ? "" : "disabled"}><small>Put N/A if not needed.</small></div>`;
   }
 
   function updateBraField(picker) {
