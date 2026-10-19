@@ -458,13 +458,13 @@ function drawRulesOverlay(page, event, font, bold) {
   page.drawRectangle({ x: 42, y: 542, width: 528, height: 70, color: toy ? cream : mist, borderColor: toy ? orange : green, borderWidth: 1 });
   const prohibitedItems = "School-appropriate clothes only. No pajamas, hats, belts, jewelry, hair accessories, or other extras.";
   if (toy) {
-    draw("APPROVED BUDGET ITEMS ONLY", 58, 592, 12, { bold: true, maxWidth: 480 });
-    draw(prohibitedItems, 58, 576, 8.3, { maxWidth: 494 });
-    draw(`Only printed categories are approved. Toys are allowed only when printed; fixed toy limit: $${Number(toy.amount) || 0}.`, 58, 564, 8.1, { maxWidth: 494 });
+    draw("TOYS: FIXED LIMIT - NO EXCEPTIONS", 58, 592, 12, { bold: true, maxWidth: 480 });
+    draw(`A toy is allowed only when it is printed on the child's sheet. The fixed toy maximum is $${Number(toy.amount) || 0}: clothing money can never be used for a more expensive toy. Toy money may be used for clothing instead.`, 58, 576, 8.3, { maxWidth: 494 });
+    draw(prohibitedItems, 58, 564, 8.1, { bold: true, maxWidth: 494 });
   } else {
-    draw("APPROVED BUDGET ITEMS ONLY", 58, 592, 12, { bold: true, maxWidth: 480 });
-    draw(prohibitedItems, 58, 576, 8.3, { maxWidth: 494 });
-    draw("Only categories printed on the child's information sheet are approved. Toys or bras require a printed approval.", 58, 564, 8.1, { maxWidth: 494 });
+    draw("CLOTHING-ONLY EVENT - NO TOYS OR ACCESSORIES", 58, 592, 10.8, { bold: true, maxWidth: 480 });
+    draw("Purchase only clothes from the categories listed on the child's information sheet. Toys or bras require a printed approval.", 58, 576, 8.4, { maxWidth: 494 });
+    draw(prohibitedItems, 58, 564, 8.1, { bold: true, maxWidth: 494 });
   }
   // A solid cover is deliberately used here: it reliably masks the template
   // beneath it before the event-aware bra or clothing-only copy is drawn.
