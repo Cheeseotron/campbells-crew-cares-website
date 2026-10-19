@@ -427,23 +427,25 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
   // Keep the closeout checklist on the child's own sheet, right below the
   // spending tracker where it is most useful at the register.
   clear(41, 24, 529, 123, paper);
-  draw("BEFORE CHECKOUT CHECKLIST", 52, 136, 10.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
+  page.drawRectangle({ x: 52, y: 35, width: 507, height: 91, color: rgb(0.965, 0.985, 0.97), borderColor: border, borderWidth: .55 });
+  page.drawRectangle({ x: 52, y: 126, width: 507, height: 21, color: rgb(0.03, 0.47, 0.23) });
+  draw("BEFORE CHECKOUT CHECKLIST", 64, 132, 10.5, { bold: true, color: rgb(1, 1, 1) });
   const checkoutItems = [
-    "At least one item from every printed category.",
-    "Within a few dollars of the clothing budget.",
-    "Fit, modesty, and age-appropriateness checked.",
-    "No pajamas, hats, belts, jewelry, hair accessories, or extras.",
-    ...(toyBudget ? ["Stayed within the fixed toy limit."] : [])
+    "One item from every printed category",
+    "Within a few dollars of the clothing budget",
+    "Fit, modesty, and age-appropriateness checked",
+    "No pajamas, accessories, or unlisted extras",
+    ...(toyBudget ? ["Stayed within the fixed toy limit"] : [])
   ];
   checkoutItems.forEach((item, index) => {
-    const column = index % 2; const row = Math.floor(index / 2); const x = 52 + column * 254; const y = 115 - row * 27;
-    page.drawRectangle({ x, y: y - 1, width: 8, height: 8, borderColor: muted, borderWidth: .6 });
-    draw(item, x + 12, y, 9, { maxWidth: 235, lineHeight: 10.5 });
+    const column = index % 2; const row = Math.floor(index / 2); const x = 66 + column * 246; const y = 105 - row * 30;
+    page.drawRectangle({ x, y: y - 2, width: 10, height: 10, borderColor: rgb(0.03, 0.47, 0.23), borderWidth: .8 });
+    draw(item, x + 15, y, 10.2, { maxWidth: 220, lineHeight: 11.5 });
   });
-  draw("Questions? Ask a CCC representative before checkout.", 284, 36, 7.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
-  page.drawLine({ start: { x: 284, y: 34 }, end: { x: 570, y: 34 }, thickness: .55, color: rgb(0.03, 0.47, 0.23) });
-  page.drawLine({ start: { x: 41, y: 34 }, end: { x: 570, y: 34 }, thickness: .55, color: border });
-  draw(`Event date: ${values.eventDate}`, 41, 20, 7.5, { muted: true });
+  draw("Need help? Ask a CCC representative before checkout.", 288, 21, 7.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
+  page.drawLine({ start: { x: 288, y: 19 }, end: { x: 570, y: 19 }, thickness: .55, color: rgb(0.03, 0.47, 0.23) });
+  page.drawLine({ start: { x: 41, y: 19 }, end: { x: 570, y: 19 }, thickness: .55, color: border });
+  draw(`Event date: ${values.eventDate}`, 41, 6, 7.2, { muted: true });
 }
 
 function drawRulesOverlay(page, event, font, bold) {
