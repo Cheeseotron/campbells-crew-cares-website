@@ -357,7 +357,7 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
   // Sizes panel: the header, table, and all value cells share the same outer
   // edge as the details, notes, and budget panels. A bra field only exists
   // when that event enabled it and the child's sizing category is applicable.
-  page.drawRectangle({ x: left, y: 420, width, height: 142, color: paper, borderColor: border, borderWidth: .55 });
+  page.drawRectangle({ x: left, y: 432, width, height: 130, color: paper, borderColor: border, borderWidth: .55 });
   page.drawRectangle({ x: left, y: 534, width, height: 28, color: fieldPanel, borderColor: border, borderWidth: .55 });
   draw("Sizes", 53, 544, 13, { bold: true });
   // Keep the child's shopping category immediately beside the size heading.
@@ -368,7 +368,7 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
   // visually centered in the small category box when printed.
   draw("SIZING CATEGORY", 403, 544.5, 6.4, { bold: true, muted: true });
   draw(values.category, 478, 543.5, 8.2, { bold: true, maxWidth: 73 });
-  const sizeTop = 523; const sizeBottom = 430; const sizeLeft = 52; const sizeRight = 559; const rowMid = 477;
+  const sizeTop = 523; const sizeBottom = 441; const sizeLeft = 52; const sizeRight = 559; const rowMid = 482;
   page.drawRectangle({ x: sizeLeft, y: sizeBottom, width: sizeRight - sizeLeft, height: sizeTop - sizeBottom, borderColor: border, borderWidth: .5 });
   page.drawLine({ start: { x: sizeLeft, y: rowMid }, end: { x: sizeRight, y: rowMid }, thickness: .5, color: border });
   const drawSizeCell = (label, item, x, y, width) => { draw(label, x + 10, y + 28, 7.6, { bold: true, muted: true }); draw(item, x + 10, y + 11, 9.5, { bold: true, maxWidth: width - 20 }); };
@@ -512,17 +512,17 @@ function drawRulesOverlay(page, event, font, bold) {
   page.drawRectangle({ x: 42, y: 224, width: 528, height: 70, color: ink });
   draw("BEFORE CHECKOUT", 58, 278, 10.5, { bold: true, color: rgb(1, 1, 1) });
   const checklist = [
-    "Each printed category has been successfully fulfilled.",
-    "Total spending is within a few dollars of the total budget.",
-    "Everything is appropriately sized and modest.",
-    "No pajamas, hats, belts, hair accessories, jewelry, or other extras.",
-    ...(toy ? [`Toy spending did not exceed the fixed $${Number(toy.amount) || 0} limit.`] : []),
-    "Any question was cleared with a CCC representative."
+    "Every printed category has at least one item.",
+    "Total is within a few dollars of the budget.",
+    "Fit, modesty, and age-appropriateness checked.",
+    "No pajamas, accessories, or other extras.",
+    ...(toy ? [`Toy spending stayed within the fixed $${Number(toy.amount) || 0} limit.`] : []),
+    "Questions cleared with a CCC representative."
   ];
   checklist.forEach((item, index) => {
-    const column = index % 2; const row = Math.floor(index / 2); const x = 58 + column * 257; const y = 260 - row * 13;
+    const column = index % 2; const row = Math.floor(index / 2); const x = 58 + column * 257; const y = 260 - row * 13.5;
     page.drawRectangle({ x, y: y - 1, width: 7, height: 7, borderColor: rgb(1, 1, 1), borderWidth: .65 });
-    draw(item, x + 12, y, 5.8, { color: rgb(1, 1, 1), maxWidth: 235, lineHeight: 7 });
+    draw(item, x + 12, y, 6.8, { color: rgb(1, 1, 1), maxWidth: 235, lineHeight: 7.8 });
   });
   // This dedicated panel is intentionally the one dynamic part of the rules
   // page. Only active special-item rules appear, so volunteers cannot mistake
