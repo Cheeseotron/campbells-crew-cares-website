@@ -460,7 +460,9 @@ function drawRulesOverlay(page, event, font, bold) {
   if (toy) {
     draw("TOYS: FIXED LIMIT - NO EXCEPTIONS", 58, 592, 12, { bold: true, maxWidth: 480 });
     draw(`A toy is allowed only when it is printed on the child's sheet. The fixed toy maximum is $${Number(toy.amount) || 0}: clothing money can never be used for a more expensive toy. Toy money may be used for clothing instead.`, 58, 576, 8.3, { maxWidth: 494 });
-    draw(prohibitedItems, 58, 564, 8.1, { bold: true, maxWidth: 494 });
+    // The toy explanation is longer than the clothing-only copy. Keep this
+    // reminder lower in the panel so the two printed lines never collide.
+    draw(prohibitedItems, 58, 550, 7.7, { bold: true, maxWidth: 494 });
   } else {
     draw("CLOTHING-ONLY EVENT - NO TOYS OR ACCESSORIES", 58, 592, 10.8, { bold: true, maxWidth: 480 });
     draw("Purchase only clothes from the categories listed on the child's information sheet. Toys or bras require a printed approval.", 58, 576, 8.4, { maxWidth: 494 });
