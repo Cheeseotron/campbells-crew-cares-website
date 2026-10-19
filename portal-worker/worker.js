@@ -509,11 +509,14 @@ function drawRulesOverlay(page, event, font, bold) {
     // The cleared fourth position intentionally remains blank when bra
     // approval is not active for this event.
   }
-  // Replace the generic closeout sentence with a practical, event-aware
-  // checklist. Keep it on a light background so it remains easy to mark by
+  // Rebuild the lower portion of the page. It has generous unused space, so
+  // make the practical checkout checklist much larger than the template's
+  // original closeout sentence while keeping the event-specific details below.
+  page.drawRectangle({ x: 36, y: 72, width: 540, height: 150, color: rgb(1, 1, 1) });
+  // Keep the checklist on a light background so it remains easy to mark by
   // hand once the rules sheet is printed. The toy confirmation exists only
   // when toys are enabled.
-  page.drawRectangle({ x: 42, y: 224, width: 528, height: 70, color: pale, borderColor: line, borderWidth: .8 });
+  page.drawRectangle({ x: 42, y: 204, width: 528, height: 90, color: pale, borderColor: line, borderWidth: .8 });
   page.drawRectangle({ x: 42, y: 274, width: 528, height: 20, color: green });
   draw("BEFORE CHECKOUT", 58, 280, 10.5, { bold: true, color: rgb(1, 1, 1) });
   const checklist = [
@@ -525,17 +528,17 @@ function drawRulesOverlay(page, event, font, bold) {
     "Questions cleared with a CCC representative."
   ];
   checklist.forEach((item, index) => {
-    const column = index % 2; const row = Math.floor(index / 2); const x = 58 + column * 257; const y = 260 - row * 13.5;
-    page.drawRectangle({ x, y: y - 1, width: 7, height: 7, borderColor: green, borderWidth: .7 });
-    draw(item, x + 12, y, 6.8, { maxWidth: 235, lineHeight: 7.8 });
+    const column = index % 2; const row = Math.floor(index / 2); const x = 58 + column * 257; const y = 257 - row * 18;
+    page.drawRectangle({ x, y: y - 2, width: 10, height: 10, borderColor: green, borderWidth: .8 });
+    draw(item, x + 16, y, 8.2, { maxWidth: 225, lineHeight: 9.2 });
   });
   // This dedicated panel is intentionally the one dynamic part of the rules
   // page. Only active special-item rules appear, so volunteers cannot mistake
   // an optional item from another event as permission for this child.
-  page.drawRectangle({ x: 42, y: 135, width: 528, height: 85, color: mist, borderColor: line, borderWidth: .7 });
-  draw("Event-specific approvals", 58, 198, 11, { bold: true });
-  draw("Only items printed on a child's shopping sheet are approved.", 58, 181, 8.5, { bold: true });
-  let y = 163;
+  page.drawRectangle({ x: 42, y: 80, width: 528, height: 114, color: mist, borderColor: line, borderWidth: .7 });
+  draw("Event-specific approvals", 58, 172, 11, { bold: true });
+  draw("Only items printed on a child's shopping sheet are approved.", 58, 155, 8.5, { bold: true });
+  let y = 137;
   if (toy) { draw(`TOYS - FIXED $${Number(toy.amount) || 0} MAX. Clothing money cannot be used for toys; toy money may be used for clothing.`, 58, y, 7.2, { bold: true, maxWidth: 495 }); y -= 16; }
   if (bra) { draw("BRAS - only for Girls/Women who truly need them, and only when both Bra Size and a Bra budget are printed on the child's sheet.", 58, y, 6.8, { bold: true, maxWidth: 495 }); }
   if (!toy && !bra) draw("No additional special-item approvals are active for this event.", 58, y, 8, { muted: true });
