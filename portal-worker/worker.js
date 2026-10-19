@@ -475,12 +475,12 @@ function drawRulesOverlay(page, event, font, bold) {
     page.drawRectangle({ x: x + 12, y: y + 30, width: 28, height: 22, color: green });
     draw(number, x + 19, y + 37, 8, { bold: true, color: rgb(1, 1, 1) });
     draw(heading, x + 50, y + 51, 9.8, { bold: true, maxWidth: 190 });
-    draw(body, x + 50, y + 35, 7, { maxWidth: 190, lineHeight: 7.8 });
+    draw(body, x + 50, y + 35, 7.4, { maxWidth: 190, lineHeight: 8.1 });
   };
   drawGuidePanel(
     "01", 42, 386,
     "Check fit and keep choices appropriate",
-    "No returns or exchanges. Never use changing rooms. Shoes and jackets may be tried on; compare all other clothing with what the child is wearing or hold it up to them. Keep choices school-appropriate."
+    "No returns or exchanges. No changing rooms. Shoes and jackets may be tried on. For other clothing, compare to what the child is wearing or hold it up to them. Keep choices school-appropriate."
   );
   drawGuidePanel(
     "02", 315, 386,
