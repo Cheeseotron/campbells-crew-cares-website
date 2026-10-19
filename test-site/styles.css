@@ -841,7 +841,7 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card--volunteer > div > span { color:var(--green-dark); font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
 .badge-card--volunteer > div > strong { color:var(--ink); font-size:31px; line-height:.94; letter-spacing:-.05em; overflow-wrap:anywhere; }
 .badge-card--volunteer > div > b { display:inline-block; padding:4px 10px; color:var(--ink); background:rgba(255,255,255,.74); border:2px solid var(--ink); border-radius:999px; font-size:13px; line-height:1.05; letter-spacing:.04em; }
-.badge-card--volunteer > div > em { color:var(--green-dark); font-size:10px; font-style:normal; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
+.badge-card--volunteer > div > em { position:absolute; bottom:31px; left:20px; color:var(--green-dark); font-size:10px; font-style:normal; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
 .badge-card--volunteer > div > .badge-event-date { position:absolute; bottom:15px; left:20px; color:var(--ink); font-size:9px; font-weight:800; letter-spacing:.06em; line-height:1.15; text-transform:uppercase; }
 .badge-card--minor-volunteer { --badge-background:linear-gradient(125deg,rgba(90,169,221,.22),rgba(90,169,221,0) 48%),radial-gradient(circle,rgba(23,107,57,.11) 0 1.15px,transparent 1.45px),#fbfefb; }
 .badge-card--minor-volunteer .badge-topbar i:first-child { background:#5aa9dd; }
@@ -954,7 +954,7 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
      stacking rule above makes every direct card child positioned. */
   body[data-print-badge] .badge-card--volunteer > div { position:static; z-index:auto; }
   body[data-print-badge] .badge-card--volunteer > div > .badge-event-date,
-  body[data-print-badge] .badge-card--minor-volunteer > div > em { z-index:2; }
+  body[data-print-badge] .badge-card--volunteer > div > em { z-index:2; }
   /* Leadership badges intentionally match their on-screen design exactly.
      The visual ring is clipped to the Avery label, so it cannot spill into
      an adjacent label while the dark background remains solid edge-to-edge. */
