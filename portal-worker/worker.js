@@ -5,7 +5,7 @@ const SESSION_SECONDS = 60 * 60 * 8;
 const REMEMBER_SESSION_SECONDS = 60 * 60 * 24 * 30;
 const PORTAL_PATHS = new Set(["/volunteer", "/apply", "/login", "/setup", "/organizer", "/forgot-password", "/google-email/connect", "/google-email/callback"]);
 const EMAIL_SENDER = "Submission@campbellscrew.com";
-const ORGANIZER_REPLY_TO = "Campbell@Campbellscrew.com";
+const ORGANIZER_REPLY_TO = "Campbell@Campbellscrew.com, Sage@Campbellscrew.com";
 const OWNER_ROLES = new Set(["executive_owner"]);
 const EDITOR_ROLES = new Set(["executive_owner", "event_admin"]);
 
