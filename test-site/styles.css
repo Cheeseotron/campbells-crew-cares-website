@@ -949,6 +949,12 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   body[data-print-badge] .badge-card--volunteer, body[data-print-badge] .badge-card--recipient, body[data-print-badge] .badge-card--board { overflow:visible; background:transparent; }
   body[data-print-badge] .badge-card--volunteer::before, body[data-print-badge] .badge-card--recipient::before, body[data-print-badge] .badge-card--board::before { content:""; position:absolute; z-index:0; inset:-.05in; background:var(--badge-background); -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   body[data-print-badge] .badge-card--volunteer > *, body[data-print-badge] .badge-card--recipient > *, body[data-print-badge] .badge-card--board > * { position:relative; z-index:1; }
+  /* The event date and youth marker are intentionally anchored to the card,
+     not the copy column. Reassert that in print because the shared Avery
+     stacking rule above makes every direct card child positioned. */
+  body[data-print-badge] .badge-card--volunteer > div { position:static; z-index:auto; }
+  body[data-print-badge] .badge-card--volunteer > div > .badge-event-date,
+  body[data-print-badge] .badge-card--minor-volunteer > div > em { z-index:2; }
   /* Leadership badges intentionally match their on-screen design exactly.
      The visual ring is clipped to the Avery label, so it cannot spill into
      an adjacent label while the dark background remains solid edge-to-edge. */
