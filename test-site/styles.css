@@ -837,15 +837,16 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .badge-card--volunteer::before, .badge-card--volunteer::after { content:none; }
 .badge-card--volunteer > * { position:relative; z-index:1; }
 .badge-card--volunteer > img { width:88px; height:88px; padding:3px; object-fit:contain; flex:0 0 auto; border:2px solid var(--green-dark); border-radius:50%; background:#fff; box-shadow:none; }
-.badge-card--volunteer > div { position:static; display:flex; min-width:0; flex:1; flex-direction:column; align-items:flex-start; gap:4px; }
-.badge-card--volunteer > div > span { color:var(--green-dark); font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
-.badge-card--volunteer > div > strong { color:var(--ink); font-size:31px; line-height:.94; letter-spacing:-.05em; overflow-wrap:anywhere; }
-.badge-card--volunteer > div > b { display:inline-block; padding:4px 10px; color:var(--ink); background:rgba(255,255,255,.74); border:2px solid var(--ink); border-radius:999px; font-size:13px; line-height:1.05; letter-spacing:.04em; }
-.badge-card--volunteer > div > em { position:absolute; bottom:31px; left:20px; color:var(--green-dark); font-size:10px; font-style:normal; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
-.badge-card--volunteer > div > .badge-event-date { position:absolute; bottom:15px; left:20px; color:var(--ink); font-size:9px; font-weight:800; letter-spacing:.06em; line-height:1.15; text-transform:uppercase; }
+.badge-card--volunteer > .badge-copy { display:flex; min-width:0; flex:1; flex-direction:column; align-items:flex-start; gap:4px; }
+.badge-card--volunteer > .badge-copy > span { color:var(--green-dark); font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+.badge-card--volunteer > .badge-copy > strong { color:var(--ink); font-size:31px; line-height:.94; letter-spacing:-.05em; overflow-wrap:anywhere; }
+.badge-card--volunteer > .badge-copy > b { display:inline-block; padding:4px 10px; color:var(--ink); background:rgba(255,255,255,.74); border:2px solid var(--ink); border-radius:999px; font-size:13px; line-height:1.05; letter-spacing:.04em; }
+.badge-card--volunteer > .badge-footer { position:absolute; z-index:2; bottom:15px; left:20px; display:flex; flex-direction:column; align-items:flex-start; gap:3px; }
+.badge-card--volunteer > .badge-footer > em { color:var(--green-dark); font-size:10px; font-style:normal; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
+.badge-card--volunteer > .badge-footer > small { color:var(--ink); font-size:9px; font-weight:800; letter-spacing:.06em; line-height:1.15; text-transform:uppercase; }
 .badge-card--minor-volunteer { --badge-background:linear-gradient(125deg,rgba(90,169,221,.22),rgba(90,169,221,0) 48%),radial-gradient(circle,rgba(23,107,57,.11) 0 1.15px,transparent 1.45px),#fbfefb; }
 .badge-card--minor-volunteer .badge-topbar i:first-child { background:#5aa9dd; }
-.badge-card--minor-volunteer > div > em { position:absolute; bottom:31px; left:20px; padding:0; color:#155f91; background:transparent; border:0; border-radius:0; letter-spacing:.08em; }
+.badge-card--minor-volunteer > .badge-footer > em { color:#155f91; letter-spacing:.08em; }
 .badge-card--volunteer > button { align-self:flex-end; }
 .badge-card--board { --badge-background:linear-gradient(135deg,#101923 0%,#101923 56%,#173b2c 100%); position:relative; isolation:isolate; overflow:hidden; width:min(100%, var(--volunteer-badge-width, 330px)); min-height:0; aspect-ratio:var(--volunteer-badge-ratio, 3.375 / 2.333); padding:38px 24px 20px; flex-direction:row; justify-content:flex-start; align-items:center; text-align:left; gap:18px; border:0; background:var(--badge-background); box-shadow:none; color:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 .badge-card--board::after { content:""; position:absolute; z-index:0; right:0; bottom:0; left:0; height:15px; background:linear-gradient(90deg,#2bd62b 0 64%,#176b39 64% 100%); pointer-events:none; }
@@ -879,7 +880,7 @@ body[data-child-badge-orientation="horizontal"] .badge-card--recipient > span { 
 body[data-child-badge-orientation="horizontal"] .badge-card--recipient > strong { font-size:30px; line-height:.94; }
 body[data-child-badge-orientation="horizontal"] .badge-card--recipient > b { margin-top:2px; font-size:10px; }
 body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer { flex-direction:column; justify-content:center; text-align:center; }
-body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div { align-items:center; }
+body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > .badge-copy { align-items:center; }
 .badge-size-note { margin-top:38px; padding:24px 28px; border:1px solid var(--line); background:#f3f6f4; }
 .badge-size-note h2 { margin-top:0; }
 .badge-size-note p:last-child { margin-bottom:0; }
@@ -949,12 +950,9 @@ body[data-volunteer-badge-orientation="vertical"] .badge-card--volunteer > div {
   body[data-print-badge] .badge-card--volunteer, body[data-print-badge] .badge-card--recipient, body[data-print-badge] .badge-card--board { overflow:visible; background:transparent; }
   body[data-print-badge] .badge-card--volunteer::before, body[data-print-badge] .badge-card--recipient::before, body[data-print-badge] .badge-card--board::before { content:""; position:absolute; z-index:0; inset:-.05in; background:var(--badge-background); -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   body[data-print-badge] .badge-card--volunteer > *, body[data-print-badge] .badge-card--recipient > *, body[data-print-badge] .badge-card--board > * { position:relative; z-index:1; }
-  /* The event date and youth marker are intentionally anchored to the card,
-     not the copy column. Reassert that in print because the shared Avery
-     stacking rule above makes every direct card child positioned. */
-  body[data-print-badge] .badge-card--volunteer > div { position:static; z-index:auto; }
-  body[data-print-badge] .badge-card--volunteer > div > .badge-event-date,
-  body[data-print-badge] .badge-card--volunteer > div > em { z-index:2; }
+  /* Keep the compact footer directly on the card in print. This leaves the
+     established copy column untouched, preserving the Avery art and text. */
+  body[data-print-badge] .badge-card--volunteer > .badge-footer { position:absolute; z-index:2; }
   /* Leadership badges intentionally match their on-screen design exactly.
      The visual ring is clipped to the Avery label, so it cannot spill into
      an adjacent label while the dark background remains solid edge-to-edge. */
