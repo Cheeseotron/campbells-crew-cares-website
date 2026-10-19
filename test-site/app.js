@@ -1233,16 +1233,17 @@
     const canEdit = canManageEventLifecycle();
     const starterItems = [
       { id: "clipboard-return-sticker", title: "Create a 'Please return clipboard at checkout' sticker for the back of every event clipboard", done: false },
-      { id: "before-checkout-banner", title: "Make a 'Before You Checkout' banner for the checkout area", done: false }
+      { id: "before-checkout-banner", title: "Make a 'Before You Checkout' banner for the checkout area", done: false },
+      { id: "cart-checker-rules-guide", title: "Create a Cart Checker rules and guide PDF", done: false }
     ];
     if (!Array.isArray(state.event.todoItems)) {
       state.event.todoItems = starterItems;
-      state.event.todoSeedVersion = 2;
+      state.event.todoSeedVersion = 3;
       state.event._todoSeedPending = true;
-    } else if (Number(state.event.todoSeedVersion || 1) < 2) {
+    } else if (Number(state.event.todoSeedVersion || 1) < 3) {
       const knownIds = new Set(state.event.todoItems.map((item) => item.id));
       state.event.todoItems.push(...starterItems.filter((item) => !knownIds.has(item.id)));
-      state.event.todoSeedVersion = 2;
+      state.event.todoSeedVersion = 3;
       state.event._todoSeedPending = true;
     }
     const items = state.event.todoItems;
