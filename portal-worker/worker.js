@@ -474,18 +474,18 @@ function drawRulesOverlay(page, event, font, bold) {
     page.drawRectangle({ x, y, width: 255, height: 64, color: pale, borderColor: line, borderWidth: .8 });
     page.drawRectangle({ x: x + 12, y: y + 30, width: 28, height: 22, color: green });
     draw(number, x + 19, y + 37, 8, { bold: true, color: rgb(1, 1, 1) });
-    draw(heading, x + 50, y + 51, 9.3, { bold: true, maxWidth: 190 });
-    draw(body, x + 50, y + 35, 6.5, { maxWidth: 190, lineHeight: 7.6 });
+    draw(heading, x + 50, y + 51, 9.8, { bold: true, maxWidth: 190 });
+    draw(body, x + 50, y + 35, 7, { maxWidth: 190, lineHeight: 7.8 });
   };
   drawGuidePanel(
     "01", 42, 386,
     "Check fit and keep choices appropriate",
-    "Items cannot be returned or exchanged. Never use changing rooms. Shoes and jackets may be tried on; compare all other clothing with what the child is wearing or hold it up to them. Keep choices school-appropriate."
+    "No returns or exchanges. Never use changing rooms. Shoes and jackets may be tried on; compare all other clothing with what the child is wearing or hold it up to them. Keep choices school-appropriate."
   );
   drawGuidePanel(
     "02", 315, 386,
     "Follow the child's printed sheet",
-    "Use the printed sizes, preferences, accommodations, and approved items. Do not add food, candy, accessories, pajamas, hats, or other extras unless the sheet allows them."
+    "Use printed sizes, preferences, accommodations, and approved items. Do not add food, candy, accessories, pajamas, hats, or other extras unless the sheet allows them."
   );
   drawGuidePanel(
     "03", 42, 310,
