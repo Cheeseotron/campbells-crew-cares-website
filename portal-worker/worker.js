@@ -5,7 +5,7 @@ const SESSION_SECONDS = 60 * 60 * 8;
 const REMEMBER_SESSION_SECONDS = 60 * 60 * 24 * 30;
 const PORTAL_PATHS = new Set(["/volunteer", "/apply", "/login", "/setup", "/organizer", "/forgot-password", "/google-email/connect", "/google-email/callback"]);
 const EMAIL_SENDER = "Submission@campbellscrew.com";
-const ORGANIZER_REPLY_TO = "Campbell@Campbellscrew.com";
+const ORGANIZER_REPLY_TO = "Campbell@Campbellscrew.com, Sage@Campbellscrew.com";
 const OWNER_ROLES = new Set(["executive_owner"]);
 const EDITOR_ROLES = new Set(["executive_owner", "event_admin"]);
 
@@ -582,6 +582,14 @@ function emailLine(value) {
   return String(value || "").replace(/[\r\n]+/g, " ").trim();
 }
 
+function emailHeader(value) {
+  const clean = emailLine(value);
+  if (/^[\x20-\x7E]*$/.test(clean)) return clean;
+  let encoded = base64Url(new TextEncoder().encode(clean)).replace(/-/g, "+").replace(/_/g, "/");
+  encoded += "=".repeat((4 - (encoded.length % 4)) % 4);
+  return `=?UTF-8?B?${encoded}?=`;
+}
+
 function brandedEmailHtml(subject, body, calendar = null) {
   const paragraphs = String(body || "").split(/\r?\n\r?\n/).filter(Boolean).map((paragraph) => `<p style="margin:0 0 18px;color:#111821;font:16px/1.55 Arial,sans-serif;overflow-wrap:anywhere">${escapeHtml(paragraph).replace(/\r?\n/g, "<br>")}</p>`).join("");
   const calendarPanel = calendar ? `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:8px 0 24px"><tr><td style="padding:0 0 12px"><a href="${escapeHtml(calendar.googleUrl)}" style="display:inline-block;padding:14px 17px;background:#4285f4;color:#fff;font:700 12px Arial,sans-serif;text-decoration:none">Add to Google Calendar</a></td></tr><tr><td style="padding:18px 20px;background:#e8f7e8;border-left:6px solid #176b39;color:#111821"><div style="margin:0 0 6px;font:800 13px Arial,sans-serif;letter-spacing:.8px">APPLE / ICLOUD USERS — CALENDAR INVITE ATTACHED ↓</div><div style="font:16px/1.45 Arial,sans-serif">Tap <strong>“Campbell's Crew event invitation.ics”</strong> below this email, then choose <strong>“Add to Calendar.”</strong></div></td></tr></table>` : "";
@@ -594,7 +602,8 @@ async function sendEmail(env, recipient, subject, body, calendar = null, replyTo
   const destination = emailLine(recipient).toLowerCase();
   if (!/^\S+@\S+\.\S+$/.test(destination)) throw new Error("A valid email address is required for delivery.");
   const replyAddress = emailLine(replyTo).toLowerCase();
-  if (replyAddress && !/^\S+@\S+\.\S+$/.test(replyAddress)) throw new Error("A valid reply-to email address is required for delivery.");
+  const replyAddresses = replyAddress ? replyAddress.split(",").map((address) => address.trim()).filter(Boolean) : [];
+  if (replyAddresses.some((address) => !/^\S+@\S+\.\S+$/.test(address))) throw new Error("A valid reply-to email address is required for delivery.");
   const refreshToken = await decryptEmailToken(credential.encrypted_refresh_token, env);
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_OAUTH_CLIENT_ID, client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET, refresh_token: refreshToken, grant_type: "refresh_token" }) });
   const token = await tokenResponse.json();
@@ -603,11 +612,11 @@ async function sendEmail(env, recipient, subject, body, calendar = null, replyTo
   const plainText = String(body || "").replace(/\r?\n/g, "\r\n");
   const alternative = (key) => `--${key}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${plainText}\r\n\r\n--${key}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${brandedEmailHtml(subject, body, calendar)}\r\n\r\n--${key}--`;
   let message;
-  const replyHeader = replyAddress ? `Reply-To: ${replyAddress}\r\n` : "";
+  const replyHeader = replyAddresses.length ? `Reply-To: ${replyAddresses.join(", ")}\r\n` : "";
   if (calendar?.ics) {
     const mixed = `${boundary}-mixed`; const encodedIcs = base64Url(new TextEncoder().encode(calendar.ics)).replace(/-/g, "+").replace(/_/g, "/");
-    message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\n${replyHeader}Subject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="${mixed}"\r\n\r\n--${mixed}\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n${alternative(boundary)}\r\n--${mixed}\r\nContent-Type: text/calendar; method=REQUEST; charset=UTF-8; name="Campbells-Crew-event-invitation.ics"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="Campbells-Crew-event-invitation.ics"\r\n\r\n${encodedIcs}\r\n--${mixed}--`;
-  } else message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\n${replyHeader}Subject: ${emailLine(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n${alternative(boundary)}`;
+    message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\n${replyHeader}Subject: ${emailHeader(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="${mixed}"\r\n\r\n--${mixed}\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n${alternative(boundary)}\r\n--${mixed}\r\nContent-Type: text/calendar; method=REQUEST; charset=UTF-8; name="Campbells-Crew-event-invitation.ics"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="Campbells-Crew-event-invitation.ics"\r\n\r\n${encodedIcs}\r\n--${mixed}--`;
+  } else message = `From: Campbell's Crew Cares <${EMAIL_SENDER}>\r\nTo: ${destination}\r\n${replyHeader}Subject: ${emailHeader(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n${alternative(boundary)}`;
   const sent = await fetch(`https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(EMAIL_SENDER)}/messages/send`, { method: "POST", headers: { Authorization: `Bearer ${token.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw: base64Url(new TextEncoder().encode(message)) }) });
   if (!sent.ok) throw new Error("Google could not send the email.");
 }
