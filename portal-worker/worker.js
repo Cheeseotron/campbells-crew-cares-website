@@ -471,24 +471,24 @@ function drawRulesOverlay(page, event, font, bold) {
   // Keep the four quick-guide panels easy to scan. The fit guidance belongs
   // with step one; the fourth position is reserved for bra guidance only.
   const drawGuidePanel = (number, x, y, heading, body) => {
-    page.drawRectangle({ x, y, width: 255, height: 64, color: pale, borderColor: line, borderWidth: .8 });
-    page.drawRectangle({ x: x + 12, y: y + 30, width: 28, height: 22, color: green });
-    draw(number, x + 19, y + 37, 8, { bold: true, color: rgb(1, 1, 1) });
-    draw(heading, x + 50, y + 51, 9.8, { bold: true, maxWidth: 190 });
-    draw(body, x + 50, y + 35, 7.4, { maxWidth: 190, lineHeight: 8.1 });
+    page.drawRectangle({ x, y, width: 255, height: 72, color: pale, borderColor: line, borderWidth: .8 });
+    page.drawRectangle({ x: x + 12, y: y + 34, width: 28, height: 24, color: green });
+    draw(number, x + 19, y + 42, 8, { bold: true, color: rgb(1, 1, 1) });
+    draw(heading, x + 50, y + 59, 10.3, { bold: true, maxWidth: 190 });
+    draw(body, x + 50, y + 42, 8.2, { maxWidth: 190, lineHeight: 9.2 });
   };
   drawGuidePanel(
-    "01", 42, 386,
+    "01", 42, 378,
     "Check fit and keep choices appropriate",
     "No returns or exchanges. No changing rooms. Shoes and jackets may be tried on. For other clothing, compare to what the child is wearing or hold it up to them. Keep choices school-appropriate."
   );
   drawGuidePanel(
-    "02", 315, 386,
+    "02", 315, 378,
     "Follow the child's printed sheet",
     "Use printed sizes, preferences, accommodations, and approved items. Do not add food, candy, accessories, pajamas, hats, or other extras unless the sheet allows them."
   );
   drawGuidePanel(
-    "03", 42, 310,
+    "03", 42, 298,
     "Stay together and protect privacy",
     "Keep the child and their bag with you. Be respectful and encouraging. Do not discuss family circumstances, application details, or personal information with others."
   );
@@ -496,12 +496,12 @@ function drawRulesOverlay(page, event, font, bold) {
   // When it is active, this same position is the only bra-specific guidance.
   if (bra) {
     drawGuidePanel(
-      "04", 315, 310,
+      "04", 315, 298,
       "Bras are limited and specific",
       "Bras are only for Girls/Women who truly need them, and only when both a bra size and bra budget are printed. Otherwise, they are not approved."
     );
   } else {
-    page.drawRectangle({ x: 314.5, y: 309.5, width: 256, height: 65, color: rgb(1, 1, 1) });
+    page.drawRectangle({ x: 314.5, y: 297.5, width: 256, height: 77, color: rgb(1, 1, 1) });
   }
   // Replace the generic closeout sentence with a practical, event-aware
   // checklist. The toy confirmation exists only when toys are enabled.
