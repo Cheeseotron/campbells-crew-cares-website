@@ -1536,6 +1536,7 @@
   }
 
   function bindOrganizer(subroute) {
+    const todoReturnRoute = subroute === "dashboard" ? "dashboard" : "todos";
     if (state.event?._todoSeedPending) {
       delete state.event._todoSeedPending;
       void saveLiveEvent(state.event).then(() => saveState()).catch(() => toast("The starter to-do item could not be saved."));
@@ -1546,18 +1547,18 @@
       const title = String(new FormData(todoForm).get("title") || "").trim();
       if (!title) return;
       state.event.todoItems = [...(state.event.todoItems || []), { id: `todo-${Date.now()}`, title, done: false }];
-      try { await saveLiveEvent(state.event); saveState(); renderOrganizer("todos"); toast("To-do item added."); }
+      try { await saveLiveEvent(state.event); saveState(); renderOrganizer(todoReturnRoute); toast("To-do item added."); }
       catch (error) { state.event.todoItems.pop(); toast("The to-do item could not be saved."); }
     });
     document.querySelectorAll("[data-todo-toggle]").forEach((input) => input.addEventListener("change", async () => {
       const item = (state.event.todoItems || []).find((entry) => entry.id === input.dataset.todoToggle); if (!item) return;
       const before = item.done; item.done = input.checked;
-      try { await saveLiveEvent(state.event); saveState(); renderOrganizer("todos"); toast(item.done ? "Task completed." : "Task reopened."); }
+      try { await saveLiveEvent(state.event); saveState(); renderOrganizer(todoReturnRoute); toast(item.done ? "Task completed." : "Task reopened."); }
       catch { item.done = before; input.checked = before; toast("The task could not be saved."); }
     }));
     document.querySelectorAll("[data-todo-remove]").forEach((button) => button.addEventListener("click", async () => {
       const before = state.event.todoItems || []; state.event.todoItems = before.filter((item) => item.id !== button.dataset.todoRemove);
-      try { await saveLiveEvent(state.event); saveState(); renderOrganizer("todos"); toast("To-do item removed."); }
+      try { await saveLiveEvent(state.event); saveState(); renderOrganizer(todoReturnRoute); toast("To-do item removed."); }
       catch { state.event.todoItems = before; toast("The task could not be removed."); }
     }));
     if (subroute === "events") {
