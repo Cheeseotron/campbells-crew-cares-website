@@ -470,24 +470,27 @@ function drawRulesOverlay(page, event, font, bold) {
   }
   // Keep the four quick-guide panels easy to scan. The fit guidance belongs
   // with step one; the fourth position is reserved for bra guidance only.
-  const drawGuidePanel = (number, x, y, heading, body, options = {}) => {
+  const drawGuidePanel = (number, x, y, heading, body) => {
     page.drawRectangle({ x, y, width: 255, height: 64, color: pale, borderColor: line, borderWidth: .8 });
     page.drawRectangle({ x: x + 12, y: y + 30, width: 28, height: 22, color: green });
     draw(number, x + 19, y + 37, 8, { bold: true, color: rgb(1, 1, 1) });
-    draw(heading, x + 50, y + 51, options.headingSize || 9.4, { bold: true, maxWidth: 190 });
-    draw(body, x + 50, y + 35, options.bodySize || 6.7, { maxWidth: 190, lineHeight: options.lineHeight || 8 });
+    draw(heading, x + 50, y + 51, 9.3, { bold: true, maxWidth: 190 });
+    draw(body, x + 50, y + 35, 6.5, { maxWidth: 190, lineHeight: 7.6 });
   };
   drawGuidePanel(
     "01", 42, 386,
     "Check fit and keep choices appropriate",
-    "Items cannot be returned or exchanged. Never take a child to a changing room. Shoes and jackets may be tried on; for all other clothing, compare with what the child is wearing or hold it up to them. Keep choices school-appropriate.",
-    { headingSize: 8.6, bodySize: 5.85, lineHeight: 6.8 }
+    "Items cannot be returned or exchanged. Never use changing rooms. Shoes and jackets may be tried on; compare all other clothing with what the child is wearing or hold it up to them. Keep choices school-appropriate."
+  );
+  drawGuidePanel(
+    "02", 315, 386,
+    "Follow the child's printed sheet",
+    "Use the printed sizes, preferences, accommodations, and approved items. Do not add food, candy, accessories, pajamas, hats, or other extras unless the sheet allows them."
   );
   drawGuidePanel(
     "03", 42, 310,
     "Stay together and protect privacy",
-    "Keep the child and their bag with you. Be respectful and encouraging. Do not discuss family circumstances, application details, or personal information with others.",
-    { headingSize: 9.2, bodySize: 6.7, lineHeight: 8 }
+    "Keep the child and their bag with you. Be respectful and encouraging. Do not discuss family circumstances, application details, or personal information with others."
   );
   // Remove the template's static fourth panel for events without bra approval.
   // When it is active, this same position is the only bra-specific guidance.
@@ -495,8 +498,7 @@ function drawRulesOverlay(page, event, font, bold) {
     drawGuidePanel(
       "04", 315, 310,
       "Bras are limited and specific",
-      "Bras are only for Girls/Women who truly need them, and only when both a bra size and bra budget are printed. Otherwise, they are not approved.",
-      { headingSize: 9.3, bodySize: 6.7, lineHeight: 8 }
+      "Bras are only for Girls/Women who truly need them, and only when both a bra size and bra budget are printed. Otherwise, they are not approved."
     );
   } else {
     page.drawRectangle({ x: 314.5, y: 309.5, width: 256, height: 65, color: rgb(1, 1, 1) });
