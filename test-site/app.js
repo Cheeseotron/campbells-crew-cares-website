@@ -1006,7 +1006,7 @@
         <div class="review-row"><span>Children</span><strong>${recipientDraft.children.map((child) => esc(child.name)).join(", ")}</strong></div>
         <div class="review-row"><span>Emergency contact</span><strong>${esc(recipientDraft.emergencyName)} · ${esc(recipientDraft.emergencyPhone)}</strong></div>
       </div>
-      <form id="signature-form"><div class="signature-box"><div class="field signature-confirmation"><label for="final-signature">Type your full name again to sign this application</label><input id="final-signature" class="virtual-signature" name="finalSignature" value="${esc(recipientDraft.finalSignature)}" autocomplete="name" placeholder="Your full name" required><small>Your typed signature must match the Responsible Party name above.</small></div><label class="checkbox-row"><input type="checkbox" name="authority" required><span>I am the Responsible Party, or I have authority to submit this application for the participating children.</span></label><label class="checkbox-row"><input type="checkbox" name="accuracy" required><span>I certify that this application is complete and accurate and confirm the agreements I checked and signed at the beginning.</span></label></div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Submit application <span>→</span></button></div></form>`;
+      <form id="signature-form"><div class="signature-box"><div class="field signature-confirmation"><label for="final-signature">Type your full name again to sign this application</label><input id="final-signature" class="virtual-signature" name="finalSignature" value="${esc(recipientDraft.finalSignature)}" autocomplete="name" placeholder="Your full name" required><small>Your typed signature must match the Responsible Party name above.</small></div><label class="checkbox-row"><input type="checkbox" name="authority" required><span>I am the Responsible Party, or I have authority to submit this application for the participating children.</span></label><label class="checkbox-row"><input type="checkbox" name="accuracy" required><span>I certify that this application is complete and accurate and confirm the agreements I checked and signed at the beginning.</span></label></div><div class="form-actions"><button class="button button--ghost" type="button" data-recipient-back>← Previous</button><button class="button button--green" type="submit">Submit application <span>→</span></button></div><div class="submission-progress" hidden aria-live="polite" role="status"><span class="submission-progress__spinner" aria-hidden="true"></span><span><strong>Submitting your application…</strong><small>Please keep this page open while we securely save your information and photos.</small></span></div></form>`;
     document.querySelector("[data-recipient-back]").addEventListener("click", () => { saveVisibleRecipientStep(); recipientStep = 3; renderRecipient(); });
     document.querySelector("#signature-form").addEventListener("submit", submitRecipient);
   }
@@ -1049,6 +1049,13 @@
     recipientDraft.agreementSignature = recipientDraft.guardian;
     const flags = findApplicationFlags(recipientDraft);
     if (LIVE_PUBLIC_RECIPIENT) {
+      const submit = form.querySelector('[type="submit"]');
+      const back = form.querySelector('[data-recipient-back]');
+      const progress = form.querySelector('.submission-progress');
+      submit.disabled = true;
+      back.disabled = true;
+      submit.innerHTML = 'Submitting application…';
+      progress.hidden = false;
       try {
         const response = await fetch("/portal-api/public/applications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
           eventId: state.event.id, guardianName: recipientDraft.guardian, email: recipientDraft.email, phone: recipientDraft.phone,
@@ -1066,7 +1073,13 @@
         recipientConfirmation = { id: payload.id, guardian: recipientDraft.guardian, eventName: state.event.title, flags: [] };
         const key = recipientDraftKey(); if (key) sessionStorage.removeItem(key);
         renderRecipient();
-      } catch (error) { toast(error.message || "Your application could not be submitted."); }
+      } catch (error) {
+        toast(error.message || "Your application could not be submitted.");
+        submit.disabled = false;
+        back.disabled = false;
+        submit.innerHTML = 'Submit application <span>→</span>';
+        progress.hidden = true;
+      }
       return;
     }
     const record = {
