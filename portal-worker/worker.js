@@ -363,11 +363,11 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
   // Keep the child's shopping category immediately beside the size heading.
   // It is deliberately a contained, labeled box so shoppers can spot Boys,
   // Girls, Men, Women, etc. without changing the measured packet layout.
-  page.drawRectangle({ x: 395, y: 539, width: 164, height: 18, color: paper, borderColor: border, borderWidth: .5 });
+  page.drawRectangle({ x: 395, y: 536, width: 164, height: 18, color: paper, borderColor: border, borderWidth: .5 });
   // Baselines sit slightly below the geometric center so the cap height is
   // visually centered in the small category box when printed.
-  draw("SIZING CATEGORY", 403, 547.5, 6.4, { bold: true, muted: true });
-  draw(values.category, 478, 546.5, 8.2, { bold: true, maxWidth: 73 });
+  draw("SIZING CATEGORY", 403, 544.5, 6.4, { bold: true, muted: true });
+  draw(values.category, 478, 543.5, 8.2, { bold: true, maxWidth: 73 });
   const sizeTop = 523; const sizeBottom = 430; const sizeLeft = 52; const sizeRight = 559; const rowMid = 477;
   page.drawRectangle({ x: sizeLeft, y: sizeBottom, width: sizeRight - sizeLeft, height: sizeTop - sizeBottom, borderColor: border, borderWidth: .5 });
   page.drawLine({ start: { x: sizeLeft, y: rowMid }, end: { x: sizeRight, y: rowMid }, thickness: .5, color: border });
