@@ -484,8 +484,8 @@ function drawRulesOverlay(page, event, font, bold) {
   };
   drawGuidePanel(
     "01", 42, 378,
-    "Check fit and choose appropriately",
-    "No returns or exchanges. No changing rooms. Shoes and jackets may be tried on. For other clothing, compare to what the child is wearing or hold it up to them. Keep choices school-appropriate."
+    "All items must fit - no returns",
+    "All items CANNOT be returned or exchanged and must fit correctly. No changing rooms. Shoes and jackets may be tried on; compare other clothing with what the child is wearing or hold it up to them."
   );
   drawGuidePanel(
     "02", 315, 378,
