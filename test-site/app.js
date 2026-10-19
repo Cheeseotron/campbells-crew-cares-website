@@ -453,7 +453,7 @@
     const payload = await response.json();
     const events = (payload.events || []).filter((record) => record.event_type === "shopping" && ["open", "code"].includes(record.settings?.recipientStatus)).map((record) => ({
       id: record.id, title: record.title, date: record.event_date || record.settings?.date || "", time: record.settings?.time || "", location: record.settings?.location || "", type: "shopping", closed: false,
-      volunteerEnabled: false, recipientEnabled: true, volunteerStatus: "closed", recipientStatus: record.settings?.recipientStatus || "closed", recipientCode: "", questions: { braSize: false, ...(record.settings?.questions || {}) }, roles: [], bagItems: [], budgetItems: [], braEnabled: Array.isArray(record.settings?.budgetItems) && record.settings.budgetItems.some((item) => item?.enabled && /bra/i.test(`${item.id || ""} ${item.label || ""}`)), activity: undefined
+      volunteerEnabled: false, recipientEnabled: true, volunteerStatus: "closed", recipientStatus: record.settings?.recipientStatus || "closed", recipientCode: "", questions: { braSize: false, ...(record.settings?.questions || {}) }, roles: [], bagItems: [], budgetItems: [], braEnabled: Boolean(record.settings?.braEnabled), activity: undefined
     }));
     state = prepareEventCollection({ ...createLiveState(), events, activeEventId: events[0]?.id || "" });
   }

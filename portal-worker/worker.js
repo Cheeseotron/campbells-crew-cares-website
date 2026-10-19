@@ -866,7 +866,7 @@ async function activeEvents(env) {
   const { results } = await env.DB.prepare("SELECT id, title, event_type, event_date, settings_json FROM events WHERE status = 'open' ORDER BY event_date ASC").all();
   return results.map((event) => {
     const settings = eventSettings(event);
-    return { id: event.id, title: event.title, event_type: event.event_type, event_date: event.event_date, settings: { date: settings.date, time: settings.time, location: settings.location, volunteerStatus: settings.volunteerStatus, recipientStatus: settings.recipientStatus, volunteerEnabled: settings.volunteerEnabled, recipientEnabled: settings.recipientEnabled, questions: settings.questions || {} } };
+    return { id: event.id, title: event.title, event_type: event.event_type, event_date: event.event_date, settings: { date: settings.date, time: settings.time, location: settings.location, volunteerStatus: settings.volunteerStatus, recipientStatus: settings.recipientStatus, volunteerEnabled: settings.volunteerEnabled, recipientEnabled: settings.recipientEnabled, braEnabled: braBudgetEnabled(settings), questions: settings.questions || {} } };
   });
 }
 
