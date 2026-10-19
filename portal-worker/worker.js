@@ -5,7 +5,7 @@ const SESSION_SECONDS = 60 * 60 * 8;
 const REMEMBER_SESSION_SECONDS = 60 * 60 * 24 * 30;
 const PORTAL_PATHS = new Set(["/volunteer", "/apply", "/login", "/setup", "/organizer", "/forgot-password", "/google-email/connect", "/google-email/callback"]);
 const EMAIL_SENDER = "Submission@campbellscrew.com";
-const ORGANIZER_REPLY_TO = "Campbell@Campbellscrew.com, Sage@Campbellscrew.com";
+const ORGANIZER_REPLY_TO = "Campbell@Campbellscrew.com";
 const OWNER_ROLES = new Set(["executive_owner"]);
 const EDITOR_ROLES = new Set(["executive_owner", "event_admin"]);
 
@@ -1607,6 +1607,33 @@ async function api(request, env, url, user) {
   }
 
   const recipientHouseholdMatch = url.pathname.match(/^\/portal-api\/organizer\/recipients\/([^/]+)$/);
+  if (recipientHouseholdMatch && request.method === "PATCH") {
+    if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Executive Owner or Event Administrator permission required." }, 403);
+    const input = await request.json();
+    const household = await env.DB.prepare("SELECT id, event_id, application_json FROM recipient_households WHERE id = ?").bind(recipientHouseholdMatch[1]).first();
+    if (!household) return json({ error: "That recipient application was not found." }, 404);
+    const guardianName = String(input.guardianName || "").trim().slice(0, 120);
+    const email = String(input.email || "").trim().toLowerCase();
+    const phone = normalizePhoneNumber(input.phone);
+    if (!guardianName || !isValidEmailAddress(email) || !phone) return json({ error: "Enter the responsible party’s name, a complete email address, and phone number." }, 400);
+    const address = input.address && typeof input.address === "object" ? input.address : {};
+    let application = {}; try { application = JSON.parse(household.application_json || "{}"); } catch {}
+    const incomingApplication = input.application && typeof input.application === "object" ? input.application : {};
+    application = { ...application, referral: String(incomingApplication.referral || "").slice(0, 500), emergencyName: String(incomingApplication.emergencyName || "").slice(0, 120), emergencyPhone: String(incomingApplication.emergencyPhone || "").slice(0, 30), emergencyRelation: String(incomingApplication.emergencyRelation || "").slice(0, 120), notes: String(input.notes || "").slice(0, 2000) };
+    await env.DB.prepare("UPDATE recipient_households SET guardian_name = ?, email = ?, phone = ?, address_json = ?, application_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(guardianName, email, phone.slice(0, 30), JSON.stringify({ address: String(address.address || "").slice(0, 180), city: String(address.city || "").slice(0, 100), state: String(address.state || "AZ").slice(0, 30), zip: String(address.zip || "").slice(0, 20) }), JSON.stringify(application), household.id).run();
+    const children = Array.isArray(input.children) ? input.children : [];
+    for (const child of children) {
+      if (!child?.id) continue;
+      const existing = await env.DB.prepare("SELECT details_json FROM recipient_children WHERE id = ? AND household_id = ?").bind(String(child.id), household.id).first();
+      if (!existing) continue;
+      let details = {}; try { details = JSON.parse(existing.details_json || "{}"); } catch {}
+      const source = child.details && typeof child.details === "object" ? child.details : {};
+      ["gender", "shirt", "pants", "shoes", "socks", "underwear", "bra", "coat", "preferences", "accommodations"].forEach((key) => { details[key] = String(source[key] || "").slice(0, 2000); });
+      await env.DB.prepare("UPDATE recipient_children SET first_name = ?, last_name = ?, birth_date = ?, details_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND household_id = ?").bind(String(child.firstName || "").trim().slice(0, 80), String(child.lastName || "").trim().slice(0, 80), String(child.birthDate || "").slice(0, 20) || null, JSON.stringify(details), child.id, household.id).run();
+    }
+    await audit(env, user, "recipient_application_overridden", "recipient_household", household.id, household.event_id);
+    return json({ id: household.id });
+  }
   if (recipientHouseholdMatch && request.method === "DELETE") {
     if (!user || !EDITOR_ROLES.has(user.role)) return json({ error: "Editing permission required." }, 403);
     const household = await env.DB.prepare("SELECT id, event_id, guardian_name FROM recipient_households WHERE id = ?").bind(recipientHouseholdMatch[1]).first();
