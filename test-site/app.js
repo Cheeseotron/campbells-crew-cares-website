@@ -379,9 +379,10 @@
     if (form.id === "children-form") {
       recipientDraft.children = recipientDraft.children.map((child, index) => {
         const next = { ...child };
-        ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "bra", "coat"].forEach((key) => {
+        ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shoes", "socks", "bra"].forEach((key) => {
           next[key] = String(data.get(`child-${index}-${key}`) || "").trim();
         });
+        ["shirt", "pants", "underwear", "coat"].forEach((key) => { next[key] = childSizeValue(data, index, key); });
         next.name = `${next.firstName} ${next.lastName}`.trim();
         return next;
       });
@@ -840,7 +841,13 @@
       renderRecipient();
     }));
     document.querySelector("[data-recipient-back]").addEventListener("click", async () => { try { await syncChildren(); } catch (error) { saveVisibleRecipientStep(); } touchRecipientDraft(); saveRecipientDraft(); recipientStep = 1; renderRecipient(); });
-    document.querySelectorAll("[data-child-gender]").forEach((picker) => picker.addEventListener("change", () => updateBraField(picker)));
+    document.querySelectorAll("[data-child-gender]").forEach((picker) => picker.addEventListener("change", () => {
+      // A category change changes the appropriate sizing controls. Save the
+      // current entries first, then redraw the child card with the right mode.
+      saveVisibleRecipientStep();
+      renderRecipient();
+    }));
+    document.querySelectorAll("[data-clothing-size-choice]").forEach((picker) => picker.addEventListener("change", () => updateOtherSizeField(picker)));
     document.querySelectorAll("[data-child-photo-input]").forEach((input) => input.addEventListener("change", async () => {
       const file = input.files?.[0];
       const index = Number(input.dataset.childPhotoInput);
@@ -877,17 +884,49 @@
       <div class="field"><label for="child-${index}-firstName">Child's first name</label><input id="child-${index}-firstName" name="child-${index}-firstName" value="${esc(child.firstName || "")}" required></div><div class="field"><label for="child-${index}-lastName">Child's last name</label><input id="child-${index}-lastName" name="child-${index}-lastName" value="${esc(child.lastName || "")}" required></div>
       <div class="field"><label for="child-${index}-birthdate">Date of birth</label><input id="child-${index}-birthdate" name="child-${index}-birthdate" type="date" value="${esc(child.birthdate)}" required></div>
       <div class="field"><label for="child-${index}-gender">Sizing category</label><select id="child-${index}-gender" name="child-${index}-gender" data-child-gender="${index}" required><option value="">Choose one</option>${["Infant / Baby","Toddler","Girls","Boys","Women","Men","Other / manual sizing"].map((value)=>`<option ${child.gender === value ? "selected" : ""}>${value}</option>`).join("")}</select><small>This helps the organizers understand the child’s typical sizing.</small></div>
-      <div class="field field--span-2 size-guidance"><strong>Clothing sizes must be accurate</strong><small>Our volunteers use these sizes while shopping, and purchased items <b>cannot be returned or exchanged.</b> Please enter the child’s current, exact sizes. Use letter sizes such as <b>Small</b>, <b>Medium</b>, or <b>Large</b>; pants may also use a specific size such as <b>30/32</b>. For socks and shoes, please use numbers.</small></div>
-      ${sizeField(index,"shirt","Shirt",child.shirt)}${sizeField(index,"pants","Pants",child.pants)}${sizeField(index,"shoes","Shoes",child.shoes)}${sizeField(index,"socks","Socks",child.socks)}${sizeField(index,"underwear","Underwear",child.underwear)}${braBudgetEnabled() ? braSizeField(index, child) : ""}${sizeField(index,"coat","Coat",child.coat)}
+      <div class="field field--span-2 size-guidance"><strong>Clothing sizes must be accurate</strong><small>Our volunteers use these sizes while shopping, and purchased items <b>cannot be returned or exchanged.</b> For Girls, Boys, Women, and Men, choose the listed clothing size or select <b>Other</b> to write one in. Infant/Baby and Toddler sizes are entered manually. Shoes, socks, and bras are always typed in; shoes should be a number.</small></div>
+      ${clothingSizeField(index,"shirt","Shirt",child.shirt,child.gender)}${clothingSizeField(index,"pants","Pants",child.pants,child.gender)}${typedSizeField(index,"shoes","Shoes",child.shoes,{ numeric: true })}${typedSizeField(index,"socks","Socks",child.socks)}${clothingSizeField(index,"underwear","Underwear",child.underwear,child.gender)}${braBudgetEnabled() ? braSizeField(index, child) : ""}${clothingSizeField(index,"coat","Coat",child.coat,child.gender)}
       <div class="field field--span-2 child-photo-field"><label for="child-${index}-photo">Current photo of this child</label><div class="child-photo-control"><div class="child-photo-preview${child.photoDataUrl ? " has-photo" : ""}" data-child-photo-preview="${index}" aria-live="polite">${child.photoDataUrl ? `<img src="${esc(child.photoDataUrl)}" alt="Preview of ${esc(child.firstName || "this child")}">` : `<span>Photo<br>preview</span>`}</div><div><div class="photo-requirement"><strong>Please use a current, recognizable photo.</strong><span>Choose a clear photo from the last 12 months whenever possible—not an old baby or toddler photo.</span></div><input id="child-${index}-photo" name="child-${index}-photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" data-child-photo-input="${index}" ${child.photoDataUrl ? "" : "required"}><small>A current photo lets Campbell's Crew pre-make the child’s event badge and keep it with the correct clothing bag. Keep the child’s face near the middle—the preview uses the same square, center-cropped framing as the badge. JPG, PNG, and iPad HEIC photos are accepted; HEIC photos are converted safely before your application is sent. ${child.photoName ? `Selected: ${esc(child.photoName)}` : ""}</small></div></div></div>
       <div class="field field--span-2"><label for="child-${index}-preferences">Colors, styles, interests, likes, or dislikes</label><textarea id="child-${index}-preferences" name="child-${index}-preferences" required>${esc(child.preferences)}</textarea></div>
       <div class="field field--span-2"><label for="child-${index}-accommodations">Medical, sensory, communication, mobility, or behavioral accommodations</label><textarea id="child-${index}-accommodations" name="child-${index}-accommodations" required>${esc(child.accommodations)}</textarea><small>Enter “None” if no accommodation is needed.</small></div>
     </div></section>`;
   }
 
-  function sizeField(index, key, label, value) {
+  const standardClothingSizes = ["Small", "Medium", "Large", "Extra Large"];
+
+  function manualSizingCategory(category) {
+    return /infant|baby|toddler|other/i.test(String(category || ""));
+  }
+
+  function typedSizeField(index, key, label, value, options = {}) {
     const inputId = `child-${index}-${key}`;
-    return `<div class="field size-field"><label for="${inputId}">${label} size</label><input id="${inputId}" name="${inputId}" value="${esc(value || "")}" placeholder="Enter size" required></div>`;
+    const numeric = options.numeric ? ' inputmode="decimal" pattern="[0-9]+(?:\\.[0-9]+)?" title="Please enter a numeric shoe size."' : "";
+    return `<div class="field size-field"><label for="${inputId}">${label} size</label><input id="${inputId}" name="${inputId}" value="${esc(value || "")}" placeholder="Enter size"${numeric} required></div>`;
+  }
+
+  function clothingSizeField(index, key, label, value, category) {
+    if (manualSizingCategory(category)) return typedSizeField(index, key, label, value);
+    const inputId = `child-${index}-${key}`;
+    const selected = !value ? "" : (standardClothingSizes.includes(value) ? value : "Other");
+    const customValue = selected === "Other" ? value : "";
+    return `<div class="field size-field" data-clothing-size-field="${index}-${key}"><label for="${inputId}-choice">${label} size</label><select id="${inputId}-choice" name="${inputId}-choice" data-clothing-size-choice data-child-index="${index}" data-size-key="${key}" required><option value="">Choose size</option>${standardClothingSizes.map((size) => `<option value="${size}" ${selected === size ? "selected" : ""}>${size}</option>`).join("")}<option value="Other" ${selected === "Other" ? "selected" : ""}>Other</option></select><input id="${inputId}-other" name="${inputId}-other" data-size-other="${index}-${key}" value="${esc(customValue)}" placeholder="Enter exact size" ${selected === "Other" ? "required" : "disabled hidden"}></div>`;
+  }
+
+  function childSizeValue(data, index, key) {
+    const inputId = `child-${index}-${key}`;
+    const choice = String(data.get(`${inputId}-choice`) || "").trim();
+    if (choice === "Other") return String(data.get(`${inputId}-other`) || "").trim();
+    return choice || String(data.get(inputId) || "").trim();
+  }
+
+  function updateOtherSizeField(picker) {
+    const other = document.querySelector(`[data-size-other="${picker.dataset.childIndex}-${picker.dataset.sizeKey}"]`);
+    if (!other) return;
+    const enabled = picker.value === "Other";
+    other.hidden = !enabled;
+    other.disabled = !enabled;
+    other.required = enabled;
+    if (enabled) other.focus();
   }
 
   async function photoDataUrl(file) {
@@ -947,7 +986,8 @@
     const data = new FormData(form);
     recipientDraft.children = await Promise.all(recipientDraft.children.map(async (child, index) => {
       const next = {};
-      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shirt", "pants", "shoes", "socks", "underwear", "bra", "coat"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); });
+      ["firstName", "lastName", "birthdate", "gender", "preferences", "accommodations", "shoes", "socks", "bra"].forEach((key) => { next[key] = String(data.get(`child-${index}-${key}`) || child[key] || "").trim(); });
+      ["shirt", "pants", "underwear", "coat"].forEach((key) => { next[key] = childSizeValue(data, index, key) || child[key] || ""; });
       if (!braBudgetEnabled() || !braSizeApplies(next.gender)) next.bra = "";
       const photo = form.querySelector(`[name="child-${index}-photo"]`); next.photoName = photo && photo.files[0] ? photo.files[0].name : (child.photoName || "");
       // The picker already prepares and previews a photo as soon as it is chosen.
