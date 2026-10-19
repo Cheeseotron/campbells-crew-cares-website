@@ -417,6 +417,15 @@ html[data-live-public-recipient="true"] .app-footer { display: none; }
 .view-tabs button { padding: 10px 14px; background: var(--white); border: 1px solid var(--line); cursor: pointer; }
 .view-tabs .is-active { color: var(--white); background: var(--ink); }
 .directory-list, .application-list, .checkin-list, .packet-list { display: grid; gap: 10px; }
+.charity-todo-panel { margin-bottom: 18px; }
+.charity-todo-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin: 18px 0; }
+.charity-todo-form input { min-height: 46px; padding: 10px 12px; border: 1px solid var(--line); font: inherit; }
+.charity-todo-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.charity-todo { display: flex; min-height: 58px; padding: 12px 14px; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid var(--line); background: var(--mist-2); }
+.charity-todo label { display: flex; align-items: center; gap: 12px; color: var(--ink); font-weight: 700; line-height: 1.35; cursor: pointer; }
+.charity-todo input { width: 19px; height: 19px; accent-color: var(--green-dark); }
+.charity-todo.is-done label span { color: var(--gray); text-decoration: line-through; }
+@media (max-width: 620px) { .charity-todo-form { grid-template-columns: 1fr; } .charity-todo { align-items: flex-start; flex-direction: column; } }
 .directory-card { background: var(--white); border: 1px solid var(--line); }
 .directory-card summary { display: grid; grid-template-columns: 1.3fr 1fr auto; padding: 18px; align-items: center; gap: 18px; cursor: pointer; }
 .directory-card summary strong, .directory-card summary small, .directory-card summary b { display: block; }

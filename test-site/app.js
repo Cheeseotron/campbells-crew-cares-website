@@ -1143,7 +1143,7 @@
     const reviewCount = state.applications.filter((item) => !item.archived && ["submitted", "review", "info"].includes(item.status)).length;
     const preview = previewRole ? `<div class="role-preview-banner"><strong>Previewing as ${esc(role)}</strong><span>You are seeing exactly what this role can access.</span><button type="button" data-return-owner>Return to Executive Owner</button></div>` : "";
     const routes = roleRoutes(role);
-    const eventLinks = [["dashboard", "Overview"], ["events", "Event Management"], ["volunteer-signups", "Volunteer Signups"], ["applications", "Current Applications", reviewCount], ["checkin", "Check-in"], ["packets", "Print Packets"], ["badges", "Print Badges"], ["emails", "Email Center"]];
+    const eventLinks = [["dashboard", "Overview"], ["todos", "Charity To-Do"], ["events", "Event Management"], ["volunteer-signups", "Volunteer Signups"], ["applications", "Current Applications", reviewCount], ["checkin", "Check-in"], ["packets", "Print Packets"], ["badges", "Print Badges"], ["emails", "Email Center"]];
     const recordLinks = [["volunteers", "Volunteer Directory"], ["recipient-history", "Past Recipients"], ["reports", "Reports & History"]];
     const linksFor = (items) => items.filter(([route]) => routes.includes(route)).map(([route, label, count]) => organizerLink(route, label, subroute, count)).join("");
     const eventMenu = linksFor(eventLinks);
@@ -1157,8 +1157,8 @@
   }
 
   function roleRoutes(role) {
-    const all = ["dashboard", "events", "volunteer-signups", "applications", "checkin", "packets", "badges", "emails", "volunteers", "recipient-history", "reports", "settings"];
-    let routes = role === "Executive Owner" ? all : role === "Event Administrator" ? all.filter((route) => route !== "settings") : role === "Read-Only Coordinator" ? ["dashboard", "events", "volunteer-signups", "applications", "volunteers", "recipient-history", "reports"] : role === "Check-In Staff" ? ["checkin"] : [];
+    const all = ["dashboard", "todos", "events", "volunteer-signups", "applications", "checkin", "packets", "badges", "emails", "volunteers", "recipient-history", "reports", "settings"];
+    let routes = role === "Executive Owner" ? all : role === "Event Administrator" ? all.filter((route) => route !== "settings") : role === "Read-Only Coordinator" ? ["dashboard", "todos", "events", "volunteer-signups", "applications", "volunteers", "recipient-history", "reports"] : role === "Check-In Staff" ? ["checkin"] : [];
     if (state.event?.type === "food-bag") routes = routes.filter((route) => !["applications", "recipient-history", "packets"].includes(route));
     return routes;
   }
@@ -1183,7 +1183,8 @@
       main.innerHTML = organizerShell(subroute, `<section class="locked-panel"><span>🔒</span><p class="eyebrow">Restricted for ${esc(role)}</p><h1>This area is not part of your access.</h1><p>Your workspace navigation only shows the tools assigned to your role.</p></section>`); bindOrganizer(subroute); return;
     }
     let content;
-    if (subroute === "events") content = organizerEventsV8();
+    if (subroute === "todos") content = organizerTodoList();
+    else if (subroute === "events") content = organizerEventsV8();
     else if (subroute === "volunteer-signups") { volunteerView = "current"; content = organizerVolunteersV8(); }
     else if (subroute === "volunteers") { volunteerView = "all"; content = organizerVolunteersV8(); }
     else if (subroute === "recipient-history") { applicationView = "log"; content = organizerApplicationsV8(); }
@@ -1226,6 +1227,21 @@
     return `<div class="event-context"><label>Working event<select aria-label="Working event"><option>${esc(state.event.title)}</option><option>Christmas Shopping 2025 (closed)</option></select></label><div><button class="button button--light" type="button" data-demo-action="duplicate">Duplicate event</button><button class="button button--green" type="button" data-demo-action="create">Create event</button></div></div>${heading("Organizer overview", state.event.title, "Current event operations and items needing attention.", `<a class="button button--green" href="#organizer/checkin">Open check-in →</a>`)}
       <div class="metric-grid"><article class="metric-card"><span>Volunteers registered</span><strong>${state.volunteers.length}</strong><small>${state.event.volunteerCapacity - state.volunteers.length} spots remaining</small></article><article class="metric-card"><span>Children requested</span><strong>${applicants}</strong><small>Across ${state.applications.length} households</small></article><article class="metric-card"><span>Awaiting review</span><strong>${review}</strong><small>Needs organizer attention</small></article><article class="metric-card"><span>Children approved</span><strong>${approved}</strong><small>Ready for event packets</small></article></div>
       <div class="dashboard-grid"><article class="panel"><div class="panel-header"><div><h2>${esc(state.event.title)}</h2><p>${esc(state.event.date)} · ${esc(state.event.location)}</p></div>${statusPill(state.event.volunteerStatus, "Volunteer signup " + formatStatus(state.event.volunteerStatus))}</div><div class="progress-block"><div class="progress-block__label"><span>Volunteer capacity</span><strong>${state.volunteers.length} / ${state.event.volunteerCapacity}</strong></div><div class="progress-track"><span style="width:${volunteerPercent}%"></span></div></div><div class="progress-block"><div class="progress-block__label"><span>Recipient capacity</span><strong>${applicants} / ${state.event.recipientCapacity}</strong></div><div class="progress-track"><span style="width:${recipientPercent}%"></span></div></div><div class="quick-actions" style="margin-top:28px"><a class="quick-action" href="#organizer/events"><strong>Edit event</strong><span>→</span></a><a class="quick-action" href="#organizer/applications"><strong>Review applications</strong><span>→</span></a><a class="quick-action" href="#organizer/volunteers"><strong>View volunteers</strong><span>→</span></a><a class="quick-action" href="#organizer/packets"><strong>Prepare packets</strong><span>→</span></a></div></article><article class="panel"><div class="panel-header"><div><h2>Recent activity</h2><p>Changes made in this prototype</p></div></div><div class="activity-list">${state.activity.slice(0, 6).map((item) => `<div class="activity-item"><span class="activity-dot"></span><p>${esc(item.text)}</p><time>${esc(item.time)}</time></div>`).join("")}</div></article></div>`;
+  }
+
+  function organizerTodoList() {
+    const canEdit = canManageEventLifecycle();
+    if (!Array.isArray(state.event.todoItems)) {
+      state.event.todoItems = [{ id: "clipboard-return-sticker", title: "Create a 'Please return clipboard at checkout' sticker for the back of every event clipboard", done: false }];
+      state.event._todoSeedPending = true;
+    }
+    const items = state.event.todoItems;
+    const open = items.filter((item) => !item.done);
+    const done = items.filter((item) => item.done);
+    const rows = (list) => list.map((item) => `<li class="charity-todo${item.done ? " is-done" : ""}"><label><input type="checkbox" data-todo-toggle="${esc(item.id)}" ${item.done ? "checked" : ""} ${canEdit ? "" : "disabled"}><span>${esc(item.title)}</span></label>${canEdit ? `<button class="button button--small button--ghost" type="button" data-todo-remove="${esc(item.id)}">Remove</button>` : ""}</li>`).join("");
+    return `${heading("Event preparation", "Charity To-Do", "Keep the practical event work in one visible place. Completed items stay here for reference.")}
+      <article class="panel charity-todo-panel"><div class="panel-header"><div><h2>Open tasks</h2><p>${open.length} item${open.length === 1 ? "" : "s"} still needs attention</p></div></div>${canEdit ? `<form id="charity-todo-form" class="charity-todo-form"><input name="title" maxlength="240" placeholder="Add a charity to-do item" required><button class="button button--green" type="submit">Add task</button></form>` : ""}<ul class="charity-todo-list">${rows(open) || `<li class="empty-state"><strong>Nothing open right now</strong>Add the next practical task when it comes up.</li>`}</ul></article>
+      ${done.length ? `<article class="panel charity-todo-panel"><div class="panel-header"><div><h2>Completed</h2><p>Kept for this event’s reference.</p></div></div><ul class="charity-todo-list">${rows(done)}</ul></article>` : ""}`;
   }
 
   function organizerEvents() {
@@ -1520,6 +1536,30 @@
   }
 
   function bindOrganizer(subroute) {
+    if (subroute === "todos" && state.event?._todoSeedPending) {
+      delete state.event._todoSeedPending;
+      void saveLiveEvent(state.event).then(() => saveState()).catch(() => toast("The starter to-do item could not be saved."));
+    }
+    const todoForm = document.querySelector("#charity-todo-form");
+    if (todoForm) todoForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const title = String(new FormData(todoForm).get("title") || "").trim();
+      if (!title) return;
+      state.event.todoItems = [...(state.event.todoItems || []), { id: `todo-${Date.now()}`, title, done: false }];
+      try { await saveLiveEvent(state.event); saveState(); renderOrganizer("todos"); toast("To-do item added."); }
+      catch (error) { state.event.todoItems.pop(); toast("The to-do item could not be saved."); }
+    });
+    document.querySelectorAll("[data-todo-toggle]").forEach((input) => input.addEventListener("change", async () => {
+      const item = (state.event.todoItems || []).find((entry) => entry.id === input.dataset.todoToggle); if (!item) return;
+      const before = item.done; item.done = input.checked;
+      try { await saveLiveEvent(state.event); saveState(); renderOrganizer("todos"); toast(item.done ? "Task completed." : "Task reopened."); }
+      catch { item.done = before; input.checked = before; toast("The task could not be saved."); }
+    }));
+    document.querySelectorAll("[data-todo-remove]").forEach((button) => button.addEventListener("click", async () => {
+      const before = state.event.todoItems || []; state.event.todoItems = before.filter((item) => item.id !== button.dataset.todoRemove);
+      try { await saveLiveEvent(state.event); saveState(); renderOrganizer("todos"); toast("To-do item removed."); }
+      catch { state.event.todoItems = before; toast("The task could not be removed."); }
+    }));
     if (subroute === "events") {
       const eventForm = document.querySelector("#event-form");
       const saveBar = document.querySelector(".sticky-save");
