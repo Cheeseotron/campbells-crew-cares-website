@@ -477,8 +477,8 @@ function drawRulesOverlay(page, event, font, bold) {
     draw("Bras are limited and specific", 92, 361, 10, { bold: true, maxWidth: 190 });
     draw("Bras are only for Girls/Women who truly need them, and only when both a bra size and bra budget are printed. Otherwise, they are not approved.", 92, 345, 6.9, { maxWidth: 190 });
   } else {
-    draw("Fit check before purchase", 92, 361, 10, { bold: true, maxWidth: 190 });
-    draw("Items cannot be returned or exchanged. Before checkout, confirm the size is correct, the child is comfortable, and the item is school appropriate. Ask a CCC representative if you are unsure.", 92, 345, 6.5, { maxWidth: 190 });
+    draw("Fit check - no changing rooms", 92, 361, 9.3, { bold: true, maxWidth: 190 });
+    draw("Items cannot be returned or exchanged. Never take a child to a changing room. Shoes and jackets may be tried on; for all other clothing, compare it with what the child is wearing or hold it up to them. Ask a CCC representative if you are unsure.", 92, 345, 6.1, { maxWidth: 190 });
   }
   // Replace the generic closeout sentence with a practical, event-aware
   // checklist. The toy confirmation exists only when toys are enabled.
