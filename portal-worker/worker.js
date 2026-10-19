@@ -385,25 +385,25 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
     [["UNDERWEAR", values.underwear], ["SOCKS", values.socks], ["COAT / JACKET", values.coat]].forEach(([label, item], index) => drawSizeCell(label, item, columns[index], sizeBottom, columns[index + 1] - columns[index]));
   }
   // Preferences are redrawn to remove the template's inset left/right edges.
-  page.drawRectangle({ x: left, y: 346, width, height: 62, color: paper, borderColor: border, borderWidth: .55 });
-  page.drawLine({ start: { x: 305, y: 346 }, end: { x: 305, y: 408 }, thickness: .55, color: border });
-  draw("Preferences, likes, colors, and styles", 53, 389, 8, { bold: true });
-  draw("Accommodations and helpful notes", 317, 389, 8, { bold: true });
-  draw(values.preferences, 53, 373, 7.7, { maxWidth: 240, lineHeight: 10 });
-  draw(values.accommodations, 317, 373, 7.7, { maxWidth: 240, lineHeight: 10 });
+  page.drawRectangle({ x: left, y: 370, width, height: 54, color: paper, borderColor: border, borderWidth: .55 });
+  page.drawLine({ start: { x: 305, y: 370 }, end: { x: 305, y: 424 }, thickness: .55, color: border });
+  draw("Preferences, likes, colors, and styles", 53, 407, 8, { bold: true });
+  draw("Accommodations and helpful notes", 317, 407, 8, { bold: true });
+  draw(values.preferences, 53, 391, 7.5, { maxWidth: 240, lineHeight: 9 });
+  draw(values.accommodations, 317, 391, 7.5, { maxWidth: 240, lineHeight: 9 });
   // Rebuild the budget table too. Its source table is wider than the profile
   // panels, which was the remaining right-side overhang in printed packets.
-  const budgetTop = 325; const budgetBottom = 113; const headerBottom = 300;
+  const budgetTop = 361; const budgetBottom = 150; const headerBottom = 336;
   const columns = [52, 204, 285, 385, 559];
   page.drawRectangle({ x: left, y: budgetBottom, width, height: budgetTop - budgetBottom, color: paper, borderColor: border, borderWidth: .55 });
   page.drawRectangle({ x: left, y: headerBottom, width, height: budgetTop - headerBottom, color: fieldPanel, borderColor: border, borderWidth: .55 });
-  draw("Budget and optional spending tracker", 53, 310, 13, { bold: true });
-  page.drawRectangle({ x: 52, y: 277, width: 507, height: 23, color: rgb(0.07, 0.10, 0.13) });
-  ["ESSENTIAL", "BUDGET", "AMOUNT SPENT", "ITEM / NOTES"].forEach((label, index) => draw(label, columns[index] + 10, 285, 7, { bold: true, color: rgb(0.94, 0.98, 0.95) }));
+  draw("Budget and optional spending tracker", 53, 346, 13, { bold: true });
+  page.drawRectangle({ x: 52, y: 313, width: 507, height: 23, color: rgb(0.07, 0.10, 0.13) });
+  ["ESSENTIAL", "BUDGET", "AMOUNT SPENT", "ITEM / NOTES"].forEach((label, index) => draw(label, columns[index] + 10, 321, 7, { bold: true, color: rgb(0.94, 0.98, 0.95) }));
   const budgetRows = values.budgetItems || [];
   // Reserve the total row before dividing the remaining table height. This
   // prevents a final optional row (such as Toys) being shortened by overlap.
-  const rowHeight = (277 - 128) / Math.max(6, budgetRows.length); const firstRowBottom = 277 - rowHeight;
+  const rowHeight = (313 - 165) / Math.max(6, budgetRows.length); const firstRowBottom = 313 - rowHeight;
   for (let index = 0; index < budgetRows.length; index += 1) {
     const y = firstRowBottom - index * rowHeight;
     page.drawRectangle({ x: 52, y, width: 507, height: rowHeight, color: paper, borderColor: border, borderWidth: .45 });
@@ -417,31 +417,31 @@ function drawProfileOverlay(page, values, font, bold, photo = null, brandLogo = 
     draw("$____________", 295, writingLineY - 1.2, rowHeight < 20 ? 7.4 : 8.1, { maxWidth: 80 });
     page.drawLine({ start: { x: 397, y: writingLineY }, end: { x: 545, y: writingLineY }, thickness: .45, color: muted });
   }
-  page.drawRectangle({ x: 52, y: 113, width: 507, height: 15, color: rgb(0.88, 0.95, 0.89), borderColor: border, borderWidth: .45 });
-  draw("TOTAL", 62, 118, 7.5, { bold: true });
-  draw(`$${values.budgetTotal}`, 214, 118, 8, { bold: true });
-  draw("$_______", 295, 115.5, 7.4, { bold: true });
+  page.drawRectangle({ x: 52, y: 150, width: 507, height: 15, color: rgb(0.88, 0.95, 0.89), borderColor: border, borderWidth: .45 });
+  draw("TOTAL", 62, 155, 7.5, { bold: true });
+  draw(`$${values.budgetTotal}`, 214, 155, 8, { bold: true });
+  draw("$_______", 295, 152.5, 7.4, { bold: true });
   const toyBudget = budgetRows.find((item) => item.fixedCap);
-  draw(toyBudget ? `TOYS: FIXED $${toyBudget.amount} MAX - NO TRANSFERS` : "Remaining: $_______", 397, 118, toyBudget ? 6.4 : 7.2, { bold: true, maxWidth: 150 });
-  columns.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: 113 }, end: { x, y: 300 }, thickness: .45, color: border }));
+  draw(toyBudget ? `TOYS: FIXED $${toyBudget.amount} MAX - NO TRANSFERS` : "Remaining: $_______", 397, 155, toyBudget ? 6.4 : 7.2, { bold: true, maxWidth: 150 });
+  columns.slice(1, -1).forEach((x) => page.drawLine({ start: { x, y: 150 }, end: { x, y: 336 }, thickness: .45, color: border }));
   // Keep the closeout checklist on the child's own sheet, right below the
   // spending tracker where it is most useful at the register.
-  clear(41, 24, 529, 86, paper);
-  draw("BEFORE CHECKOUT CHECKLIST", 52, 100, 9.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
+  clear(41, 24, 529, 123, paper);
+  draw("BEFORE CHECKOUT CHECKLIST", 52, 136, 10.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
   const checkoutItems = [
-    "Bought at least one item from every printed category.",
-    "Stayed within a few dollars of the clothing budget.",
-    "Checked fit, modesty, and age-appropriateness.",
-    "No pajamas, hats, belts, hair accessories, jewelry, or other extras.",
-    ...(toyBudget ? ["Did not spend more than the fixed toy limit."] : [])
+    "At least one item from every printed category.",
+    "Within a few dollars of the clothing budget.",
+    "Fit, modesty, and age-appropriateness checked.",
+    "No pajamas, hats, belts, jewelry, hair accessories, or extras.",
+    ...(toyBudget ? ["Stayed within the fixed toy limit."] : [])
   ];
   checkoutItems.forEach((item, index) => {
-    const column = index % 3; const row = Math.floor(index / 3); const x = 52 + column * 169; const y = 84 - row * 23;
+    const column = index % 2; const row = Math.floor(index / 2); const x = 52 + column * 254; const y = 115 - row * 27;
     page.drawRectangle({ x, y: y - 1, width: 8, height: 8, borderColor: muted, borderWidth: .6 });
-    draw(item, x + 12, y, 8.6, { maxWidth: 151, lineHeight: 9.8 });
+    draw(item, x + 12, y, 9, { maxWidth: 235, lineHeight: 10.5 });
   });
-  draw("Need help? Ask a CCC representative before checkout.", 348, 45, 7.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
-  page.drawLine({ start: { x: 348, y: 43 }, end: { x: 570, y: 43 }, thickness: .55, color: rgb(0.03, 0.47, 0.23) });
+  draw("Questions? Ask a CCC representative before checkout.", 284, 36, 7.5, { bold: true, color: rgb(0.03, 0.47, 0.23) });
+  page.drawLine({ start: { x: 284, y: 34 }, end: { x: 570, y: 34 }, thickness: .55, color: rgb(0.03, 0.47, 0.23) });
   page.drawLine({ start: { x: 41, y: 34 }, end: { x: 570, y: 34 }, thickness: .55, color: border });
   draw(`Event date: ${values.eventDate}`, 41, 20, 7.5, { muted: true });
 }
