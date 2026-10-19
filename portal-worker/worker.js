@@ -510,9 +510,12 @@ function drawRulesOverlay(page, event, font, bold) {
     // approval is not active for this event.
   }
   // Replace the generic closeout sentence with a practical, event-aware
-  // checklist. The toy confirmation exists only when toys are enabled.
-  page.drawRectangle({ x: 42, y: 224, width: 528, height: 70, color: ink });
-  draw("BEFORE CHECKOUT", 58, 278, 10.5, { bold: true, color: rgb(1, 1, 1) });
+  // checklist. Keep it on a light background so it remains easy to mark by
+  // hand once the rules sheet is printed. The toy confirmation exists only
+  // when toys are enabled.
+  page.drawRectangle({ x: 42, y: 224, width: 528, height: 70, color: pale, borderColor: line, borderWidth: .8 });
+  page.drawRectangle({ x: 42, y: 274, width: 528, height: 20, color: green });
+  draw("BEFORE CHECKOUT", 58, 280, 10.5, { bold: true, color: rgb(1, 1, 1) });
   const checklist = [
     "Every printed category has at least one item.",
     "Total is within a few dollars of the budget.",
@@ -523,8 +526,8 @@ function drawRulesOverlay(page, event, font, bold) {
   ];
   checklist.forEach((item, index) => {
     const column = index % 2; const row = Math.floor(index / 2); const x = 58 + column * 257; const y = 260 - row * 13.5;
-    page.drawRectangle({ x, y: y - 1, width: 7, height: 7, borderColor: rgb(1, 1, 1), borderWidth: .65 });
-    draw(item, x + 12, y, 6.8, { color: rgb(1, 1, 1), maxWidth: 235, lineHeight: 7.8 });
+    page.drawRectangle({ x, y: y - 1, width: 7, height: 7, borderColor: green, borderWidth: .7 });
+    draw(item, x + 12, y, 6.8, { maxWidth: 235, lineHeight: 7.8 });
   });
   // This dedicated panel is intentionally the one dynamic part of the rules
   // page. Only active special-item rules appear, so volunteers cannot mistake
