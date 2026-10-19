@@ -470,6 +470,9 @@ function drawRulesOverlay(page, event, font, bold) {
   }
   // Keep the four quick-guide panels easy to scan. The fit guidance belongs
   // with step one; the fourth position is reserved for bra guidance only.
+  // Clear the original rounded template panels first so none of their edges
+  // show through around this square-cornered, event-aware replacement.
+  page.drawRectangle({ x: 36, y: 294, width: 540, height: 160, color: rgb(1, 1, 1) });
   const drawGuidePanel = (number, x, y, heading, body) => {
     page.drawRectangle({ x, y, width: 255, height: 72, color: pale, borderColor: line, borderWidth: .8 });
     page.drawRectangle({ x: x + 12, y: y + 34, width: 28, height: 24, color: green });
@@ -479,7 +482,7 @@ function drawRulesOverlay(page, event, font, bold) {
   };
   drawGuidePanel(
     "01", 42, 378,
-    "Check fit and keep choices appropriate",
+    "Check fit and choose appropriately",
     "No returns or exchanges. No changing rooms. Shoes and jackets may be tried on. For other clothing, compare to what the child is wearing or hold it up to them. Keep choices school-appropriate."
   );
   drawGuidePanel(
@@ -501,7 +504,8 @@ function drawRulesOverlay(page, event, font, bold) {
       "Bras are only for Girls/Women who truly need them, and only when both a bra size and bra budget are printed. Otherwise, they are not approved."
     );
   } else {
-    page.drawRectangle({ x: 314.5, y: 297.5, width: 256, height: 77, color: rgb(1, 1, 1) });
+    // The cleared fourth position intentionally remains blank when bra
+    // approval is not active for this event.
   }
   // Replace the generic closeout sentence with a practical, event-aware
   // checklist. The toy confirmation exists only when toys are enabled.
