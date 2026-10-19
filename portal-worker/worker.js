@@ -468,17 +468,38 @@ function drawRulesOverlay(page, event, font, bold) {
     draw("Purchase only clothes from the categories listed on the child's information sheet. Toys or bras require a printed approval.", 58, 576, 8.4, { maxWidth: 494 });
     draw(prohibitedItems, 58, 564, 8.1, { bold: true, maxWidth: 494 });
   }
-  // A solid cover is deliberately used here: it reliably masks the template
-  // beneath it before the event-aware bra or clothing-only copy is drawn.
-  page.drawRectangle({ x: 42, y: 310, width: 255, height: 64, color: pale, borderColor: line, borderWidth: .8 });
-  page.drawRectangle({ x: 54, y: 340, width: 28, height: 22, color: green });
-  draw("03", 61, 347, 8, { bold: true, color: rgb(1, 1, 1) });
+  // Keep the four quick-guide panels easy to scan. The fit guidance belongs
+  // with step one; the fourth position is reserved for bra guidance only.
+  const drawGuidePanel = (number, x, y, heading, body, options = {}) => {
+    page.drawRectangle({ x, y, width: 255, height: 64, color: pale, borderColor: line, borderWidth: .8 });
+    page.drawRectangle({ x: x + 12, y: y + 30, width: 28, height: 22, color: green });
+    draw(number, x + 19, y + 37, 8, { bold: true, color: rgb(1, 1, 1) });
+    draw(heading, x + 50, y + 51, options.headingSize || 9.4, { bold: true, maxWidth: 190 });
+    draw(body, x + 50, y + 35, options.bodySize || 6.7, { maxWidth: 190, lineHeight: options.lineHeight || 8 });
+  };
+  drawGuidePanel(
+    "01", 42, 386,
+    "Check fit and keep choices appropriate",
+    "Items cannot be returned or exchanged. Never take a child to a changing room. Shoes and jackets may be tried on; for all other clothing, compare with what the child is wearing or hold it up to them. Keep choices school-appropriate.",
+    { headingSize: 8.6, bodySize: 5.85, lineHeight: 6.8 }
+  );
+  drawGuidePanel(
+    "03", 42, 310,
+    "Stay together and protect privacy",
+    "Keep the child and their bag with you. Be respectful and encouraging. Do not discuss family circumstances, application details, or personal information with others.",
+    { headingSize: 9.2, bodySize: 6.7, lineHeight: 8 }
+  );
+  // Remove the template's static fourth panel for events without bra approval.
+  // When it is active, this same position is the only bra-specific guidance.
   if (bra) {
-    draw("Bras are limited and specific", 92, 361, 10, { bold: true, maxWidth: 190 });
-    draw("Bras are only for Girls/Women who truly need them, and only when both a bra size and bra budget are printed. Otherwise, they are not approved.", 92, 345, 6.9, { maxWidth: 190 });
+    drawGuidePanel(
+      "04", 315, 310,
+      "Bras are limited and specific",
+      "Bras are only for Girls/Women who truly need them, and only when both a bra size and bra budget are printed. Otherwise, they are not approved.",
+      { headingSize: 9.3, bodySize: 6.7, lineHeight: 8 }
+    );
   } else {
-    draw("Fit check - no changing rooms", 92, 361, 9.3, { bold: true, maxWidth: 190 });
-    draw("Items cannot be returned or exchanged. Never take a child to a changing room. Shoes and jackets may be tried on; for all other clothing, compare it with what the child is wearing or hold it up to them. Ask a CCC representative if you are unsure.", 92, 345, 6.1, { maxWidth: 190 });
+    page.drawRectangle({ x: 314.5, y: 309.5, width: 256, height: 65, color: rgb(1, 1, 1) });
   }
   // Replace the generic closeout sentence with a practical, event-aware
   // checklist. The toy confirmation exists only when toys are enabled.
