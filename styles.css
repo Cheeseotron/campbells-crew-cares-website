@@ -481,6 +481,8 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 .involved-card h3 { margin: 42px 0 16px; font-size: clamp(38px, 5vw, 64px); }
 .involved-card p { max-width: 520px; margin-bottom: 34px; color: var(--gray); line-height: 1.6; }
 .involved-card a { display: flex; width: 100%; margin-top: auto; padding-top: 14px; justify-content: space-between; border-top: 2px solid var(--logo-dark); color: var(--logo-dark); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.involved-card a.involved-card__button { width: fit-content; min-width: 215px; padding: 15px 18px; align-items: center; gap: 28px; border: 1px solid var(--logo-bright); color: var(--ink); background: var(--logo-bright); transition: background .18s ease, color .18s ease, border-color .18s ease; }
+.involved-card a.involved-card__button:hover { color: var(--white); background: var(--forest); border-color: var(--forest); }
 .involved-card--featured { background: var(--mist); }
 .involved-card--dark { color: var(--white); background: var(--ink); }
 .involved-card--dark > span, .involved-card--dark a { color: var(--logo-bright); }
