@@ -38,6 +38,10 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
 .section-heading > p { margin-bottom: 0; color: var(--gray); line-height: 1.7; }
 .section--ink .section-heading > p, .section--forest .section-heading > p { color: #c6d2cc; }
 
+.site-utility { min-height: 32px; color: var(--white); background: #0a100e; border-top: 3px solid #8c7848; border-bottom: 1px solid #35403e; }
+.site-utility__inner { min-height: 32px; display: flex; align-items: center; justify-content: flex-end; }
+.site-utility__login { display: inline-flex; min-height: 23px; padding: 0 11px; align-items: center; color: var(--logo-bright); border: 1px solid #4b5a54; font-size: 9px; font-weight: 800; letter-spacing: .12em; text-decoration: none; text-transform: uppercase; transition: background .18s ease, color .18s ease, border-color .18s ease; }
+.site-utility__login:hover { color: var(--ink); background: var(--logo-bright); border-color: var(--logo-bright); }
 .site-header { min-height: 82px; background: var(--ink); color: var(--white); border-bottom: 1px solid #35403e; }
 .site-header__inner { min-height: 82px; display: flex; align-items: center; gap: 28px; }
 .brand { display: flex; align-items: center; gap: 13px; margin-right: auto; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
@@ -630,6 +634,7 @@ h3 { font-size: clamp(25px, 3vw, 40px); }
   .section-heading, .mission-grid, .event-feature, .story-feature, .testimonial-feature, .split-section, .contact-layout { grid-template-columns: 1fr; }
   .section-heading { gap: 25px; }
   .brand span, .donate-link, .site-header > .button { display: none; }
+  .site-utility__inner { padding-inline: 18px; }
   .site-header__inner { gap: 6px; }
   .site-header > .brand { margin-left: 18px; }
   .site-header:has(> .desktop-nav) { gap: 6px; }
